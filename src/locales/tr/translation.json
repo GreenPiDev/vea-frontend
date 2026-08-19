@@ -11,5 +11,57 @@
   "authUseDifferentEmail": "Farklı e-posta kullan",
   "authErrorSendFailed": "Kod gönderilemedi",
   "authErrorVerifyFailed": "Kod doğrulanamadı",
-  "authLogout": "Çıkış Yap"
+  "authLogout": "Çıkış Yap",
+
+  "panelOpen": "Panel",
+  "panelBackToGallery": "← Sergiye Dön",
+
+  "profileCreateTitle": "Sanatçı Profili Oluştur",
+  "profileCreateSubtitle": "Eser ekleyebilmek için önce bir sanatçı profili oluşturmalısınız.",
+  "profileDisplayNameLabel": "Görünen İsim",
+  "profileBioLabel": "Biyografi",
+  "profileInstitutionLabel": "Kurum Adı (opsiyonel)",
+  "profileCreateSubmit": "Profili Oluştur",
+  "profileCreating": "Oluşturuluyor…",
+  "profileCreateError": "Profil oluşturulamadı",
+  "profileWelcome": "Hoş geldiniz, {{name}}",
+
+  "artworkListTitle": "Eserlerim",
+  "artworkEmpty": "Henüz eser eklemediniz.",
+  "artworkNew": "+ Yeni Eser",
+  "artworkEdit": "Düzenle",
+  "artworkDelete": "Sil",
+  "artworkPublish": "Yayınla",
+  "artworkUnpublish": "Taslağa Al",
+
+  "artworkFormTitle": "Eser Başlığı",
+  "artworkFormTechnique": "Teknik (opsiyonel)",
+  "artworkFormYear": "Yapım Yılı (opsiyonel)",
+  "artworkFormHeight": "Yükseklik (cm)",
+  "artworkFormWidth": "Genişlik (cm)",
+  "artworkFormOrientation": "Yönelim",
+  "artworkFormCategory": "Kategori",
+  "artworkFormPrice": "Fiyat",
+  "artworkFormCurrency": "Para Birimi",
+  "artworkFormImageUrl": "Görsel URL",
+  "artworkFormSubmitCreate": "Eseri Ekle",
+  "artworkFormSubmitUpdate": "Değişiklikleri Kaydet",
+  "artworkFormSaving": "Kaydediliyor…",
+  "artworkFormCancel": "Vazgeç",
+  "artworkFormError": "Eser kaydedilemedi",
+
+  "orientationPortrait": "Dikey",
+  "orientationLandscape": "Yatay",
+  "orientationSquare": "Kare",
+
+  "categoryPainting": "Resim",
+  "categorySculpture": "Heykel",
+  "categoryPhotography": "Fotoğraf",
+  "categoryOther": "Diğer",
+
+  "statusDraft": "Taslak",
+  "statusListed": "Yayında",
+  "statusInExhibition": "Sergide",
+  "statusSold": "Satıldı",
+  "statusArchived": "Arşivlendi"
 }

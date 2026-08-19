@@ -11,5 +11,57 @@
   "authUseDifferentEmail": "Use a different email",
   "authErrorSendFailed": "Could not send the code",
   "authErrorVerifyFailed": "Could not verify the code",
-  "authLogout": "Sign Out"
+  "authLogout": "Sign Out",
+
+  "panelOpen": "Panel",
+  "panelBackToGallery": "← Back to Gallery",
+
+  "profileCreateTitle": "Create Artist Profile",
+  "profileCreateSubtitle": "You need an artist profile before you can add artworks.",
+  "profileDisplayNameLabel": "Display Name",
+  "profileBioLabel": "Bio",
+  "profileInstitutionLabel": "Institution Name (optional)",
+  "profileCreateSubmit": "Create Profile",
+  "profileCreating": "Creating…",
+  "profileCreateError": "Could not create the profile",
+  "profileWelcome": "Welcome, {{name}}",
+
+  "artworkListTitle": "My Artworks",
+  "artworkEmpty": "You haven't added any artworks yet.",
+  "artworkNew": "+ New Artwork",
+  "artworkEdit": "Edit",
+  "artworkDelete": "Delete",
+  "artworkPublish": "Publish",
+  "artworkUnpublish": "Move to Draft",
+
+  "artworkFormTitle": "Artwork Title",
+  "artworkFormTechnique": "Technique (optional)",
+  "artworkFormYear": "Year Created (optional)",
+  "artworkFormHeight": "Height (cm)",
+  "artworkFormWidth": "Width (cm)",
+  "artworkFormOrientation": "Orientation",
+  "artworkFormCategory": "Category",
+  "artworkFormPrice": "Price",
+  "artworkFormCurrency": "Currency",
+  "artworkFormImageUrl": "Image URL",
+  "artworkFormSubmitCreate": "Add Artwork",
+  "artworkFormSubmitUpdate": "Save Changes",
+  "artworkFormSaving": "Saving…",
+  "artworkFormCancel": "Cancel",
+  "artworkFormError": "Could not save the artwork",
+
+  "orientationPortrait": "Portrait",
+  "orientationLandscape": "Landscape",
+  "orientationSquare": "Square",
+
+  "categoryPainting": "Painting",
+  "categorySculpture": "Sculpture",
+  "categoryPhotography": "Photography",
+  "categoryOther": "Other",
+
+  "statusDraft": "Draft",
+  "statusListed": "Listed",
+  "statusInExhibition": "In Exhibition",
+  "statusSold": "Sold",
+  "statusArchived": "Archived"
 }

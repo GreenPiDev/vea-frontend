@@ -5,9 +5,11 @@ import { loadCustomExhibitions, saveCustomExhibitions } from "./components/3d/cu
 import ExhibitionSelect from "./components/ExhibitionSelect";
 import ExhibitionBuilder from "./components/ExhibitionBuilder";
 import AuthBar from "./components/auth/AuthBar";
+import ArtistPanel from "./components/panel/ArtistPanel";
 import "./App.css";
 
 export default function App() {
+  const [screen, setScreen] = useState<"gallery" | "panel">("gallery");
   const [exhibition, setExhibition] = useState<Exhibition | null>(null);
   const [building, setBuilding] = useState(false);
   const [editingExhibition, setEditingExhibition] = useState<Exhibition | null>(null);
@@ -39,6 +41,10 @@ export default function App() {
     saveCustomExhibitions(next);
   }
 
+  if (screen === "panel") {
+    return <ArtistPanel onBack={() => setScreen("gallery")} />;
+  }
+
   if (building) {
     return (
       <>
@@ -58,7 +64,7 @@ export default function App() {
   if (!exhibition) {
     return (
       <>
-        <AuthBar />
+        <AuthBar onOpenPanel={() => setScreen("panel")} />
         <ExhibitionSelect
           exhibitions={[...EXHIBITIONS, ...customExhibitions]}
           onSelect={setExhibition}
