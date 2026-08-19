@@ -1,0 +1,15 @@
+{
+  "authTitle": "Virtual Exhibition",
+  "authSubtitleEmail": "Sign in with your email address",
+  "authSubtitleCode": "Enter the code sent to {{email}}",
+  "authEmailPlaceholder": "you@example.com",
+  "authSendCode": "Send Code",
+  "authSendingCode": "Sending…",
+  "authCodePlaceholder": "6-digit code",
+  "authLogin": "Sign In",
+  "authVerifyingCode": "Verifying…",
+  "authUseDifferentEmail": "Use a different email",
+  "authErrorSendFailed": "Could not send the code",
+  "authErrorVerifyFailed": "Could not verify the code",
+  "authLogout": "Sign Out"
+}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth/AuthContext';
 import Login from './Login';
 
@@ -7,6 +8,7 @@ import Login from './Login';
 // (GET /exhibitions has no guard on the backend), so login is opt-in via
 // this button, not a full-screen wall.
 export default function AuthBar() {
+  const { t } = useTranslation();
   const { user, isLoading, isAuthenticated, logout } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
 
@@ -14,18 +16,18 @@ export default function AuthBar() {
     <>
       <div className="fixed top-3 right-3 z-50">
         {isAuthenticated ? (
-          <div className="flex items-center gap-2 rounded-md bg-white/90 px-3 py-1.5 text-sm shadow-sm backdrop-blur">
-            <span className="text-neutral-700">{isLoading ? '…' : user?.email}</span>
-            <button onClick={logout} className="text-neutral-500 underline hover:text-neutral-800">
-              Çıkış Yap
+          <div className="flex items-center gap-2 rounded-md bg-brand-50/90 px-3 py-1.5 text-sm shadow-sm backdrop-blur">
+            <span className="text-brand-800">{isLoading ? '…' : user?.email}</span>
+            <button onClick={logout} className="text-brand-600 underline hover:text-brand-900">
+              {t('authLogout')}
             </button>
           </div>
         ) : (
           <button
             onClick={() => setShowLogin(true)}
-            className="rounded-md bg-white/90 px-3 py-1.5 text-sm font-medium text-neutral-800 shadow-sm backdrop-blur hover:bg-white"
+            className="rounded-md bg-brand-50/90 px-3 py-1.5 text-sm font-medium text-brand-800 shadow-sm backdrop-blur hover:bg-brand-100"
           >
-            Giriş Yap
+            {t('authLogin')}
           </button>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useRequestCode, useVerifyCode } from '../../lib/api/domains/auth';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { ApiError } from '../../lib/api/client';
@@ -10,6 +11,7 @@ interface LoginProps {
 }
 
 export default function Login({ onSuccess }: LoginProps) {
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -24,7 +26,7 @@ export default function Login({ onSuccess }: LoginProps) {
     setError(null);
     requestCode.mutate(email, {
       onSuccess: () => setStep('code'),
-      onError: (err) => setError(err instanceof ApiError ? err.message : 'Kod gönderilemedi'),
+      onError: (err) => setError(err instanceof ApiError ? err.message : t('authErrorSendFailed')),
     });
   }
 
@@ -38,70 +40,70 @@ export default function Login({ onSuccess }: LoginProps) {
           login(accessToken);
           onSuccess?.();
         },
-        onError: (err) => setError(err instanceof ApiError ? err.message : 'Kod doğrulanamadı'),
+        onError: (err) => setError(err instanceof ApiError ? err.message : t('authErrorVerifyFailed')),
       },
     );
   }
 
   return (
-    <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow-sm">
-      <h1 className="mb-1 text-xl font-semibold text-neutral-900">Sanal Sergi</h1>
-        <p className="mb-6 text-sm text-neutral-500">
-          {step === 'email' ? 'E-posta adresinizle giriş yapın' : `${email} adresine gönderilen kodu girin`}
-        </p>
+    <div className="w-full max-w-sm rounded-lg bg-brand-50 p-8 shadow-sm">
+      <h1 className="mb-1 text-xl font-semibold text-brand-900">{t('authTitle')}</h1>
+      <p className="mb-6 text-sm text-brand-600">
+        {step === 'email' ? t('authSubtitleEmail') : t('authSubtitleCode', { email })}
+      </p>
 
-        {step === 'email' ? (
-          <form onSubmit={handleRequestCode} className="flex flex-col gap-3">
-            <input
-              type="email"
-              required
-              autoFocus
-              placeholder="ornek@eposta.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
-            />
-            <button
-              type="submit"
-              disabled={requestCode.isPending}
-              className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {requestCode.isPending ? 'Gönderiliyor…' : 'Kod Gönder'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
-            <input
-              type="text"
-              inputMode="numeric"
-              required
-              autoFocus
-              maxLength={6}
-              placeholder="6 haneli kod"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              className="rounded-md border border-neutral-300 px-3 py-2 text-center text-lg tracking-widest outline-none focus:border-neutral-500"
-            />
-            <button
-              type="submit"
-              disabled={verifyCode.isPending || code.length !== 6}
-              className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {verifyCode.isPending ? 'Doğrulanıyor…' : 'Giriş Yap'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setStep('email');
-                setCode('');
-                setError(null);
-              }}
-              className="text-xs text-neutral-500 underline"
-            >
-              Farklı e-posta kullan
-            </button>
-          </form>
-        )}
+      {step === 'email' ? (
+        <form onSubmit={handleRequestCode} className="flex flex-col gap-3">
+          <input
+            type="email"
+            required
+            autoFocus
+            placeholder={t('authEmailPlaceholder')}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+          />
+          <button
+            type="submit"
+            disabled={requestCode.isPending}
+            className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+          >
+            {requestCode.isPending ? t('authSendingCode') : t('authSendCode')}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
+          <input
+            type="text"
+            inputMode="numeric"
+            required
+            autoFocus
+            maxLength={6}
+            placeholder={t('authCodePlaceholder')}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+            className="rounded-md border border-brand-300 bg-white px-3 py-2 text-center text-lg tracking-widest text-brand-900 outline-none focus:border-brand-500"
+          />
+          <button
+            type="submit"
+            disabled={verifyCode.isPending || code.length !== 6}
+            className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+          >
+            {verifyCode.isPending ? t('authVerifyingCode') : t('authLogin')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStep('email');
+              setCode('');
+              setError(null);
+            }}
+            className="text-xs text-brand-600 underline"
+          >
+            {t('authUseDifferentEmail')}
+          </button>
+        </form>
+      )}
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
     </div>

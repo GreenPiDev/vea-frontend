@@ -1,0 +1,15 @@
+{
+  "authTitle": "Sanal Sergi",
+  "authSubtitleEmail": "E-posta adresinizle giriş yapın",
+  "authSubtitleCode": "{{email}} adresine gönderilen kodu girin",
+  "authEmailPlaceholder": "ornek@eposta.com",
+  "authSendCode": "Kod Gönder",
+  "authSendingCode": "Gönderiliyor…",
+  "authCodePlaceholder": "6 haneli kod",
+  "authLogin": "Giriş Yap",
+  "authVerifyingCode": "Doğrulanıyor…",
+  "authUseDifferentEmail": "Farklı e-posta kullan",
+  "authErrorSendFailed": "Kod gönderilemedi",
+  "authErrorVerifyFailed": "Kod doğrulanamadı",
+  "authLogout": "Çıkış Yap"
+}

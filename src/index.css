@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/* Warm brown palette for the DOM/UI layer (gallery/museum tone) — use
+   bg-brand-N, text-brand-N etc. instead of the default neutral/gray scale
+   so every screen shares one consistent brand color. */
+@theme {
+  --color-brand-50: #faf6f1;
+  --color-brand-100: #f3e9dd;
+  --color-brand-200: #e5d0b8;
+  --color-brand-300: #d3b28c;
+  --color-brand-400: #bb8f62;
+  --color-brand-500: #9c6f45;
+  --color-brand-600: #7d5636;
+  --color-brand-700: #61432b;
+  --color-brand-800: #493323;
+  --color-brand-900: #33241a;
+  --color-brand-950: #1f1610;
+}
+
 :root {
   color-scheme: light;
 }
