@@ -1,0 +1,17 @@
+tablo bilgileri:
+------------------
+unique id
+ölçü
+teknik
+yapım yılı
+boyutlar(dikey-yatay diye seçsin)
+tablo adı
+ressam
+hikaye-manifesto(varsa)
+ressam özgeçmiş
+kondisyon(haliyle,restorasyon tadilat durumu var mı)
+not
+
+--------------------------------------------------
+fikir:
+qr ekranı ile üyelik formu açılması

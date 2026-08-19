@@ -1,0 +1,117 @@
+.app-root {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  background: #efeee8;
+}
+
+.app-root canvas {
+  display: block;
+  outline: none;
+  touch-action: none;
+}
+
+.instructions-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 8vh;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  opacity: 1;
+}
+
+.instructions-overlay.hidden {
+  opacity: 0;
+}
+
+.instructions-card {
+  background: rgba(20, 20, 18, 0.55);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 18px 28px;
+  max-width: 92vw;
+  text-align: center;
+  color: #f6f5f1;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.instructions-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(246, 245, 241, 0.6);
+}
+
+.instructions-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.instructions-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: rgba(246, 245, 241, 0.55);
+}
+
+.hud-controls {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+}
+
+.hud-button {
+  padding: 8px 14px;
+  background: rgba(20, 20, 18, 0.55);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: #f6f5f1;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hud-button:hover {
+  background: rgba(20, 20, 18, 0.75);
+}
+
+.loading-indicator {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #efeee8;
+}
+
+.loading-indicator::after {
+  content: "";
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(20, 20, 18, 0.15);
+  border-top-color: rgba(20, 20, 18, 0.65);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
