@@ -4,6 +4,7 @@ import { EXHIBITIONS, type Exhibition } from "./components/3d/exhibitions";
 import { loadCustomExhibitions, saveCustomExhibitions } from "./components/3d/customExhibitions";
 import ExhibitionSelect from "./components/ExhibitionSelect";
 import ExhibitionBuilder from "./components/ExhibitionBuilder";
+import AuthBar from "./components/auth/AuthBar";
 import "./App.css";
 
 export default function App() {
@@ -40,32 +41,38 @@ export default function App() {
 
   if (building) {
     return (
-      <ExhibitionBuilder
-        editing={editingExhibition}
-        onCancel={() => {
-          setBuilding(false);
-          setEditingExhibition(null);
-        }}
-        onCreate={handleCreate}
-      />
+      <>
+        <AuthBar />
+        <ExhibitionBuilder
+          editing={editingExhibition}
+          onCancel={() => {
+            setBuilding(false);
+            setEditingExhibition(null);
+          }}
+          onCreate={handleCreate}
+        />
+      </>
     );
   }
 
   if (!exhibition) {
     return (
-      <ExhibitionSelect
-        exhibitions={[...EXHIBITIONS, ...customExhibitions]}
-        onSelect={setExhibition}
-        onCreateNew={() => {
-          setEditingExhibition(null);
-          setBuilding(true);
-        }}
-        onEdit={(ex) => {
-          setEditingExhibition(ex);
-          setBuilding(true);
-        }}
-        onDelete={handleDelete}
-      />
+      <>
+        <AuthBar />
+        <ExhibitionSelect
+          exhibitions={[...EXHIBITIONS, ...customExhibitions]}
+          onSelect={setExhibition}
+          onCreateNew={() => {
+            setEditingExhibition(null);
+            setBuilding(true);
+          }}
+          onEdit={(ex) => {
+            setEditingExhibition(ex);
+            setBuilding(true);
+          }}
+          onDelete={handleDelete}
+        />
+      </>
     );
   }
 
