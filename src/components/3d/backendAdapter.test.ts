@@ -45,7 +45,7 @@ function makeLink(overrides: Partial<ApiExhibitionArtwork> = {}): ApiExhibitionA
 function makeExhibition(overrides: Partial<ApiExhibition> = {}): ApiExhibition {
   return {
     id: "exhibition-1",
-    ownerProfileId: "profile-1",
+    curatorUserId: "user-1",
     title: "Test Exhibition",
     description: "A description",
     startDate: "2026-01-01T00:00:00.000Z",

@@ -6,7 +6,7 @@ import {
   useRemoveExhibitionArtwork,
   useUpdateExhibitionArtworkLink,
 } from '../../lib/api/domains/exhibitions';
-import { useMyArtworks, type ApiArtwork } from '../../lib/api/domains/artworks';
+import { usePublicArtworks, type ApiArtwork } from '../../lib/api/domains/artworks';
 import { groupByWallRun, wallRunsForSceneConfig } from '../3d/backendAdapter';
 import { FLOOR_CLEARANCE, type WallRunGeometry } from '../3d/galleryLayout';
 import { ApiError } from '../../lib/api/client';
@@ -42,7 +42,7 @@ interface ExhibitionArtworkPlacementProps {
 export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: ExhibitionArtworkPlacementProps) {
   const { t } = useTranslation();
   const { data: exhibition, isLoading } = useOwnExhibition(exhibitionId);
-  const { data: myArtworks } = useMyArtworks();
+  const { data: publicArtworks } = usePublicArtworks();
   const addArtwork = useAddExhibitionArtwork(exhibitionId);
   const updateArtworkLink = useUpdateExhibitionArtworkLink(exhibitionId);
   const removeArtwork = useRemoveExhibitionArtwork(exhibitionId);
@@ -69,8 +69,10 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
     return <p className="text-sm text-brand-600">{t('placementUnavailable')}</p>;
   }
 
-  const availableArtworks = (myArtworks ?? []).filter(
-    (artwork) => artwork.status !== 'ARCHIVED' && artwork.status !== 'SOLD' && !placedArtworkIds.has(artwork.id)
+  // LISTED only — public list also includes IN_EXHIBITION artworks (already
+  // showing somewhere else), which shouldn't be offered here as if free.
+  const availableArtworks = (publicArtworks ?? []).filter(
+    (artwork) => artwork.status === 'LISTED' && !placedArtworkIds.has(artwork.id)
   );
 
   function wallLabel(run: WallRunGeometry & { id: string }): string {
@@ -187,7 +189,14 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
             <ul className="flex flex-col gap-1">
               {availableArtworks.map((artwork) => (
                 <li key={artwork.id} className="flex items-center justify-between gap-2 rounded-md bg-white px-3 py-1.5 text-sm text-brand-900">
-                  <span>{artwork.title}</span>
+                  <span>
+                    {artwork.title}
+                    {artwork.artistProfile && (
+                      <span className="ml-1 text-xs text-brand-500">
+                        {t('placementByArtist', { name: artwork.artistProfile.displayName })}
+                      </span>
+                    )}
+                  </span>
                   <div className="flex items-center gap-2">
                     <label className="flex items-center gap-1 text-xs text-brand-700">
                       {t('placementHeightY')}

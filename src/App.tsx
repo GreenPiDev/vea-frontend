@@ -5,6 +5,8 @@ import { adaptApiExhibition, previewAccentColor } from "./components/3d/backendA
 import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSelect";
 import AuthBar from "./components/auth/AuthBar";
 import ArtistPanel from "./components/panel/ArtistPanel";
+import CuratorPanel from "./components/panel/CuratorPanel";
+import { useAuth } from "./lib/auth/AuthContext";
 import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitions";
 import "./App.css";
 
@@ -21,6 +23,7 @@ export default function App() {
   const [locked, setLocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const { user } = useAuth();
   const { data: backendExhibitions } = usePublicExhibitions();
 
   const localExhibition = useMemo(
@@ -60,7 +63,11 @@ export default function App() {
   );
 
   if (screen === "panel") {
-    return <ArtistPanel onBack={() => setScreen("gallery")} />;
+    return user?.role === "ADMIN" ? (
+      <CuratorPanel onBack={() => setScreen("gallery")} />
+    ) : (
+      <ArtistPanel onBack={() => setScreen("gallery")} />
+    );
   }
 
   if (!exhibition) {

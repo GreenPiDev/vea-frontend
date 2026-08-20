@@ -37,6 +37,13 @@ export default function ArtworkList({ onEdit }: ArtworkListProps) {
             <div>
               <p className="text-sm font-medium text-brand-900">{artwork.title}</p>
               <p className="text-xs text-brand-600">{t(STATUS_KEYS[artwork.status])}</p>
+              {artwork.exhibitionLinks && artwork.exhibitionLinks.length > 0 && (
+                <p className="text-xs text-brand-500">
+                  {artwork.exhibitionLinks
+                    .map((link) => t('artworkInExhibition', { title: link.exhibition.title }))
+                    .join(', ')}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-3 text-sm">

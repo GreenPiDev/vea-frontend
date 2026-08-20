@@ -52,7 +52,7 @@ export interface ApiExhibitionArtwork {
 
 export interface ApiExhibition {
   id: string;
-  ownerProfileId: string;
+  curatorUserId: string;
   title: string;
   description: string | null;
   startDate: string;

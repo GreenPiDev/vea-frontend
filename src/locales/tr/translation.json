@@ -65,6 +65,10 @@
   "statusSold": "Satıldı",
   "statusArchived": "Arşivlendi",
 
+  "curatorPanelTitle": "Küratör Paneli",
+  "artworkInExhibition": "Sergileniyor: {{title}}",
+  "placementByArtist": "({{name}})",
+
   "exhibitionListTitle": "Sergilerim",
   "exhibitionEmpty": "Henüz sergi oluşturmadınız.",
   "exhibitionNew": "+ Yeni Sergi",

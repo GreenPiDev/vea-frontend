@@ -33,12 +33,21 @@ export interface ApiArtwork {
   model3dUrl: string | null;
   status: ArtworkStatus;
   createdAt: string;
-  /** Only present when the backend embeds it (e.g. GET /exhibitions/:id's artworkLinks[].artwork) — not returned by /artworks list/detail endpoints. */
+  /** Only present when the backend embeds it (e.g. GET /exhibitions/:id's artworkLinks[].artwork, or GET /artworks for a curator's cross-artist picker) — not returned by /artworks/mine. */
   artistProfile?: { displayName: string };
+  /** Only present on GET /artworks/mine — which exhibition(s), if any, this artwork is currently placed in. */
+  exhibitionLinks?: { exhibition: { id: string; title: string; status: 'DRAFT' | 'ACTIVE' | 'ENDED' } }[];
 }
 
 export function useMyArtworks() {
   return useApiGetList<ApiArtwork>(Paths.ArtworksMine);
+}
+
+// GET /artworks — public list (LISTED/IN_EXHIBITION only), used by the
+// curator panel to pick any artist's artwork for placement (cross-artist
+// curation), same pattern as usePublicExhibitions.
+export function usePublicArtworks() {
+  return useApiGetList<ApiArtwork>(Paths.Artworks);
 }
 
 export function useArtworkMutations() {

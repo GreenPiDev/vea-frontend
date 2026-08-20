@@ -65,6 +65,10 @@
   "statusSold": "Sold",
   "statusArchived": "Archived",
 
+  "curatorPanelTitle": "Curator Panel",
+  "artworkInExhibition": "On display: {{title}}",
+  "placementByArtist": "({{name}})",
+
   "exhibitionListTitle": "My Exhibitions",
   "exhibitionEmpty": "You haven't created any exhibitions yet.",
   "exhibitionNew": "+ New Exhibition",
