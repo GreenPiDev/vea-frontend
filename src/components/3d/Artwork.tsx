@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { useTexture, Text } from "@react-three/drei";
-import type { Artwork as ArtworkData } from "./artworks";
+import type { Artwork as ArtworkData, FrameStyle } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
 import { FRAME_TEXTURES } from "./frameTextures";
 import { buildTexturedBoxGeometry } from "./textureUv";
@@ -27,8 +27,8 @@ export default function Artwork({ data }: { data: ArtworkData }) {
 
   return (
     <group position={data.position} rotation={[0, data.rotationY, 0]}>
-      {/* Frame */}
-      <FrameMesh style={data.frame} size={frameSize} />
+      {/* Frame — skipped for backend-sourced artworks, whose uploaded image already includes its own frame (see artworks.ts's `frame` doc comment) */}
+      {data.frame ? <FrameMesh style={data.frame} size={frameSize} /> : null}
 
 
       {/* Canvas */}
@@ -73,7 +73,7 @@ function FrameMesh({
   style,
   size,
 }: {
-  style: ArtworkData["frame"];
+  style: FrameStyle;
   size: [number, number, number];
 }) {
   const frameStyle = FRAME_TEXTURES[style];

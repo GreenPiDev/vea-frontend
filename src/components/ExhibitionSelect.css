@@ -4,7 +4,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Was justify-content: center with no overflow handling — fine while the
+     list was just 4 static templates, but real backend exhibitions (Faz 3c)
+     can grow this list past viewport height, so it needs to scroll instead
+     of silently clipping cards top/bottom. */
+  justify-content: flex-start;
+  overflow-y: auto;
   gap: 10px;
   padding: 24px;
   background: radial-gradient(circle at 50% 30%, #1c1a17 0%, #0c0b0a 75%);
@@ -36,12 +41,6 @@
   max-width: 1000px;
 }
 
-.exhibition-select-card-wrap {
-  position: relative;
-  width: 260px;
-  height: 190px;
-}
-
 .exhibition-select-card {
   --accent: #fff2d0;
   width: 100%;
@@ -61,49 +60,6 @@
   transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
   font-family: inherit;
   box-sizing: border-box;
-}
-
-.exhibition-select-card-new {
-  --accent: #b9924a;
-  width: 260px;
-  height: 190px;
-  border-style: dashed;
-  justify-content: center;
-  opacity: 0.85;
-}
-
-.exhibition-select-card-new:hover {
-  opacity: 1;
-}
-
-.exhibition-select-card-actions {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 6px;
-}
-
-.exhibition-select-action {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(20, 20, 18, 0.7);
-  color: #f6f5f1;
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.exhibition-select-action:hover {
-  background: rgba(20, 20, 18, 0.95);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.exhibition-select-delete:hover {
-  background: #a33;
-  border-color: #a33;
 }
 
 .exhibition-select-card:hover,

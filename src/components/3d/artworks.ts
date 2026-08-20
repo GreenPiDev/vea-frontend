@@ -21,7 +21,8 @@ export interface Artwork {
   aspect: number;
   /** Physical height of the canvas on the wall, in meters. */
   height: number;
-  frame: FrameStyle;
+  /** Undefined/null for backend-sourced artworks — the artist's uploaded image already includes its own frame, so no extra 3D frame mesh is rendered (see Artwork.tsx). Only the static demo ARTWORKS below use this. */
+  frame?: FrameStyle | null;
   /** Center position of the canvas face, flush against the wall surface. */
   position: [number, number, number];
   /** Yaw so the painting's front faces into the room. */

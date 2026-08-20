@@ -1,21 +1,46 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Scene from "./components/3d/Scene";
-import { EXHIBITIONS, type Exhibition } from "./components/3d/exhibitions";
-import { loadCustomExhibitions, saveCustomExhibitions } from "./components/3d/customExhibitions";
-import ExhibitionSelect from "./components/ExhibitionSelect";
-import ExhibitionBuilder from "./components/ExhibitionBuilder";
+import { EXHIBITIONS } from "./components/3d/exhibitions";
+import { adaptApiExhibition, previewAccentColor } from "./components/3d/backendAdapter";
+import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSelect";
 import AuthBar from "./components/auth/AuthBar";
 import ArtistPanel from "./components/panel/ArtistPanel";
+import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitions";
 import "./App.css";
+
+const LOCAL_CARDS: ExhibitionCard[] = EXHIBITIONS.map((e) => ({
+  id: e.id,
+  name: e.name,
+  subtitle: e.subtitle,
+  accent: e.theme.spotColor,
+}));
 
 export default function App() {
   const [screen, setScreen] = useState<"gallery" | "panel">("gallery");
-  const [exhibition, setExhibition] = useState<Exhibition | null>(null);
-  const [building, setBuilding] = useState(false);
-  const [editingExhibition, setEditingExhibition] = useState<Exhibition | null>(null);
-  const [customExhibitions, setCustomExhibitions] = useState<Exhibition[]>(loadCustomExhibitions);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const { data: backendExhibitions } = usePublicExhibitions();
+
+  const localExhibition = useMemo(
+    () => (selectedId ? (EXHIBITIONS.find((e) => e.id === selectedId) ?? null) : null),
+    [selectedId]
+  );
+  const backendId = selectedId && !localExhibition ? selectedId : "";
+  // Kept as a live query (not copied into local state once) so that if this
+  // exhibition's cached detail is stale (e.g. fetched earlier before an
+  // artwork was placed on it), the background refetch TanStack Query does
+  // automatically still reaches the screen — a one-shot "adapt once on
+  // fetch, then forget the query" effect would freeze on whatever data
+  // happened to be cached at the moment of the first click.
+  const { data: backendDetail, isLoading: backendLoading } = useExhibition(backendId);
+
+  const exhibition = useMemo(() => {
+    if (localExhibition) return localExhibition;
+    if (backendDetail) return adaptApiExhibition(backendDetail);
+    return null;
+  }, [localExhibition, backendDetail]);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(document.fullscreenElement != null);
@@ -23,61 +48,32 @@ export default function App() {
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  function handleCreate(created: Exhibition) {
-    const exists = customExhibitions.some((ex) => ex.id === created.id);
-    const next = exists
-      ? customExhibitions.map((ex) => (ex.id === created.id ? created : ex))
-      : [...customExhibitions, created];
-    setCustomExhibitions(next);
-    saveCustomExhibitions(next);
-    setBuilding(false);
-    setEditingExhibition(null);
-    setExhibition(created);
-  }
-
-  function handleDelete(id: string) {
-    const next = customExhibitions.filter((ex) => ex.id !== id);
-    setCustomExhibitions(next);
-    saveCustomExhibitions(next);
-  }
+  const backendCards: ExhibitionCard[] = useMemo(
+    () =>
+      (backendExhibitions ?? []).map((e) => ({
+        id: e.id,
+        name: e.title,
+        subtitle: e.description ?? "",
+        accent: previewAccentColor(e.sceneConfig),
+      })),
+    [backendExhibitions]
+  );
 
   if (screen === "panel") {
     return <ArtistPanel onBack={() => setScreen("gallery")} />;
   }
 
-  if (building) {
-    return (
-      <>
-        <AuthBar />
-        <ExhibitionBuilder
-          editing={editingExhibition}
-          onCancel={() => {
-            setBuilding(false);
-            setEditingExhibition(null);
-          }}
-          onCreate={handleCreate}
-        />
-      </>
-    );
-  }
-
   if (!exhibition) {
+    // Either nothing picked yet, or a backend exhibition is still loading
+    // (backendId set, backendDetail not in yet), or adaptation failed (e.g.
+    // an unknown templateId) — all fall back to the selector.
+    if (backendId && backendLoading) {
+      return <div className="loading-indicator" />;
+    }
     return (
       <>
         <AuthBar onOpenPanel={() => setScreen("panel")} />
-        <ExhibitionSelect
-          exhibitions={[...EXHIBITIONS, ...customExhibitions]}
-          onSelect={setExhibition}
-          onCreateNew={() => {
-            setEditingExhibition(null);
-            setBuilding(true);
-          }}
-          onEdit={(ex) => {
-            setEditingExhibition(ex);
-            setBuilding(true);
-          }}
-          onDelete={handleDelete}
-        />
+        <ExhibitionSelect exhibitions={[...LOCAL_CARDS, ...backendCards]} onSelect={setSelectedId} />
       </>
     );
   }
@@ -93,7 +89,7 @@ export default function App() {
           className="hud-button"
           onClick={() => {
             setLocked(false);
-            setExhibition(null);
+            setSelectedId(null);
           }}
         >
           ← Sergiler

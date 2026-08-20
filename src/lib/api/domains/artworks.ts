@@ -33,6 +33,8 @@ export interface ApiArtwork {
   model3dUrl: string | null;
   status: ArtworkStatus;
   createdAt: string;
+  /** Only present when the backend embeds it (e.g. GET /exhibitions/:id's artworkLinks[].artwork) — not returned by /artworks list/detail endpoints. */
+  artistProfile?: { displayName: string };
 }
 
 export function useMyArtworks() {

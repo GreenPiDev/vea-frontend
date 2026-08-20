@@ -273,3 +273,93 @@ export function buildCustomRoomLayout(
 
   return { layout, wallRuns };
 }
+
+// --- Shared wall-hanging placement math ------------------------------------
+// Used by components/3d/backendAdapter.ts to place backend-linked artworks
+// on a wall run. Faz 3d's artwork-placement panel screen (not built yet)
+// should reuse this too instead of re-deriving the same geometry — the
+// retired local-demo ExhibitionBuilder.tsx used to have its own inline copy
+// of this exact math, extracted here specifically so a second copy never
+// has the chance to drift out of sync again.
+
+/** Every painting hangs with the same floor-to-frame-bottom gap, regardless of its own height, so a room never looks like paintings float at random heights. Ceiling height must clear a painting's own height plus this gap plus headroom above the frame. */
+export const FLOOR_CLEARANCE = 0.57;
+export const CEILING_HEADROOM = 0.73;
+export const MIN_CEILING_MARGIN = FLOOR_CLEARANCE + CEILING_HEADROOM; // 1.2
+
+export function minCeilingFor(paintingHeight: number): number {
+  return paintingHeight + MIN_CEILING_MARGIN;
+}
+
+/** The subset of WallSegment/CustomWallRun fields needed to place artworks on it. */
+export interface WallRunGeometry {
+  orientation: "horizontal" | "vertical";
+  start: number;
+  end: number;
+  fixed: number;
+  outward: -1 | 1;
+}
+
+export interface WallPlacementInput {
+  /** Real image aspect ratio (width / height). */
+  aspect: number;
+  /** Desired physical height in meters — shrunk to fit the wall/ceiling if needed. */
+  height: number;
+  /** Curator-set hang-center height override, in meters from the floor — replaces the FLOOR_CLEARANCE formula below when set (still clamped to the ceiling margin). */
+  heightYOverride?: number;
+}
+
+export interface WallPlacement {
+  /** Center position of the canvas face, flush against the wall surface. */
+  position: [number, number, number];
+  /** Yaw so the painting's front faces into the room. */
+  rotationY: number;
+  /** Actual fitted height in meters (<= input height). */
+  height: number;
+}
+
+/**
+ * Places N artworks evenly spaced along one wall run: the run is split into
+ * N equal-length slots and each artwork is centered within its own slot,
+ * width-fit (aspect preserved) to that slot's available space. With a single
+ * item this reduces exactly to "centered on the whole run" — the original
+ * one-artwork-per-wall behavior.
+ */
+export function placeArtworksAlongWall(
+  run: WallRunGeometry,
+  wallHeight: number,
+  items: WallPlacementInput[]
+): WallPlacement[] {
+  if (items.length === 0) return [];
+
+  const runLength = run.end - run.start;
+  const slotLength = runLength / items.length;
+  const interior = -run.outward;
+
+  return items.map((item, i) => {
+    const slotCenter = run.start + slotLength * (i + 0.5);
+    const maxWidth = Math.max(0.6, slotLength - 2 * WALL_CLEARANCE - 0.4);
+    let height = item.height;
+    if (height * item.aspect > maxWidth) height = maxWidth / item.aspect;
+    height = Math.min(height, wallHeight - MIN_CEILING_MARGIN);
+    const hangCenterY =
+      item.heightYOverride != null
+        ? Math.max(height / 2, Math.min(item.heightYOverride, wallHeight - height / 2 - CEILING_HEADROOM))
+        : height / 2 + FLOOR_CLEARANCE;
+
+    let x: number;
+    let z: number;
+    let rotationY: number;
+    if (run.orientation === "horizontal") {
+      x = slotCenter;
+      z = run.fixed + interior * WALL_CLEARANCE;
+      rotationY = run.outward === -1 ? 0 : Math.PI;
+    } else {
+      x = run.fixed + interior * WALL_CLEARANCE;
+      z = slotCenter;
+      rotationY = run.outward === -1 ? Math.PI / 2 : -Math.PI / 2;
+    }
+
+    return { position: [x, hangCenterY, z], rotationY, height };
+  });
+}
