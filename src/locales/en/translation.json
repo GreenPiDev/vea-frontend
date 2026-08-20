@@ -66,6 +66,7 @@
   "statusArchived": "Archived",
 
   "curatorPanelTitle": "Curator Panel",
+  "artistPanelTitle": "Artist Panel",
   "artworkInExhibition": "On display: {{title}}",
   "placementByArtist": "({{name}})",
 

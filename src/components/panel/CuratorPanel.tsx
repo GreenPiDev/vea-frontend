@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import ExhibitionForm from './ExhibitionForm';
 import ExhibitionList from './ExhibitionList';
 import ExhibitionArtworkPlacement from './ExhibitionArtworkPlacement';
+import PanelLayout from '../layout/PanelLayout';
+import { GalleryIcon } from '../layout/icons';
 
 interface CuratorPanelProps {
   onBack: () => void;
@@ -18,40 +20,40 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
   const [showExhibitionForm, setShowExhibitionForm] = useState(false);
   const [placingExhibitionId, setPlacingExhibitionId] = useState<string | null>(null);
 
+  const navItems = [{ id: 'exhibitions', label: t('exhibitionListTitle'), icon: <GalleryIcon /> }];
+
   return (
-    <div className="h-full w-full overflow-y-auto bg-neutral-100 px-6 py-10">
-      <div className="mx-auto max-w-3xl">
-        <button onClick={onBack} className="mb-6 text-sm text-brand-700 underline hover:text-brand-900">
-          {t('panelBackToGallery')}
-        </button>
-
-        <div className="flex flex-col gap-6">
-          <h1 className="text-xl font-semibold text-brand-900">{t('curatorPanelTitle')}</h1>
-
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-brand-900">{t('exhibitionListTitle')}</h2>
-            {!showExhibitionForm && (
-              <button
-                onClick={() => setShowExhibitionForm(true)}
-                className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
-              >
-                {t('exhibitionNew')}
-              </button>
-            )}
-          </div>
-
-          {showExhibitionForm && <ExhibitionForm onDone={() => setShowExhibitionForm(false)} />}
-
-          {placingExhibitionId && (
-            <ExhibitionArtworkPlacement
-              exhibitionId={placingExhibitionId}
-              onDone={() => setPlacingExhibitionId(null)}
-            />
+    <PanelLayout
+      title={t('curatorPanelTitle')}
+      navItems={navItems}
+      activeSectionId="exhibitions"
+      onSelectSection={() => {}}
+      onBack={onBack}
+    >
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-brand-900">{t('exhibitionListTitle')}</h2>
+          {!showExhibitionForm && (
+            <button
+              onClick={() => setShowExhibitionForm(true)}
+              className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
+            >
+              {t('exhibitionNew')}
+            </button>
           )}
-
-          <ExhibitionList onPlace={setPlacingExhibitionId} />
         </div>
+
+        {showExhibitionForm && <ExhibitionForm onDone={() => setShowExhibitionForm(false)} />}
+
+        {placingExhibitionId && (
+          <ExhibitionArtworkPlacement
+            exhibitionId={placingExhibitionId}
+            onDone={() => setPlacingExhibitionId(null)}
+          />
+        )}
+
+        <ExhibitionList onPlace={setPlacingExhibitionId} />
       </div>
-    </div>
+    </PanelLayout>
   );
 }

@@ -66,6 +66,7 @@
   "statusArchived": "Arşivlendi",
 
   "curatorPanelTitle": "Küratör Paneli",
+  "artistPanelTitle": "Sanatçı Paneli",
   "artworkInExhibition": "Sergileniyor: {{title}}",
   "placementByArtist": "({{name}})",
 
