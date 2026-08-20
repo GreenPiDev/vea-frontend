@@ -19,7 +19,16 @@ const LOCAL_CARDS: ExhibitionCard[] = EXHIBITIONS.map((e) => ({
 
 export default function App() {
   const [screen, setScreen] = useState<"gallery" | "panel">("gallery");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Lets ArtworkList.tsx's "on display" links (opened in a new tab via
+  // `/?exhibition=<id>`) drop the artist straight into that exhibition's 3D
+  // scene, without needing a router — read once on mount. The URL cleanup
+  // (below, in an effect) is deliberately kept out of this initializer:
+  // StrictMode double-invokes state initializers in dev, and a
+  // read-then-strip side effect inside it would strip the query string on
+  // the first invocation, then read nothing on the second — losing the id.
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get("exhibition")
+  );
   const [locked, setLocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -49,6 +58,14 @@ export default function App() {
     const onChange = () => setIsFullscreen(document.fullscreenElement != null);
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  // Strip the `?exhibition=` param after it's been read into state, so a
+  // refresh/back-navigation doesn't keep re-selecting it.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("exhibition")) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
   }, []);
 
   const backendCards: ExhibitionCard[] = useMemo(

@@ -68,6 +68,7 @@
   "curatorPanelTitle": "Curator Panel",
   "artistPanelTitle": "Artist Panel",
   "artworkInExhibition": "On display: {{title}}",
+  "artworkInDraftExhibition": "In a draft exhibition: {{title}}",
   "placementByArtist": "({{name}})",
 
   "exhibitionListTitle": "My Exhibitions",

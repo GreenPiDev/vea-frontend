@@ -68,6 +68,7 @@
   "curatorPanelTitle": "Küratör Paneli",
   "artistPanelTitle": "Sanatçı Paneli",
   "artworkInExhibition": "Sergileniyor: {{title}}",
+  "artworkInDraftExhibition": "Taslak sergide yer alıyor: {{title}}",
   "placementByArtist": "({{name}})",
 
   "exhibitionListTitle": "Sergilerim",
