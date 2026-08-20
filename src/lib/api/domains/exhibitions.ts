@@ -59,6 +59,8 @@ export interface ApiExhibition {
   endDate: string;
   status: 'DRAFT' | 'ACTIVE' | 'ENDED';
   sceneConfig: ApiSceneConfig | null;
+  /** Curator-set cap on how many artworks may ever be placed at once. Null/unset = unlimited. */
+  maxArtworks: number | null;
   createdAt: string;
   /** Only present on GET /exhibitions/:id (findOneForView) — list endpoints (usePublicExhibitions/useMyExhibitions) don't include it. */
   artworkLinks?: ApiExhibitionArtwork[];

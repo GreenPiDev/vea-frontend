@@ -83,6 +83,7 @@ export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [maxArtworks, setMaxArtworks] = useState('');
   const [roomType, setRoomType] = useState<RoomType>('template');
   const [templateId, setTemplateId] = useState(EXHIBITIONS[0]?.id ?? '');
 
@@ -181,6 +182,7 @@ export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
       description: description || undefined,
       startDate,
       endDate,
+      maxArtworks: maxArtworks ? Number(maxArtworks) : undefined,
       sceneConfig,
     };
 
@@ -233,6 +235,19 @@ export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
           />
         </label>
       </div>
+
+      <label className="flex flex-col gap-1 text-sm text-brand-800">
+        {t('exhibitionFormMaxArtworks')}
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={maxArtworks}
+          onChange={(e) => setMaxArtworks(e.target.value)}
+          placeholder={t('exhibitionFormMaxArtworksPlaceholder')}
+          className="w-40 rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+        />
+      </label>
 
       <div className="flex flex-col gap-1 text-sm text-brand-800">
         <span>{t('exhibitionFormRoomType')}</span>

@@ -69,11 +69,16 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
     return <p className="text-sm text-brand-600">{t('placementUnavailable')}</p>;
   }
 
+  const placedCount = placedArtworkIds.size;
+  const isFull = exhibition.maxArtworks != null && placedCount >= exhibition.maxArtworks;
+
   // LISTED only — public list also includes IN_EXHIBITION artworks (already
   // showing somewhere else), which shouldn't be offered here as if free.
-  const availableArtworks = (publicArtworks ?? []).filter(
-    (artwork) => artwork.status === 'LISTED' && !placedArtworkIds.has(artwork.id)
-  );
+  const availableArtworks = isFull
+    ? []
+    : (publicArtworks ?? []).filter(
+        (artwork) => artwork.status === 'LISTED' && !placedArtworkIds.has(artwork.id)
+      );
 
   function wallLabel(run: WallRunGeometry & { id: string }): string {
     const namedKey = NAMED_WALL_KEYS[run.id];
@@ -120,6 +125,12 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
           {t('placementDone')}
         </button>
       </div>
+
+      {exhibition.maxArtworks != null && (
+        <p className={`text-sm ${isFull ? 'font-medium text-red-600' : 'text-brand-600'}`}>
+          {t('placementCapCounter', { placed: placedCount, max: exhibition.maxArtworks })}
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {runs.map((run) => (
@@ -183,7 +194,8 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
 
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-brand-800">{t('placementAddArtwork')}</p>
-            {availableArtworks.length === 0 && (
+            {isFull && <p className="text-xs text-red-600">{t('placementCapReached')}</p>}
+            {!isFull && availableArtworks.length === 0 && (
               <p className="text-xs text-brand-600">{t('placementNoAvailableArtworks')}</p>
             )}
             <ul className="flex flex-col gap-1">

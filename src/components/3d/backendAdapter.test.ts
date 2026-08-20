@@ -52,6 +52,7 @@ function makeExhibition(overrides: Partial<ApiExhibition> = {}): ApiExhibition {
     endDate: "2026-02-01T00:00:00.000Z",
     status: "ACTIVE",
     sceneConfig: null,
+    maxArtworks: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     artworkLinks: [],
     ...overrides,
