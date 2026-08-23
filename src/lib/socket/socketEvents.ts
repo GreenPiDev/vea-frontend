@@ -7,6 +7,8 @@ export const SOCKET_EVENTS = {
   // Client -> Server
   ExhibitionJoin: 'exhibition:join',
   ExhibitionLeave: 'exhibition:leave',
+  ExhibitionWatch: 'exhibition:watch',
+  ExhibitionUnwatch: 'exhibition:unwatch',
   // Server -> Client
   ExhibitionVisitorCount: 'exhibition:visitorCount',
   ExhibitionError: 'exhibition:error',

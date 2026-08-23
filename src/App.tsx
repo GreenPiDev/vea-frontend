@@ -15,6 +15,7 @@ import BuyerPanel from "./components/panel/BuyerPanel";
 import { useAuth } from "./lib/auth/AuthContext";
 import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitions";
 import { useRealtimeQuerySync } from "./lib/socket/useRealtimeQuerySync";
+import { useExhibitionVisitorCount } from "./lib/socket/useExhibitionVisitorCount";
 import "./App.css";
 
 const LOCAL_CARDS: ExhibitionCard[] = EXHIBITIONS.map((e) => ({
@@ -70,6 +71,11 @@ export default function App() {
     if (backendDetail) return adaptApiExhibition(backendDetail);
     return null;
   }, [localExhibition, backendDetail]);
+
+  // Stays null for the static demo exhibitions (their ids don't exist in
+  // the backend, so ExhibitionGateway.handleJoin silently no-ops) — the HUD
+  // badge below simply doesn't render in that case, no special-casing needed.
+  const visitorCount = useExhibitionVisitorCount(exhibition?.id);
 
   const exhibitionArtworks = useMemo(
     () => exhibition?.artworks ?? (exhibition ? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id) : []),
@@ -231,7 +237,18 @@ export default function App() {
           })}
 
       {selectedArtwork && (
-        <ArtworkDetailCard artwork={selectedArtwork} onClose={closeArtworkDetail} />
+        <ArtworkDetailCard
+          artwork={selectedArtwork}
+          exhibitionId={exhibition.id}
+          onClose={closeArtworkDetail}
+        />
+      )}
+
+      {visitorCount !== null && (
+        <div className="fixed right-3 top-3 z-40 flex items-center gap-1.5 rounded-md bg-black/55 px-3 py-1.5 text-sm font-medium text-white backdrop-blur">
+          <span className="h-2 w-2 rounded-full bg-green-400" />
+          {t("hudVisitorCount", { count: visitorCount })}
+        </div>
       )}
 
       <div className="hud-controls">

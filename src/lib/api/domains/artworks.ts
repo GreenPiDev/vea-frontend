@@ -7,6 +7,14 @@ import { Paths } from '../paths';
 import { patch } from '../client';
 import { useApiGetList, useApiMutations } from '../factory';
 
+export interface ApiArtistArtworkStats {
+  artworkId: string;
+  title: string;
+  viewCount: number;
+  /** Null if the artwork isn't currently placed in any exhibition. */
+  exhibition: { id: string; title: string; totalVisitors: number } | null;
+}
+
 export type ArtworkCategory = 'PAINTING' | 'SCULPTURE' | 'PHOTOGRAPHY' | 'OTHER';
 export type ArtworkOrientation = 'PORTRAIT' | 'LANDSCAPE' | 'SQUARE';
 export type ArtworkConditionStatus = 'ORIGINAL' | 'RESTORED' | 'DAMAGED' | 'OTHER';
@@ -41,6 +49,15 @@ export interface ApiArtwork {
 
 export function useMyArtworks() {
   return useApiGetList<ApiArtwork>(Paths.ArtworksMine);
+}
+
+// GET /artworks/mine/stats — ArtistPanel's "İstatistikler": per-artwork
+// view counts, plus (when placed) that exhibition's all-time visitor total.
+export function useArtistStats() {
+  return useApiGetList<ApiArtistArtworkStats>(
+    `${Paths.ArtworksMine}/stats`,
+    [Paths.ArtworksMine, 'stats'],
+  );
 }
 
 // GET /artworks — fully public list (LISTED/IN_EXHIBITION only), no

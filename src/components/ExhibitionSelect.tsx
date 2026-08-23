@@ -1,3 +1,4 @@
+import ExhibitionSelectCard from "./ExhibitionSelectCard";
 import "./ExhibitionSelect.css";
 
 export interface ExhibitionCard {
@@ -20,15 +21,7 @@ export default function ExhibitionSelect({ exhibitions, onSelect }: ExhibitionSe
       <p className="exhibition-select-heading">Hangi Sergiye Gireceğinizi Seçiniz</p>
       <div className="exhibition-select-grid">
         {exhibitions.map((ex) => (
-          <button
-            key={ex.id}
-            className="exhibition-select-card"
-            style={{ "--accent": ex.accent } as React.CSSProperties}
-            onClick={() => onSelect(ex.id)}
-          >
-            <span className="exhibition-select-name">{ex.name}</span>
-            <span className="exhibition-select-subtitle">{ex.subtitle}</span>
-          </button>
+          <ExhibitionSelectCard key={ex.id} exhibition={ex} onSelect={onSelect} />
         ))}
       </div>
     </div>

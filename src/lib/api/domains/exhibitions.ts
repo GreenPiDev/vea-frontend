@@ -158,3 +158,32 @@ export function useRemoveExhibitionArtwork(exhibitionId: string) {
     onSuccess: () => invalidateExhibitionQueries(queryClient, exhibitionId),
   });
 }
+
+// POST .../views — public, no auth (same as browsing). Fires once per
+// ArtworkDetailCard open (see App.tsx); the response already carries the
+// post-increment count so the card can show it without a second round-trip.
+export function useRecordArtworkView() {
+  return useMutation({
+    mutationFn: ({ exhibitionId, artworkId, sessionId }: { exhibitionId: string; artworkId: string; sessionId: string }) =>
+      post<{ count: number }>({
+        path: `${Paths.Exhibitions}/${exhibitionId}/artworks/${artworkId}/views`,
+        payload: { sessionId },
+      }),
+  });
+}
+
+export interface ApiExhibitionStats {
+  totalVisitors: number;
+  artworks: { artworkId: string; title: string; viewCount: number }[];
+}
+
+// GET /exhibitions/mine/:id/stats — curator's per-exhibition analytics
+// (CuratorPanel's "İstatistikler"), all-time cumulative counts, distinct
+// from the live/concurrent counter useExhibitionVisitorCount tracks.
+export function useExhibitionStats(exhibitionId: string) {
+  return useApiGet<ApiExhibitionStats>(
+    `${Paths.ExhibitionsMine}/${exhibitionId}/stats`,
+    [Paths.ExhibitionsMine, exhibitionId, 'stats'],
+    { enabled: Boolean(exhibitionId) },
+  );
+}

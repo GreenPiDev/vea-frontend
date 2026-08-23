@@ -212,6 +212,20 @@
   "orgOfferDecisionApproved": "Approved",
   "orgOfferDecisionRejected": "Rejected",
 
+  "hudVisitorCount": "{{count}} here now",
+  "artworkViewCount": "Viewed {{count}} times",
+  "exhibitionLiveCount": "{{count}} here right now",
+
+  "curatorStatsTitle": "Statistics",
+  "statsTotalVisitors": "Total visitors: {{count}}",
+  "statsArtworkViews": "Views",
+  "statsEmpty": "No data yet.",
+  "artistStatsTitle": "Statistics",
+  "artistStatsArtwork": "Artwork",
+  "artistStatsViews": "Views",
+  "artistStatsExhibition": "Exhibition",
+  "artistStatsNoExhibition": "Not placed in an exhibition",
+
   "buyerOfferDecisionPending": "The artist hasn't decided yet",
   "buyerOfferDecisionApproved": "The artist approved",
   "buyerOfferDecisionRejected": "The artist rejected",

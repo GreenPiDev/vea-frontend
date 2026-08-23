@@ -7,8 +7,11 @@ interface VisitorCountPayload {
   count: number;
 }
 
-/** Live visitor count for one exhibition — joins its room while mounted, leaves on unmount/id change. */
-export function useExhibitionVisitorCount(exhibitionId: string | undefined): number | null {
+function useExhibitionCountSocket(
+  exhibitionId: string | undefined,
+  joinEvent: string,
+  leaveEvent: string,
+): number | null {
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -26,14 +29,24 @@ export function useExhibitionVisitorCount(exhibitionId: string | undefined): num
 
     socket.on(SOCKET_EVENTS.ExhibitionVisitorCount, handleCount);
     socket.on(SOCKET_EVENTS.ExhibitionError, handleError);
-    socket.emit(SOCKET_EVENTS.ExhibitionJoin, { exhibitionId });
+    socket.emit(joinEvent, { exhibitionId });
 
     return () => {
-      socket.emit(SOCKET_EVENTS.ExhibitionLeave);
+      socket.emit(leaveEvent, { exhibitionId });
       socket.off(SOCKET_EVENTS.ExhibitionVisitorCount, handleCount);
       socket.off(SOCKET_EVENTS.ExhibitionError, handleError);
     };
-  }, [exhibitionId]);
+  }, [exhibitionId, joinEvent, leaveEvent]);
 
   return count;
+}
+
+/** Live visitor count for one exhibition — joins its room while mounted (counts as a real visitor, records a VisitEvent), leaves on unmount/id change. */
+export function useExhibitionVisitorCount(exhibitionId: string | undefined): number | null {
+  return useExhibitionCountSocket(exhibitionId, SOCKET_EVENTS.ExhibitionJoin, SOCKET_EVENTS.ExhibitionLeave);
+}
+
+/** Same live count, but as a passive "watcher" (e.g. the exhibition selector screen showing a badge per card) — does NOT count as a visitor and never records a VisitEvent. See vea-api's ExhibitionGateway watcher room. */
+export function useExhibitionWatcherCount(exhibitionId: string | undefined): number | null {
+  return useExhibitionCountSocket(exhibitionId, SOCKET_EVENTS.ExhibitionWatch, SOCKET_EVENTS.ExhibitionUnwatch);
 }

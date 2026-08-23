@@ -6,15 +6,16 @@ import ArtistProfileForm from './ArtistProfileForm';
 import ArtworkForm from './ArtworkForm';
 import ArtworkList from './ArtworkList';
 import ArtistOfferTable from './ArtistOfferTable';
+import ArtistStatsTable from './ArtistStatsTable';
 import type { ApiArtwork } from '../../lib/api/domains/artworks';
 import PanelLayout from '../layout/PanelLayout';
-import { ArtworkIcon, GalleryIcon } from '../layout/icons';
+import { ArtworkIcon, ChartIcon, GalleryIcon } from '../layout/icons';
 
 interface ArtistPanelProps {
   onBack: () => void;
 }
 
-type Section = 'artworks' | 'offers';
+type Section = 'artworks' | 'offers' | 'stats';
 
 export default function ArtistPanel({ onBack }: ArtistPanelProps) {
   const { t } = useTranslation();
@@ -27,6 +28,7 @@ export default function ArtistPanel({ onBack }: ArtistPanelProps) {
   const navItems = [
     { id: 'artworks', label: t('artworkListTitle'), icon: <ArtworkIcon /> },
     { id: 'offers', label: t('artistOffersTitle'), icon: <GalleryIcon /> },
+    { id: 'stats', label: t('artistStatsTitle'), icon: <ChartIcon /> },
   ];
 
   return (
@@ -72,6 +74,13 @@ export default function ArtistPanel({ onBack }: ArtistPanelProps) {
         <div className="flex flex-col gap-4">
           <h2 className="text-lg font-semibold text-brand-900">{t('artistOffersTitle')}</h2>
           <ArtistOfferTable />
+        </div>
+      )}
+
+      {profile && section === 'stats' && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold text-brand-900">{t('artistStatsTitle')}</h2>
+          <ArtistStatsTable />
         </div>
       )}
     </PanelLayout>

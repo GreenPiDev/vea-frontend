@@ -1,8 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Artwork } from './3d/artworks';
 import { useAuth } from '../lib/auth/AuthContext';
 import { useCreateOffer } from '../lib/api/domains/offers';
+import { useRecordArtworkView } from '../lib/api/domains/exhibitions';
+import { getViewSessionId } from '../lib/viewSession';
 import { ApiError } from '../lib/api/client';
 import Login from './auth/Login';
 
@@ -16,6 +18,7 @@ const STATUS_KEYS: Record<NonNullable<Artwork['status']>, string> = {
 
 interface ArtworkDetailCardProps {
   artwork: Artwork;
+  exhibitionId: string;
   onClose: () => void;
 }
 
@@ -26,15 +29,29 @@ interface ArtworkDetailCardProps {
  * handles releasing/re-acquiring pointer lock around this card's lifetime;
  * this component only deals with its own content and close affordances.
  */
-export default function ArtworkDetailCard({ artwork, onClose }: ArtworkDetailCardProps) {
+export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: ArtworkDetailCardProps) {
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const createOffer = useCreateOffer();
+  const recordView = useRecordArtworkView();
   const [amount, setAmount] = useState('');
   const [offerError, setOfferError] = useState<string | null>(null);
   const [offerSent, setOfferSent] = useState(false);
+  const [viewCount, setViewCount] = useState<number | null>(null);
 
   const isPurchasable = artwork.artworkId != null;
+
+  // One view recorded per card open — no dedup, a re-open counts again
+  // (matches the literal ask: "opened" == "viewed"). Static demo paintings
+  // (no artworkId) have nothing to attach a VisitEvent to, so they're skipped.
+  const recordViewMutate = recordView.mutate;
+  useEffect(() => {
+    if (!artwork.artworkId) return;
+    recordViewMutate(
+      { exhibitionId, artworkId: artwork.artworkId, sessionId: getViewSessionId() },
+      { onSuccess: (data) => setViewCount(data.count) },
+    );
+  }, [artwork.artworkId, exhibitionId, recordViewMutate]);
   const isSold = artwork.status === 'SOLD';
   const isOwnArtwork = isAuthenticated && user?.id === artwork.sellerId;
 
@@ -98,7 +115,11 @@ export default function ArtworkDetailCard({ artwork, onClose }: ArtworkDetailCar
         )}
 
         {artwork.status && (
-          <p className="mb-3 text-xs text-brand-500">{t(STATUS_KEYS[artwork.status])}</p>
+          <p className="mb-1 text-xs text-brand-500">{t(STATUS_KEYS[artwork.status])}</p>
+        )}
+
+        {viewCount !== null && (
+          <p className="mb-3 text-xs text-brand-500">{t('artworkViewCount', { count: viewCount })}</p>
         )}
 
         {!isPurchasable && (

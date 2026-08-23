@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { act } from 'react';
-import { useExhibitionVisitorCount } from './useExhibitionVisitorCount';
+import { useExhibitionVisitorCount, useExhibitionWatcherCount } from './useExhibitionVisitorCount';
 import { SOCKET_EVENTS } from './socketEvents';
 
 const handlers = new Map<string, (payload: unknown) => void>();
@@ -63,7 +63,9 @@ describe('useExhibitionVisitorCount', () => {
     const { unmount } = renderHook(() => useExhibitionVisitorCount('exh-1'));
     unmount();
 
-    expect(fakeSocket.emit).toHaveBeenCalledWith(SOCKET_EVENTS.ExhibitionLeave);
+    expect(fakeSocket.emit).toHaveBeenCalledWith(SOCKET_EVENTS.ExhibitionLeave, {
+      exhibitionId: 'exh-1',
+    });
     expect(fakeSocket.off).toHaveBeenCalledWith(
       SOCKET_EVENTS.ExhibitionVisitorCount,
       expect.any(Function),
@@ -73,5 +75,31 @@ describe('useExhibitionVisitorCount', () => {
   it('does nothing when exhibitionId is undefined', () => {
     renderHook(() => useExhibitionVisitorCount(undefined));
     expect(fakeSocket.emit).not.toHaveBeenCalled();
+  });
+});
+
+describe('useExhibitionWatcherCount', () => {
+  beforeEach(() => {
+    handlers.clear();
+    vi.clearAllMocks();
+    fakeSocket.connected = false;
+  });
+
+  it('watches (not joins) the exhibition room on mount', () => {
+    renderHook(() => useExhibitionWatcherCount('exh-1'));
+
+    expect(fakeSocket.emit).toHaveBeenCalledWith(SOCKET_EVENTS.ExhibitionWatch, {
+      exhibitionId: 'exh-1',
+    });
+    expect(fakeSocket.emit).not.toHaveBeenCalledWith(SOCKET_EVENTS.ExhibitionJoin, expect.anything());
+  });
+
+  it('unwatches on unmount', () => {
+    const { unmount } = renderHook(() => useExhibitionWatcherCount('exh-1'));
+    unmount();
+
+    expect(fakeSocket.emit).toHaveBeenCalledWith(SOCKET_EVENTS.ExhibitionUnwatch, {
+      exhibitionId: 'exh-1',
+    });
   });
 });

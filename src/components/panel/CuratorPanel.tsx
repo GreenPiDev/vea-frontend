@@ -5,14 +5,15 @@ import ExhibitionList from './ExhibitionList';
 import ExhibitionArtworkPlacement from './ExhibitionArtworkPlacement';
 import OrgArtistList from './OrgArtistList';
 import OrgOfferTable from './OrgOfferTable';
+import ExhibitionStatsList from './ExhibitionStatsList';
 import PanelLayout from '../layout/PanelLayout';
-import { ArtworkIcon, GalleryIcon, PeopleIcon } from '../layout/icons';
+import { ArtworkIcon, ChartIcon, GalleryIcon, PeopleIcon } from '../layout/icons';
 
 interface CuratorPanelProps {
   onBack: () => void;
 }
 
-type Section = 'exhibitions' | 'artists' | 'offers';
+type Section = 'exhibitions' | 'artists' | 'offers' | 'stats';
 
 // Admin/curator screen: exhibition creation + artwork placement, split out
 // of ArtistPanel.tsx so artists (who only manage their own artwork/portfolio)
@@ -21,7 +22,8 @@ type Section = 'exhibitions' | 'artists' | 'offers';
 // RolesGuard/@Roles(ADMIN) on the /exhibitions write endpoints. Also owns
 // "Sanatçılarım" (OrgArtistList) — inviting artists into this curator's own
 // organization, since artist onboarding is no longer self-serve — and
-// "Teklifler" (OrgOfferTable), the org-wide read-only offer overview.
+// "Teklifler" (OrgOfferTable), the org-wide read-only offer overview, and
+// "İstatistikler" (ExhibitionStatsList) — visitor/view counts.
 export default function CuratorPanel({ onBack }: CuratorPanelProps) {
   const { t } = useTranslation();
   const [section, setSection] = useState<Section>('exhibitions');
@@ -32,6 +34,7 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
     { id: 'exhibitions', label: t('exhibitionListTitle'), icon: <GalleryIcon /> },
     { id: 'artists', label: t('curatorArtistsTitle'), icon: <PeopleIcon /> },
     { id: 'offers', label: t('orgOffersTitle'), icon: <ArtworkIcon /> },
+    { id: 'stats', label: t('curatorStatsTitle'), icon: <ChartIcon /> },
   ];
 
   return (
@@ -75,6 +78,13 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
         <div className="flex flex-col gap-4">
           <h2 className="text-lg font-semibold text-brand-900">{t('orgOffersTitle')}</h2>
           <OrgOfferTable />
+        </div>
+      )}
+
+      {section === 'stats' && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold text-brand-900">{t('curatorStatsTitle')}</h2>
+          <ExhibitionStatsList />
         </div>
       )}
     </PanelLayout>

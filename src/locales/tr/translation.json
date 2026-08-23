@@ -212,6 +212,20 @@
   "orgOfferDecisionApproved": "Onaylandı",
   "orgOfferDecisionRejected": "Reddedildi",
 
+  "hudVisitorCount": "{{count}} kişi burada",
+  "artworkViewCount": "{{count}} kez görüntülendi",
+  "exhibitionLiveCount": "{{count}} kişi şu anda burada",
+
+  "curatorStatsTitle": "İstatistikler",
+  "statsTotalVisitors": "Toplam ziyaretçi: {{count}}",
+  "statsArtworkViews": "Görüntülenme",
+  "statsEmpty": "Henüz veri yok.",
+  "artistStatsTitle": "İstatistikler",
+  "artistStatsArtwork": "Eser",
+  "artistStatsViews": "Görüntülenme",
+  "artistStatsExhibition": "Sergi",
+  "artistStatsNoExhibition": "Bir sergide yer almıyor",
+
   "buyerOfferDecisionPending": "Sanatçı henüz karar vermedi",
   "buyerOfferDecisionApproved": "Sanatçı onayladı",
   "buyerOfferDecisionRejected": "Sanatçı reddetti",
