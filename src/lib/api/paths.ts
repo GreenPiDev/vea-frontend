@@ -17,6 +17,8 @@ export const Paths = {
 
   Organizations: '/organizations',
 
+  Notifications: '/notifications',
+
   OffersMineBuying: '/offers/mine/buying',
   OffersMineSelling: '/offers/mine/selling',
 } as const;

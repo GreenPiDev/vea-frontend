@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { connectSocket } from './socketClient';
+import { SOCKET_EVENTS } from './socketEvents';
+import { Paths } from '../api/paths';
 
 interface RealtimeInvalidation {
   event: string;
@@ -14,20 +16,28 @@ interface RealtimeInvalidation {
  * another project's socketConstant.ts + useWebSocket.ts (davinci-frontend),
  * scaled down for what vea-api currently emits.
  *
- * Empty today: vea-api only pushes `exhibition:visitorCount`, a live value
- * with no backing REST resource to invalidate (see
- * useExhibitionVisitorCount.ts, which handles it directly). The first real
- * entry here will likely be something like an "offerChanged" event
- * invalidating an offer's detail query once the frontend has offer UI.
+ * `exhibition:visitorCount` isn't here — it's a live value with no backing
+ * REST resource to invalidate (see useExhibitionVisitorCount.ts, which
+ * handles it directly).
  */
-export const REALTIME_INVALIDATION_MAP: RealtimeInvalidation[] = [];
+export const REALTIME_INVALIDATION_MAP: RealtimeInvalidation[] = [
+  {
+    event: SOCKET_EVENTS.NotificationCreated,
+    invalidateKeys: [[Paths.Notifications], [Paths.Notifications, 'unread-count']],
+  },
+];
 
-/** Mount once near the app root once real invalidation entries exist above. */
-export function useRealtimeQuerySync(): void {
+/**
+ * Mount once near the app root. `enabled` should be `isAuthenticated`
+ * (App.tsx) — every entry above is personal (notifications), so there's
+ * nothing to sync for an anonymous visitor and no point paying the
+ * connection cost for them.
+ */
+export function useRealtimeQuerySync(enabled: boolean): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (REALTIME_INVALIDATION_MAP.length === 0) return;
+    if (!enabled || REALTIME_INVALIDATION_MAP.length === 0) return;
 
     const socket = connectSocket();
     const registered = REALTIME_INVALIDATION_MAP.map(({ event, invalidateKeys }) => {
@@ -43,5 +53,5 @@ export function useRealtimeQuerySync(): void {
     return () => {
       registered.forEach(({ event, handler }) => socket.off(event, handler));
     };
-  }, [queryClient]);
+  }, [queryClient, enabled]);
 }

@@ -10,4 +10,5 @@ export const SOCKET_EVENTS = {
   // Server -> Client
   ExhibitionVisitorCount: 'exhibition:visitorCount',
   ExhibitionError: 'exhibition:error',
+  NotificationCreated: 'notification:created',
 } as const;

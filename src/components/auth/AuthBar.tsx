@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth/AuthContext';
 import Login from './Login';
+import NotificationBell from '../notifications/NotificationBell';
 
 interface AuthBarProps {
   onOpenPanel?: () => void;
@@ -21,6 +22,7 @@ export default function AuthBar({ onOpenPanel }: AuthBarProps) {
   return (
     <>
       <div className="fixed top-3 right-3 z-50 flex items-center gap-2">
+        {isAuthenticated && <NotificationBell />}
         {isAuthenticated && onOpenPanel && (
           <button
             onClick={onOpenPanel}

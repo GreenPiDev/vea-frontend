@@ -178,5 +178,42 @@
   "offerStatusDelivered": "Delivered",
   "offerStatusReleased": "Completed",
   "offerStatusRejected": "Rejected",
-  "offerStatusCancelled": "Cancelled"
+  "offerStatusCancelled": "Cancelled",
+
+  "notificationsTitle": "Notifications",
+  "notificationsEmpty": "You have no notifications yet.",
+  "notificationsMarkAllRead": "Mark all as read",
+  "notifOfferCreated": "New offer for \"{{artworkTitle}}\": {{amount}}",
+  "notifOfferDecisionApproved": "The offer for \"{{artworkTitle}}\" was approved",
+  "notifOfferDecisionRejected": "The offer for \"{{artworkTitle}}\" was rejected",
+
+  "artistOffersTitle": "My Offers",
+  "artistOfferEmpty": "No offers on your artworks yet.",
+  "artistOfferArtwork": "Artwork",
+  "artistOfferAmount": "Amount",
+  "artistOfferStatus": "Status",
+  "artistOfferDecisionCol": "Your Decision",
+  "artistOfferApprove": "Approve",
+  "artistOfferReject": "Reject",
+  "artistOfferApproved": "Approved",
+  "artistOfferRejected": "Rejected",
+  "artistOfferConfirmPrompt": "Are you sure? This decision cannot be undone.",
+  "artistOfferConfirmYes": "Yes",
+  "artistOfferConfirmCancel": "Cancel",
+
+  "orgOffersTitle": "Offers",
+  "orgOfferEmpty": "No offers in your organization yet.",
+  "orgOfferArtist": "Artist",
+  "orgOfferArtwork": "Artwork",
+  "orgOfferBuyer": "Buyer",
+  "orgOfferAmount": "Amount",
+  "orgOfferStatus": "Status",
+  "orgOfferArtistDecision": "Artist Decision",
+  "orgOfferDecisionApproved": "Approved",
+  "orgOfferDecisionRejected": "Rejected",
+
+  "buyerOfferDecisionPending": "The artist hasn't decided yet",
+  "buyerOfferDecisionApproved": "The artist approved",
+  "buyerOfferDecisionRejected": "The artist rejected",
+  "buyerOfferRejectedHint": "You can submit a new offer."
 }

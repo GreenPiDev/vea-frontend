@@ -5,36 +5,43 @@ import { ApiError } from '../../lib/api/client';
 import ArtistProfileForm from './ArtistProfileForm';
 import ArtworkForm from './ArtworkForm';
 import ArtworkList from './ArtworkList';
+import ArtistOfferTable from './ArtistOfferTable';
 import type { ApiArtwork } from '../../lib/api/domains/artworks';
 import PanelLayout from '../layout/PanelLayout';
-import { ArtworkIcon } from '../layout/icons';
+import { ArtworkIcon, GalleryIcon } from '../layout/icons';
 
 interface ArtistPanelProps {
   onBack: () => void;
 }
 
+type Section = 'artworks' | 'offers';
+
 export default function ArtistPanel({ onBack }: ArtistPanelProps) {
   const { t } = useTranslation();
   const { data: profile, isLoading, error } = useMyArtistProfile();
   const [formMode, setFormMode] = useState<'none' | 'create' | ApiArtwork>('none');
+  const [section, setSection] = useState<Section>('artworks');
 
   const hasNoProfile = error instanceof ApiError && error.status === 404;
 
-  const navItems = [{ id: 'artworks', label: t('artworkListTitle'), icon: <ArtworkIcon /> }];
+  const navItems = [
+    { id: 'artworks', label: t('artworkListTitle'), icon: <ArtworkIcon /> },
+    { id: 'offers', label: t('artistOffersTitle'), icon: <GalleryIcon /> },
+  ];
 
   return (
     <PanelLayout
       title={t('artistPanelTitle')}
       navItems={navItems}
-      activeSectionId="artworks"
-      onSelectSection={() => {}}
+      activeSectionId={section}
+      onSelectSection={(id) => setSection(id as Section)}
       onBack={onBack}
     >
       {isLoading && null}
 
       {hasNoProfile && <ArtistProfileForm />}
 
-      {profile && (
+      {profile && section === 'artworks' && (
         <div className="flex flex-col gap-6">
           <p className="text-brand-800">{t('profileWelcome', { name: profile.displayName })}</p>
 
@@ -58,6 +65,13 @@ export default function ArtistPanel({ onBack }: ArtistPanelProps) {
           )}
 
           <ArtworkList onEdit={(artwork) => setFormMode(artwork)} />
+        </div>
+      )}
+
+      {profile && section === 'offers' && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold text-brand-900">{t('artistOffersTitle')}</h2>
+          <ArtistOfferTable />
         </div>
       )}
     </PanelLayout>

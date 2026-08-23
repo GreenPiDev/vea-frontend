@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth/AuthContext';
 import Sidebar, { type PanelNavItem } from './Sidebar';
 import { MenuIcon } from './icons';
+import NotificationBell from '../notifications/NotificationBell';
 
 interface PanelLayoutProps {
   title: string;
@@ -35,6 +36,7 @@ export default function PanelLayout({ title, navItems, activeSectionId, onSelect
           <h1 className="truncate text-base font-semibold text-brand-900">{title}</h1>
         </div>
         <div className="flex flex-shrink-0 items-center gap-3">
+          <NotificationBell />
           <span className="hidden text-sm text-brand-700 sm:inline">{user?.email}</span>
           <button
             type="button"

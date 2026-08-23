@@ -56,6 +56,18 @@ export default function BuyerPanel({ onBack }: BuyerPanelProps) {
                   {offer.artwork?.title ?? offer.artworkId}
                 </p>
                 <p className="text-xs text-brand-600">{t(STATUS_KEYS[offer.status])}</p>
+                {offer.artistDecision === 'APPROVED' && (
+                  <p className="text-xs font-medium text-green-700">{t('buyerOfferDecisionApproved')}</p>
+                )}
+                {offer.artistDecision === 'REJECTED' && (
+                  <>
+                    <p className="text-xs font-medium text-red-700">{t('buyerOfferDecisionRejected')}</p>
+                    <p className="text-xs text-brand-500">{t('buyerOfferRejectedHint')}</p>
+                  </>
+                )}
+                {!offer.artistDecision && (
+                  <p className="text-xs text-brand-500">{t('buyerOfferDecisionPending')}</p>
+                )}
               </div>
               <p className="text-sm font-medium text-brand-900">
                 {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: offer.currency }).format(

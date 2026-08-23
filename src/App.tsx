@@ -14,6 +14,7 @@ import SuperAdminPanel from "./components/panel/SuperAdminPanel";
 import BuyerPanel from "./components/panel/BuyerPanel";
 import { useAuth } from "./lib/auth/AuthContext";
 import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitions";
+import { useRealtimeQuerySync } from "./lib/socket/useRealtimeQuerySync";
 import "./App.css";
 
 const LOCAL_CARDS: ExhibitionCard[] = EXHIBITIONS.map((e) => ({
@@ -47,8 +48,9 @@ export default function App() {
   // force a lock the visitor never asked for.
   const pointerWasLockedRef = useRef(false);
 
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { data: backendExhibitions } = usePublicExhibitions();
+  useRealtimeQuerySync(isAuthenticated);
 
   const localExhibition = useMemo(
     () => (selectedId ? (EXHIBITIONS.find((e) => e.id === selectedId) ?? null) : null),

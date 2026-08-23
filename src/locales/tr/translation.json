@@ -178,5 +178,42 @@
   "offerStatusDelivered": "Teslim Edildi",
   "offerStatusReleased": "Tamamlandı",
   "offerStatusRejected": "Reddedildi",
-  "offerStatusCancelled": "İptal Edildi"
+  "offerStatusCancelled": "İptal Edildi",
+
+  "notificationsTitle": "Bildirimler",
+  "notificationsEmpty": "Henüz bildiriminiz yok.",
+  "notificationsMarkAllRead": "Tümünü okundu işaretle",
+  "notifOfferCreated": "\"{{artworkTitle}}\" için yeni teklif: {{amount}}",
+  "notifOfferDecisionApproved": "\"{{artworkTitle}}\" için verilen teklif onaylandı",
+  "notifOfferDecisionRejected": "\"{{artworkTitle}}\" için verilen teklif reddedildi",
+
+  "artistOffersTitle": "Tekliflerim",
+  "artistOfferEmpty": "Eserlerinize henüz teklif gelmedi.",
+  "artistOfferArtwork": "Eser",
+  "artistOfferAmount": "Tutar",
+  "artistOfferStatus": "Durum",
+  "artistOfferDecisionCol": "Kararınız",
+  "artistOfferApprove": "Onayla",
+  "artistOfferReject": "Reddet",
+  "artistOfferApproved": "Onayladınız",
+  "artistOfferRejected": "Reddettiniz",
+  "artistOfferConfirmPrompt": "Emin misiniz? Bu karar geri alınamaz.",
+  "artistOfferConfirmYes": "Evet",
+  "artistOfferConfirmCancel": "Vazgeç",
+
+  "orgOffersTitle": "Teklifler",
+  "orgOfferEmpty": "Kurumunuzda henüz teklif yok.",
+  "orgOfferArtist": "Sanatçı",
+  "orgOfferArtwork": "Eser",
+  "orgOfferBuyer": "Alıcı",
+  "orgOfferAmount": "Tutar",
+  "orgOfferStatus": "Durum",
+  "orgOfferArtistDecision": "Sanatçı Kararı",
+  "orgOfferDecisionApproved": "Onaylandı",
+  "orgOfferDecisionRejected": "Reddedildi",
+
+  "buyerOfferDecisionPending": "Sanatçı henüz karar vermedi",
+  "buyerOfferDecisionApproved": "Sanatçı onayladı",
+  "buyerOfferDecisionRejected": "Sanatçı reddetti",
+  "buyerOfferRejectedHint": "Yeni bir teklif verebilirsiniz."
 }
