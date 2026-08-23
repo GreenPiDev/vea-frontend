@@ -21,12 +21,25 @@ export default function Login({ onSuccess }: LoginProps) {
   const verifyCode = useVerifyCode();
   const { login } = useAuth();
 
+  // The backend's raw ApiError.message is normally fine to surface as-is
+  // (it's already a short, specific sentence — see e.g. offer creation
+  // errors in ArtworkDetailCard.tsx), but a 429 from Nest's ThrottlerGuard
+  // comes back as the framework's internal exception name ("ThrottlerException:
+  // Too Many Requests"), which isn't something a visitor should ever see.
+  function getErrorMessage(err: unknown, fallbackKey: string): string {
+    if (err instanceof ApiError) {
+      if (err.status === 429) return t('authErrorTooManyRequests');
+      return err.message;
+    }
+    return t(fallbackKey);
+  }
+
   function handleRequestCode(e: FormEvent) {
     e.preventDefault();
     setError(null);
     requestCode.mutate(email, {
       onSuccess: () => setStep('code'),
-      onError: (err) => setError(err instanceof ApiError ? err.message : t('authErrorSendFailed')),
+      onError: (err) => setError(getErrorMessage(err, 'authErrorSendFailed')),
     });
   }
 
@@ -40,7 +53,7 @@ export default function Login({ onSuccess }: LoginProps) {
           login(accessToken);
           onSuccess?.();
         },
-        onError: (err) => setError(err instanceof ApiError ? err.message : t('authErrorVerifyFailed')),
+        onError: (err) => setError(getErrorMessage(err, 'authErrorVerifyFailed')),
       },
     );
   }

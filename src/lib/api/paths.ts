@@ -15,6 +15,8 @@ export const Paths = {
   Exhibitions: '/exhibitions',
   ExhibitionsMine: '/exhibitions/mine',
 
+  Organizations: '/organizations',
+
   OffersMineBuying: '/offers/mine/buying',
   OffersMineSelling: '/offers/mine/selling',
 } as const;

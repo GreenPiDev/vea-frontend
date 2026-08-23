@@ -65,6 +65,12 @@ function toRenderableArtwork(link: ApiExhibitionArtwork, exhibitionId: string, p
     frame: null,
     position: placement.position,
     rotationY: placement.rotationY,
+    artworkId: link.artworkId,
+    technique: artwork.technique,
+    priceAmount: artwork.priceAmount,
+    currency: artwork.currency,
+    status: artwork.status,
+    sellerId: artwork.artistProfile?.userId,
   };
 }
 

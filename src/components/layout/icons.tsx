@@ -48,6 +48,16 @@ export function CloseIcon({ className }: IconProps) {
   );
 }
 
+export function OrganizationIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <rect x="4" y="3" width="10" height="18" rx="1" />
+      <rect x="15" y="9" width="5" height="12" rx="1" />
+      <path d="M7 7h1M11 7h1M7 11h1M11 11h1M7 15h1M11 15h1" />
+    </svg>
+  );
+}
+
 export function LogoutIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

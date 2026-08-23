@@ -25,7 +25,7 @@ function makeArtwork(overrides: Partial<ApiArtwork> = {}): ApiArtwork {
     model3dUrl: null,
     status: "IN_EXHIBITION",
     createdAt: "2026-01-01T00:00:00.000Z",
-    artistProfile: { displayName: "Test Artist" },
+    artistProfile: { displayName: "Test Artist", userId: "user-1" },
     ...overrides,
   };
 }

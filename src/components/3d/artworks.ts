@@ -27,6 +27,20 @@ export interface Artwork {
   position: [number, number, number];
   /** Yaw so the painting's front faces into the room. */
   rotationY: number;
+
+  // The fields below are only populated for backend-sourced artworks (see
+  // backendAdapter.ts's toRenderableArtwork) — the static demo ARTWORKS
+  // below never set them, which is exactly how ArtworkDetailCard tells a
+  // demo painting (not purchasable) apart from a real one.
+  /** Real backend Artwork.id — distinct from `id` above, which for a backend artwork is the ExhibitionArtwork join-row id. Needed to POST an offer against the right artwork. */
+  artworkId?: string;
+  technique?: string | null;
+  /** Minor-unit price (e.g. kuruş/cent), mirrors ApiArtwork.priceAmount. */
+  priceAmount?: number;
+  currency?: string;
+  status?: "DRAFT" | "LISTED" | "IN_EXHIBITION" | "SOLD" | "ARCHIVED";
+  /** The artist's User.id (ArtistProfile.userId) — lets the UI proactively hide the offer form on the viewer's own artwork instead of only relying on the backend's 403. */
+  sellerId?: string;
 }
 
 /** Standard museum hanging-line: center of artwork ~1.65m from the floor. */

@@ -1,11 +1,16 @@
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Scene from "./components/3d/Scene";
 import { EXHIBITIONS } from "./components/3d/exhibitions";
+import { ARTWORKS, type Artwork } from "./components/3d/artworks";
+import type { ArtworkIconPosition } from "./components/3d/ArtworkIconProjector";
 import { adaptApiExhibition, previewAccentColor } from "./components/3d/backendAdapter";
 import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSelect";
+import ArtworkDetailCard from "./components/ArtworkDetailCard";
 import AuthBar from "./components/auth/AuthBar";
 import ArtistPanel from "./components/panel/ArtistPanel";
 import CuratorPanel from "./components/panel/CuratorPanel";
+import SuperAdminPanel from "./components/panel/SuperAdminPanel";
 import { useAuth } from "./lib/auth/AuthContext";
 import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitions";
 import "./App.css";
@@ -18,6 +23,7 @@ const LOCAL_CARDS: ExhibitionCard[] = EXHIBITIONS.map((e) => ({
 }));
 
 export default function App() {
+  const { t } = useTranslation();
   const [screen, setScreen] = useState<"gallery" | "panel">("gallery");
   // Lets ArtworkList.tsx's "on display" links (opened in a new tab via
   // `/?exhibition=<id>`) drop the artist straight into that exhibition's 3D
@@ -31,6 +37,14 @@ export default function App() {
   );
   const [locked, setLocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [iconPositions, setIconPositions] = useState<ArtworkIconPosition[]>([]);
+  const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
+  const canvasElRef = useRef<HTMLCanvasElement | null>(null);
+  // Whether the pointer was actually locked (player was walking) at the
+  // moment the info card opened — only re-request pointer lock on close if
+  // it was, so opening the card before ever clicking into the scene doesn't
+  // force a lock the visitor never asked for.
+  const pointerWasLockedRef = useRef(false);
 
   const { user } = useAuth();
   const { data: backendExhibitions } = usePublicExhibitions();
@@ -53,6 +67,66 @@ export default function App() {
     if (backendDetail) return adaptApiExhibition(backendDetail);
     return null;
   }, [localExhibition, backendDetail]);
+
+  const exhibitionArtworks = useMemo(
+    () => exhibition?.artworks ?? (exhibition ? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id) : []),
+    [exhibition]
+  );
+
+  // Only the closest in-range painting responds to the interact key — with
+  // several icons on screen at once (e.g. a row of paintings on one wall),
+  // "which one does Enter open" needs to be unambiguous.
+  const nearestArtwork = useMemo(() => {
+    let nearest: { artwork: Artwork; distanceSq: number } | null = null;
+    for (const pos of iconPositions) {
+      if (!pos.visible) continue;
+      if (nearest && pos.distanceSq >= nearest.distanceSq) continue;
+      const artwork = exhibitionArtworks.find((a) => a.id === pos.id);
+      if (artwork) nearest = { artwork, distanceSq: pos.distanceSq };
+    }
+    return nearest?.artwork ?? null;
+  }, [iconPositions, exhibitionArtworks]);
+
+  function openArtworkDetail(artwork: Artwork) {
+    pointerWasLockedRef.current = locked;
+    document.exitPointerLock();
+    setSelectedArtwork(artwork);
+  }
+
+  function closeArtworkDetail() {
+    setSelectedArtwork(null);
+    if (pointerWasLockedRef.current) {
+      canvasElRef.current?.requestPointerLock();
+    }
+  }
+
+  // Interact key (Enter/Space) opens the nearest in-range painting's detail
+  // card — the primary way in while pointer-locked (no visible cursor to
+  // click the on-screen icon with). Clicking the icon itself still works
+  // whenever the cursor happens to be visible (see the icon button below).
+  useEffect(() => {
+    if (selectedArtwork || !nearestArtwork) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Enter" && e.code !== "Space" && e.code !== "NumpadEnter") return;
+      e.preventDefault();
+      pointerWasLockedRef.current = locked;
+      document.exitPointerLock();
+      setSelectedArtwork(nearestArtwork);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedArtwork, nearestArtwork, locked]);
+
+  // Escape closes the open detail card (in addition to its own ✕ button).
+  useEffect(() => {
+    if (!selectedArtwork) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Escape") return;
+      closeArtworkDetail();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedArtwork]);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(document.fullscreenElement != null);
@@ -80,6 +154,9 @@ export default function App() {
   );
 
   if (screen === "panel") {
+    if (user?.role === "SUPERADMIN") {
+      return <SuperAdminPanel onBack={() => setScreen("gallery")} />;
+    }
     return user?.role === "ADMIN" ? (
       <CuratorPanel onBack={() => setScreen("gallery")} />
     ) : (
@@ -105,8 +182,47 @@ export default function App() {
   return (
     <div className="app-root">
       <Suspense fallback={<div className="loading-indicator" />}>
-        <Scene key={exhibition.id} exhibition={exhibition} onLockChange={setLocked} />
+        <Scene
+          key={exhibition.id}
+          exhibition={exhibition}
+          onLockChange={setLocked}
+          onIconPositionsChange={setIconPositions}
+          onCanvasReady={(el) => (canvasElRef.current = el)}
+        />
       </Suspense>
+
+      {!selectedArtwork &&
+        iconPositions
+          .filter((p) => p.visible)
+          .map((p) => {
+            const artwork = exhibitionArtworks.find((a) => a.id === p.id);
+            if (!artwork) return null;
+            const isNearest = nearestArtwork?.id === artwork.id;
+            return (
+              <button
+                key={p.id}
+                onClick={() => openArtworkDetail(artwork)}
+                aria-label={t("artworkInfoIconLabel", { title: artwork.title })}
+                style={{ left: p.x, top: p.y }}
+                className={`absolute z-40 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 ${
+                  isNearest ? "scale-110" : "opacity-80"
+                }`}
+              >
+                <span className="flex h-8 w-8 animate-pulse items-center justify-center rounded-full bg-brand-700/90 text-sm font-semibold text-white shadow-md">
+                  i
+                </span>
+                {isNearest && (
+                  <span className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                    {t("artworkInteractHint")}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+      {selectedArtwork && (
+        <ArtworkDetailCard artwork={selectedArtwork} onClose={closeArtworkDetail} />
+      )}
 
       <div className="hud-controls">
         <button
@@ -132,7 +248,7 @@ export default function App() {
         </button>
       </div>
 
-      <div className={`instructions-overlay ${locked ? "hidden" : ""}`}>
+      <div className={`instructions-overlay ${locked || selectedArtwork ? "hidden" : ""}`}>
         <div className="instructions-card">
           <p className="instructions-title">{exhibition.name}</p>
           <p className="instructions-text">

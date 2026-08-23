@@ -5,6 +5,7 @@ import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import Gallery from "./Gallery";
 import Player from "./Player";
+import ArtworkIconProjector, { type ArtworkIconPosition } from "./ArtworkIconProjector";
 import { buildRoomLayout } from "./galleryLayout";
 import { ExhibitionProvider } from "./ExhibitionContext";
 import type { Exhibition } from "./exhibitions";
@@ -12,9 +13,16 @@ import type { Exhibition } from "./exhibitions";
 interface SceneProps {
   exhibition: Exhibition;
   onLockChange?: (locked: boolean) => void;
+  onIconPositionsChange?: (positions: ArtworkIconPosition[]) => void;
+  onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 }
 
-export default function Scene({ exhibition, onLockChange }: SceneProps) {
+export default function Scene({
+  exhibition,
+  onLockChange,
+  onIconPositionsChange,
+  onCanvasReady,
+}: SceneProps) {
   // Adaptive resolution: start conservative and only spend extra pixels once
   // the device has proven it can hold frame rate, so mid/low-end GPUs don't
   // pay retina-level render cost by default.
@@ -40,6 +48,7 @@ export default function Scene({ exhibition, onLockChange }: SceneProps) {
         // only need to be baked once instead of every frame.
         gl.shadowMap.autoUpdate = false;
         gl.shadowMap.needsUpdate = true;
+        onCanvasReady?.(gl.domElement);
       }}
     >
       <PerformanceMonitor
@@ -52,6 +61,9 @@ export default function Scene({ exhibition, onLockChange }: SceneProps) {
           <Gallery />
         </Suspense>
         <Player onLockChange={onLockChange} />
+        {onIconPositionsChange && (
+          <ArtworkIconProjector onPositionsChange={onIconPositionsChange} />
+        )}
       </ExhibitionProvider>
       <Stats className="fps-stats" />
       <EffectComposer multisampling={0}>

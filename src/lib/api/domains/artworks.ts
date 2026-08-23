@@ -33,8 +33,8 @@ export interface ApiArtwork {
   model3dUrl: string | null;
   status: ArtworkStatus;
   createdAt: string;
-  /** Only present when the backend embeds it (e.g. GET /exhibitions/:id's artworkLinks[].artwork, or GET /artworks for a curator's cross-artist picker) — not returned by /artworks/mine. */
-  artistProfile?: { displayName: string };
+  /** Only present when the backend embeds it (e.g. GET /exhibitions/:id's artworkLinks[].artwork, or GET /artworks for a curator's cross-artist picker) — not returned by /artworks/mine. Backend includes the full ArtistProfile row; `userId` lets the offer UI tell whether the current viewer owns this artwork. */
+  artistProfile?: { displayName: string; userId: string };
   /** Only present on GET /artworks/mine — which exhibition(s), if any, this artwork is currently placed in. */
   exhibitionLinks?: { exhibition: { id: string; title: string; status: 'DRAFT' | 'ACTIVE' | 'ENDED' } }[];
 }
