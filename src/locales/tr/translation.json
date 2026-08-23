@@ -160,5 +160,23 @@
   "orgAdminAdd": "Ekle",
   "orgAdminAdding": "Ekleniyor…",
   "orgAdminAddError": "Admin eklenemedi",
-  "orgAdminRemove": "Kaldır"
+  "orgAdminRemove": "Kaldır",
+
+  "curatorArtistsTitle": "Sanatçılarım",
+  "artistEmpty": "Henüz kuruma davet edilmiş bir sanatçı yok.",
+  "artistEmailLabel": "E-posta ile sanatçı davet et",
+  "artistAdd": "Davet Et",
+  "artistAdding": "Davet ediliyor…",
+  "artistAddError": "Sanatçı davet edilemedi",
+  "artistRemove": "Kaldır",
+
+  "buyerPanelTitle": "Tekliflerim",
+  "buyerOffersEmpty": "Henüz teklif vermediniz.",
+  "offerStatusPending": "Beklemede",
+  "offerStatusAccepted": "Kabul Edildi",
+  "offerStatusPaymentHeld": "Ödeme Blokede",
+  "offerStatusDelivered": "Teslim Edildi",
+  "offerStatusReleased": "Tamamlandı",
+  "offerStatusRejected": "Reddedildi",
+  "offerStatusCancelled": "İptal Edildi"
 }

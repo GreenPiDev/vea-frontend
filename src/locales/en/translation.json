@@ -160,5 +160,23 @@
   "orgAdminAdd": "Add",
   "orgAdminAdding": "Adding…",
   "orgAdminAddError": "Could not add the admin",
-  "orgAdminRemove": "Remove"
+  "orgAdminRemove": "Remove",
+
+  "curatorArtistsTitle": "My Artists",
+  "artistEmpty": "No artists invited to this organization yet.",
+  "artistEmailLabel": "Invite an artist by email",
+  "artistAdd": "Invite",
+  "artistAdding": "Inviting…",
+  "artistAddError": "Could not invite the artist",
+  "artistRemove": "Remove",
+
+  "buyerPanelTitle": "My Offers",
+  "buyerOffersEmpty": "You haven't made any offers yet.",
+  "offerStatusPending": "Pending",
+  "offerStatusAccepted": "Accepted",
+  "offerStatusPaymentHeld": "Payment Held",
+  "offerStatusDelivered": "Delivered",
+  "offerStatusReleased": "Completed",
+  "offerStatusRejected": "Rejected",
+  "offerStatusCancelled": "Cancelled"
 }

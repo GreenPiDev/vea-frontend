@@ -57,3 +57,32 @@ export function useRemoveOrgAdmin(organizationId: string) {
       queryClient.invalidateQueries({ queryKey: [Paths.Organizations, organizationId, 'admins'] }),
   });
 }
+
+// The curator's own roster of invited artists — "mine" (no organizationId
+// param, backend derives it from the ADMIN's JWT), mirrors the admins
+// hooks above but under /organizations/mine/artists.
+export type ApiOrgArtist = ApiOrgAdmin;
+
+const MINE_ARTISTS_KEY = [Paths.Organizations, 'mine', 'artists'];
+
+export function useMyOrgArtists() {
+  return useApiGetList<ApiOrgArtist>(`${Paths.Organizations}/mine/artists`, MINE_ARTISTS_KEY);
+}
+
+export function useAddMyOrgArtist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (email: string) =>
+      post<ApiOrgArtist>({ path: `${Paths.Organizations}/mine/artists`, payload: { email } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: MINE_ARTISTS_KEY }),
+  });
+}
+
+export function useRemoveMyOrgArtist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      remove<void>({ path: `${Paths.Organizations}/mine/artists/${userId}` }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: MINE_ARTISTS_KEY }),
+  });
+}

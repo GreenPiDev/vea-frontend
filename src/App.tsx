@@ -11,6 +11,7 @@ import AuthBar from "./components/auth/AuthBar";
 import ArtistPanel from "./components/panel/ArtistPanel";
 import CuratorPanel from "./components/panel/CuratorPanel";
 import SuperAdminPanel from "./components/panel/SuperAdminPanel";
+import BuyerPanel from "./components/panel/BuyerPanel";
 import { useAuth } from "./lib/auth/AuthContext";
 import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitions";
 import "./App.css";
@@ -154,14 +155,21 @@ export default function App() {
   );
 
   if (screen === "panel") {
-    if (user?.role === "SUPERADMIN") {
-      return <SuperAdminPanel onBack={() => setScreen("gallery")} />;
+    const onBack = () => setScreen("gallery");
+    switch (user?.role) {
+      case "SUPERADMIN":
+        return <SuperAdminPanel onBack={onBack} />;
+      case "ADMIN":
+        return <CuratorPanel onBack={onBack} />;
+      case "ARTIST":
+        return <ArtistPanel onBack={onBack} />;
+      default:
+        // Plain visitor/buyer — artist onboarding is invite-only now (a
+        // curator adds them via CuratorPanel's "Sanatçılarım"), so anyone
+        // without that role just tracks their own offers here instead of
+        // being forced into ArtistPanel's profile-creation form.
+        return <BuyerPanel onBack={onBack} />;
     }
-    return user?.role === "ADMIN" ? (
-      <CuratorPanel onBack={() => setScreen("gallery")} />
-    ) : (
-      <ArtistPanel onBack={() => setScreen("gallery")} />
-    );
   }
 
   if (!exhibition) {

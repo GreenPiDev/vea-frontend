@@ -6,7 +6,7 @@ import {
   useRemoveExhibitionArtwork,
   useUpdateExhibitionArtworkLink,
 } from '../../lib/api/domains/exhibitions';
-import { usePublicArtworks, type ApiArtwork } from '../../lib/api/domains/artworks';
+import { useOrganizationArtworks, type ApiArtwork } from '../../lib/api/domains/artworks';
 import { groupByWallRun, wallRunsForSceneConfig } from '../3d/backendAdapter';
 import { FLOOR_CLEARANCE, type WallRunGeometry } from '../3d/galleryLayout';
 import { ApiError } from '../../lib/api/client';
@@ -42,7 +42,7 @@ interface ExhibitionArtworkPlacementProps {
 export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: ExhibitionArtworkPlacementProps) {
   const { t } = useTranslation();
   const { data: exhibition, isLoading } = useOwnExhibition(exhibitionId);
-  const { data: publicArtworks } = usePublicArtworks();
+  const { data: orgArtworks } = useOrganizationArtworks();
   const addArtwork = useAddExhibitionArtwork(exhibitionId);
   const updateArtworkLink = useUpdateExhibitionArtworkLink(exhibitionId);
   const removeArtwork = useRemoveExhibitionArtwork(exhibitionId);
@@ -76,7 +76,7 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
   // showing somewhere else), which shouldn't be offered here as if free.
   const availableArtworks = isFull
     ? []
-    : (publicArtworks ?? []).filter(
+    : (orgArtworks ?? []).filter(
         (artwork) => artwork.status === 'LISTED' && !placedArtworkIds.has(artwork.id)
       );
 

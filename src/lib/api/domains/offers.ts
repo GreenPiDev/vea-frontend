@@ -1,9 +1,12 @@
-// Offer creation only (Teklif -> ... state machine lives entirely on the
-// backend, see vea-api/CLAUDE.md's "Offer modülü"). Accept/pay/deliver/
-// release + "my offers" list screens aren't built yet — this is just the
-// buyer-side "make an offer" mutation consumed by ArtworkDetailCard.
+// Offer creation + the buyer's own read-only offer list (Teklif -> ...
+// state machine lives entirely on the backend, see vea-api/CLAUDE.md's
+// "Offer modülü"). Accept/pay/deliver/release management screens (seller
+// side) aren't built yet.
 import { useMutation } from '@tanstack/react-query';
+import { Paths } from '../paths';
 import { post } from '../client';
+import { useApiGetList } from '../factory';
+import type { ApiArtwork } from './artworks';
 
 export type OfferStatus =
   | 'PENDING'
@@ -25,6 +28,8 @@ export interface ApiOffer {
   commissionTaxAmount: number | null;
   createdAt: string;
   respondedAt: string | null;
+  /** Only present on GET /offers/mine/buying — the backend embeds it so the buyer's offer list can show a title/price without a second round-trip per offer. */
+  artwork?: ApiArtwork;
 }
 
 interface CreateOfferPayload {
@@ -41,4 +46,8 @@ export function useCreateOffer() {
     mutationFn: ({ artworkId, amount }: CreateOfferPayload) =>
       post<ApiOffer>({ path: `/artworks/${artworkId}/offers`, payload: { amount } }),
   });
+}
+
+export function useMyOffersAsBuyer() {
+  return useApiGetList<ApiOffer>(Paths.OffersMineBuying);
 }

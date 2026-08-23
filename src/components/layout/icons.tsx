@@ -58,6 +58,16 @@ export function OrganizationIcon({ className }: IconProps) {
   );
 }
 
+export function PeopleIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 21v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2" />
+      <path d="M17 4.5a3 3 0 0 1 0 6M21 21v-2a5 5 0 0 0-3.5-4.77" />
+    </svg>
+  );
+}
+
 export function LogoutIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

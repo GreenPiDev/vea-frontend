@@ -43,11 +43,18 @@ export function useMyArtworks() {
   return useApiGetList<ApiArtwork>(Paths.ArtworksMine);
 }
 
-// GET /artworks — public list (LISTED/IN_EXHIBITION only), used by the
-// curator panel to pick any artist's artwork for placement (cross-artist
-// curation), same pattern as usePublicExhibitions.
+// GET /artworks — fully public list (LISTED/IN_EXHIBITION only), no
+// organization scoping. Not currently used by any screen (no general
+// "browse all art" page yet) — kept for that future use.
 export function usePublicArtworks() {
   return useApiGetList<ApiArtwork>(Paths.Artworks);
+}
+
+// GET /artworks/organization — the curator panel's actual artwork picker
+// for placement (cross-artist curation *within their own org's roster*
+// only, since artists now belong to an Organization via curator invite).
+export function useOrganizationArtworks() {
+  return useApiGetList<ApiArtwork>(`${Paths.Artworks}/organization`, [Paths.Artworks, 'organization']);
 }
 
 export function useArtworkMutations() {
