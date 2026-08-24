@@ -19,7 +19,7 @@ export default function ExhibitionStatsList() {
   if (isLoading) return null;
 
   if (!exhibitions || exhibitions.length === 0) {
-    return <p className="text-sm text-brand-600">{t('statsEmpty')}</p>;
+    return <p className="text-sm text-brand-200">{t('statsEmpty')}</p>;
   }
 
   return (

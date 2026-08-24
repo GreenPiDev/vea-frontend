@@ -14,7 +14,7 @@ export default function ArtistStatsTable() {
   if (isLoading) return null;
 
   if (!stats || stats.length === 0) {
-    return <p className="text-sm text-brand-600">{t('statsEmpty')}</p>;
+    return <p className="text-sm text-brand-200">{t('statsEmpty')}</p>;
   }
 
   return (

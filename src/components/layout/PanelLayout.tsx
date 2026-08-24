@@ -2,8 +2,9 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../lib/auth/AuthContext';
 import Sidebar, { type PanelNavItem } from './Sidebar';
-import { MenuIcon } from './icons';
+import { ArrowLeftIcon, MenuIcon } from './icons';
 import NotificationBell from '../notifications/NotificationBell';
+import Tooltip from './Tooltip';
 
 interface PanelLayoutProps {
   title: string;
@@ -28,11 +29,22 @@ export default function PanelLayout({ title, navItems, activeSectionId, onSelect
 
   return (
     <div className="h-full w-full bg-brand-50">
-      <header className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-brand-200 bg-white px-4 md:px-6">
-        <div className="flex items-center gap-4 min-w-0">
-          <button onClick={onBack} className="flex-shrink-0 text-sm text-brand-700 underline hover:text-brand-900">
-            {t('panelBackToGallery')}
-          </button>
+      <header className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-brand-300 bg-brand-200 pr-4 md:pr-6">
+        <div className="flex min-w-0 items-center gap-4">
+          {/* w-16 matches Sidebar's rail width so this icon lines up
+              directly above the sidebar's icon column below it. */}
+          <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center">
+            <Tooltip label={t('panelBackToGallery')}>
+              <button
+                type="button"
+                onClick={onBack}
+                aria-label={t('panelBackToGallery')}
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-brand-300 text-brand-700 transition-colors hover:border-brand-400 hover:bg-brand-100 hover:text-brand-900"
+              >
+                <ArrowLeftIcon />
+              </button>
+            </Tooltip>
+          </div>
           <h1 className="truncate text-base font-semibold text-brand-900">{title}</h1>
         </div>
         <div className="flex flex-shrink-0 items-center gap-3">
@@ -61,8 +73,20 @@ export default function PanelLayout({ title, navItems, activeSectionId, onSelect
         logoutLabel={t('authLogout')}
       />
 
-      <main className="h-full overflow-y-auto pt-16 md:pl-16">
-        <div className="mx-auto max-w-3xl px-6 py-8">{children}</div>
+      {/* Darkened sanat-galerisi.jpg backdrop — shared by every role's
+          dashboard since they all render through this shell. The overlay is
+          baked into the same `backgroundImage` (linear-gradient stacked on
+          top of the url()) rather than a separate absolutely-positioned
+          layer, so there's no extra element to keep in sync with <main>'s
+          scroll/size. */}
+      <main
+        className="relative h-full overflow-y-auto bg-cover bg-center bg-no-repeat pt-16 md:pl-16"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(15, 10, 6, 0.72), rgba(15, 10, 6, 0.72)), url('/sanat-galerisi.jpg')",
+        }}
+      >
+        <div className="max-w-6xl px-6 py-8">{children}</div>
       </main>
 
       <div

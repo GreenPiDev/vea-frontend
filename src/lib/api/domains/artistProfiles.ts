@@ -3,7 +3,7 @@
 // hand-written like domains/auth.ts.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Paths } from '../paths';
-import { ApiError, get, post } from '../client';
+import { ApiError, get, patch, post } from '../client';
 
 export interface ApiArtistProfile {
   id: string;
@@ -34,6 +34,19 @@ export function useCreateArtistProfile() {
   return useMutation({
     mutationFn: (payload: CreateArtistProfilePayload) =>
       post<ApiArtistProfile>({ path: Paths.ArtistProfiles, payload }),
+    onSuccess: (profile) => {
+      queryClient.setQueryData([Paths.ArtistProfileMe], profile);
+    },
+  });
+}
+
+// Only `bio` is editable — see vea-api's UpdateArtistProfileDto for why
+// displayName/institutionName aren't included here.
+export function useUpdateArtistProfileBio() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bio: string) =>
+      patch<ApiArtistProfile>({ path: Paths.ArtistProfileMe, payload: { bio } }),
     onSuccess: (profile) => {
       queryClient.setQueryData([Paths.ArtistProfileMe], profile);
     },

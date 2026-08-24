@@ -24,10 +24,10 @@ export default function OrgArtistList() {
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold text-brand-900">{t('curatorArtistsTitle')}</h2>
+      <h2 className="text-lg font-semibold text-white">{t('curatorArtistsTitle')}</h2>
 
       {!isLoading && (!artists || artists.length === 0) && (
-        <p className="text-sm text-brand-600">{t('artistEmpty')}</p>
+        <p className="text-sm text-brand-200">{t('artistEmpty')}</p>
       )}
 
       <ul className="flex flex-col gap-2">

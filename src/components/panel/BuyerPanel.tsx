@@ -32,17 +32,17 @@ export default function BuyerPanel({ onBack }: BuyerPanelProps) {
 
   return (
     <PanelLayout
-      title={t('buyerPanelTitle')}
+      title={t('buyerPanelHeaderTitle')}
       navItems={navItems}
       activeSectionId="offers"
       onSelectSection={() => {}}
       onBack={onBack}
     >
       <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-brand-900">{t('buyerPanelTitle')}</h2>
+        <h2 className="text-lg font-semibold text-white">{t('buyerPanelTitle')}</h2>
 
         {!isLoading && (!offers || offers.length === 0) && (
-          <p className="text-sm text-brand-600">{t('buyerOffersEmpty')}</p>
+          <p className="text-sm text-brand-200">{t('buyerOffersEmpty')}</p>
         )}
 
         <ul className="flex flex-col gap-2">

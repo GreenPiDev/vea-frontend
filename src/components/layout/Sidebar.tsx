@@ -39,7 +39,7 @@ export default function Sidebar({
   return (
     <>
       <aside
-        className={`fixed left-0 top-16 bottom-0 z-40 hidden flex-col justify-between overflow-hidden border-r border-brand-200 bg-white transition-[width] duration-200 md:flex ${
+        className={`fixed left-0 top-16 bottom-0 z-40 hidden flex-col justify-between overflow-hidden border-r border-brand-300 bg-brand-200 transition-[width] duration-200 md:flex ${
           railOpen ? 'w-60 shadow-[2px_0_12px_rgba(0,0,0,0.08)]' : 'w-16'
         }`}
         onMouseEnter={() => onRailOpenChange(true)}
@@ -82,8 +82,8 @@ export default function Sidebar({
         aria-hidden="true"
       />
       {mobileOpen && (
-        <div role="dialog" aria-modal="true" className="fixed inset-y-0 right-0 z-[200] flex w-4/5 max-w-[300px] flex-col bg-white shadow-[-2px_0_16px_rgba(0,0,0,0.12)] md:hidden">
-          <div className="flex h-16 flex-shrink-0 items-center justify-end border-b border-brand-200 px-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-y-0 right-0 z-[200] flex w-4/5 max-w-[300px] flex-col bg-brand-200 shadow-[-2px_0_16px_rgba(0,0,0,0.12)] md:hidden">
+          <div className="flex h-16 flex-shrink-0 items-center justify-end border-b border-brand-300 px-4">
             <button type="button" onClick={onMobileClose} className="text-brand-600 hover:text-brand-900" aria-label={logoutLabel}>
               <CloseIcon />
             </button>

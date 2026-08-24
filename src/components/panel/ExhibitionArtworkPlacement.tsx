@@ -66,7 +66,7 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
   if (isLoading) return null;
 
   if (!exhibition || !runs) {
-    return <p className="text-sm text-brand-600">{t('placementUnavailable')}</p>;
+    return <p className="text-sm text-brand-200">{t('placementUnavailable')}</p>;
   }
 
   const placedCount = placedArtworkIds.size;

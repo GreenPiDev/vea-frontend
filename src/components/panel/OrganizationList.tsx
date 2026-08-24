@@ -35,7 +35,7 @@ export default function OrganizationList({ selectedId, onSelect }: OrganizationL
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-brand-900">{t('orgListTitle')}</h2>
+        <h2 className="text-lg font-semibold text-white">{t('orgListTitle')}</h2>
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
@@ -81,7 +81,7 @@ export default function OrganizationList({ selectedId, onSelect }: OrganizationL
       )}
 
       {!isLoading && (!organizations || organizations.length === 0) && (
-        <p className="text-sm text-brand-600">{t('orgEmpty')}</p>
+        <p className="text-sm text-brand-200">{t('orgEmpty')}</p>
       )}
 
       <ul className="flex flex-col gap-2">

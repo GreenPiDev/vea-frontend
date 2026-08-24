@@ -34,7 +34,7 @@ export default function ArtworkList({ onEdit }: ArtworkListProps) {
   if (isLoading) return null;
 
   if (!artworks || artworks.length === 0) {
-    return <p className="text-sm text-brand-600">{t('artworkEmpty')}</p>;
+    return <p className="text-sm text-brand-200">{t('artworkEmpty')}</p>;
   }
 
   return (

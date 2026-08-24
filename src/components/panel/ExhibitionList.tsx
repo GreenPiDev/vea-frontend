@@ -20,7 +20,7 @@ export default function ExhibitionList({ onPlace }: ExhibitionListProps) {
   if (isLoading) return null;
 
   if (!exhibitions || exhibitions.length === 0) {
-    return <p className="text-sm text-brand-600">{t('exhibitionEmpty')}</p>;
+    return <p className="text-sm text-brand-200">{t('exhibitionEmpty')}</p>;
   }
 
   return (

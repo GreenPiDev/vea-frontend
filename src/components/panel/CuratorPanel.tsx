@@ -50,7 +50,7 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
       {section === 'exhibitions' && (
         <div className="flex flex-col gap-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-brand-900">{t('exhibitionListTitle')}</h2>
+            <h2 className="text-lg font-semibold text-white">{t('exhibitionListTitle')}</h2>
             {!showExhibitionForm && (
               <button
                 onClick={() => setShowExhibitionForm(true)}
@@ -78,21 +78,21 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
 
       {section === 'offers' && (
         <div className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold text-brand-900">{t('orgOffersTitle')}</h2>
+          <h2 className="text-lg font-semibold text-white">{t('orgOffersTitle')}</h2>
           <OrgOfferTable />
         </div>
       )}
 
       {section === 'removalRequests' && (
         <div className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold text-brand-900">{t('removalRequestsTitle')}</h2>
+          <h2 className="text-lg font-semibold text-white">{t('removalRequestsTitle')}</h2>
           <RemovalRequestTable />
         </div>
       )}
 
       {section === 'stats' && (
         <div className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold text-brand-900">{t('curatorStatsTitle')}</h2>
+          <h2 className="text-lg font-semibold text-white">{t('curatorStatsTitle')}</h2>
           <ExhibitionStatsList />
         </div>
       )}

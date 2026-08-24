@@ -31,7 +31,7 @@ export default function RemovalRequestTable() {
   if (isLoading) return null;
 
   if (!requests || requests.length === 0) {
-    return <p className="text-sm text-brand-600">{t('removalRequestEmpty')}</p>;
+    return <p className="text-sm text-brand-200">{t('removalRequestEmpty')}</p>;
   }
 
   const startDeciding = (id: string, decision: RemovalDecision) => {

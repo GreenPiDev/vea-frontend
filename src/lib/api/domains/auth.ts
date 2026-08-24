@@ -12,8 +12,13 @@ export interface ApiUser {
   email: string;
   phone: string | null;
   role: 'VISITOR' | 'ARTIST' | 'INSTITUTION' | 'ADMIN' | 'SUPERADMIN';
-  /** Only set for ADMIN — which Organization's shared exhibition pool they manage. */
+  /** Set for ADMIN (which org's shared exhibition pool they manage) and for
+   * ARTIST (which org's curator invited them) — null otherwise. */
   organizationId: string | null;
+  /** Same scope as organizationId; the nested object so the org's display
+   * name is available without a second request (e.g. auto-filling an
+   * invited artist's "Kurum Adı" field). */
+  organization: { id: string; name: string } | null;
   createdAt: string;
 }
 

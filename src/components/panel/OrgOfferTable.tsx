@@ -27,7 +27,7 @@ export default function OrgOfferTable() {
   if (isLoading) return null;
 
   if (!offers || offers.length === 0) {
-    return <p className="text-sm text-brand-600">{t('orgOfferEmpty')}</p>;
+    return <p className="text-sm text-brand-200">{t('orgOfferEmpty')}</p>;
   }
 
   return (

@@ -30,7 +30,7 @@ export default function ArtistOfferTable() {
   if (isLoading) return null;
 
   if (!offers || offers.length === 0) {
-    return <p className="text-sm text-brand-600">{t('artistOfferEmpty')}</p>;
+    return <p className="text-sm text-brand-200">{t('artistOfferEmpty')}</p>;
   }
 
   return (
