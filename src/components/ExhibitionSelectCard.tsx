@@ -32,7 +32,7 @@ export default function ExhibitionSelectCard({ exhibition, onSelect }: Exhibitio
         </span>
       )}
       <span className="exhibition-select-name">{exhibition.name}</span>
-      <span className="exhibition-select-subtitle">{exhibition.subtitle}</span>
+      <span className="exhibition-select-card-subtitle">{exhibition.subtitle}</span>
     </button>
   );
 }

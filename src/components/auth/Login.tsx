@@ -59,14 +59,14 @@ export default function Login({ onSuccess }: LoginProps) {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-lg bg-brand-50 p-8 shadow-sm">
-      <h1 className="mb-1 text-xl font-semibold text-brand-900">{t('authTitle')}</h1>
+    <div className="flex w-full max-w-md flex-col items-center rounded-lg bg-brand-50 p-10 text-center shadow-sm">
+      <h1 className="mb-1 text-2xl font-semibold text-brand-900">{t('authTitle')}</h1>
       <p className="mb-6 text-sm text-brand-600">
         {step === 'email' ? t('authSubtitleEmail') : t('authSubtitleCode', { email })}
       </p>
 
       {step === 'email' ? (
-        <form onSubmit={handleRequestCode} className="flex flex-col gap-3">
+        <form onSubmit={handleRequestCode} className="flex w-full flex-col items-center gap-3">
           <input
             type="email"
             required
@@ -74,18 +74,18 @@ export default function Login({ onSuccess }: LoginProps) {
             placeholder={t('authEmailPlaceholder')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+            className="w-full rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
           />
           <button
             type="submit"
             disabled={requestCode.isPending}
-            className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+            className="w-full cursor-pointer rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {requestCode.isPending ? t('authSendingCode') : t('authSendCode')}
           </button>
         </form>
       ) : (
-        <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
+        <form onSubmit={handleVerifyCode} className="flex w-full flex-col items-center gap-3">
           <input
             type="text"
             inputMode="numeric"
@@ -95,12 +95,12 @@ export default function Login({ onSuccess }: LoginProps) {
             placeholder={t('authCodePlaceholder')}
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-            className="rounded-md border border-brand-300 bg-white px-3 py-2 text-center text-lg tracking-widest text-brand-900 outline-none focus:border-brand-500"
+            className="w-full rounded-md border border-brand-300 bg-white px-3 py-2 text-center text-lg tracking-widest text-brand-900 outline-none focus:border-brand-500"
           />
           <button
             type="submit"
             disabled={verifyCode.isPending || code.length !== 6}
-            className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+            className="w-full cursor-pointer rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {verifyCode.isPending ? t('authVerifyingCode') : t('authLogin')}
           </button>
@@ -111,7 +111,7 @@ export default function Login({ onSuccess }: LoginProps) {
               setCode('');
               setError(null);
             }}
-            className="text-xs text-brand-600 underline"
+            className="cursor-pointer text-xs text-brand-600 underline"
           >
             {t('authUseDifferentEmail')}
           </button>

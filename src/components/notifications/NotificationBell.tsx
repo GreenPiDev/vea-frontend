@@ -43,7 +43,15 @@ function renderMessage(n: ApiNotification, t: (key: string, opts?: Record<string
   }
 }
 
-export default function NotificationBell() {
+interface NotificationBellProps {
+  /** Mirrors Header's transparent-at-top vs. scrolled "milky coffee" state —
+   * the icon is brand-700 by default, which disappears against the
+   * transparent header's dark backdrop, so it needs to lighten to white
+   * at the top the same way the rest of the header row does. */
+  atTop?: boolean;
+}
+
+export default function NotificationBell({ atTop }: NotificationBellProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const { data: notifications } = useNotifications();
@@ -59,7 +67,9 @@ export default function NotificationBell() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={t('notificationsTitle')}
-        className="relative flex h-9 w-9 items-center justify-center rounded-md text-brand-700 hover:bg-brand-100"
+        className={`relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition-colors duration-300 ${
+          atTop ? 'text-white hover:bg-white/15' : 'text-brand-700 hover:bg-brand-100'
+        }`}
       >
         <BellIcon />
         {count > 0 && (

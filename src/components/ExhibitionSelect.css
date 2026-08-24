@@ -11,41 +11,54 @@
   justify-content: flex-start;
   overflow-y: auto;
   gap: 10px;
-  padding: 24px;
+  /* Top padding reserves space for the fixed Header (h-16 = 64px) so content
+     starts below it in normal flow instead of being covered by it. */
+  padding: 88px 24px 24px;
   background: radial-gradient(circle at 50% 30%, #1c1a17 0%, #0c0b0a 75%);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #f6f5f1;
 }
 
-.exhibition-select-title {
-  margin: 0;
-  font-size: 13px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: rgba(246, 245, 241, 0.5);
+.exhibition-select-welcome {
+  margin: 0 0 8px;
+  font-size: clamp(28px, 5vw, 44px);
+  font-weight: 600;
+  text-align: center;
 }
 
-.exhibition-select-heading {
+.exhibition-select-subtitle {
   margin: 0 0 36px;
-  font-size: clamp(22px, 4vw, 34px);
-  font-weight: 500;
+  font-size: 15px;
+  color: rgba(246, 245, 241, 0.6);
   text-align: center;
 }
 
 .exhibition-select-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: flex-start;
   gap: 20px;
+  width: 100%;
   max-width: 1000px;
+}
+
+@media (max-width: 900px) {
+  .exhibition-select-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .exhibition-select-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .exhibition-select-card {
   --accent: #fff2d0;
   position: relative;
   width: 100%;
-  height: 190px;
+  aspect-ratio: 1 / 1;
   padding: 28px 22px;
   display: flex;
   flex-direction: column;
@@ -98,7 +111,7 @@
   font-weight: 600;
 }
 
-.exhibition-select-subtitle {
+.exhibition-select-card-subtitle {
   font-size: 13px;
   color: rgba(246, 245, 241, 0.6);
 }

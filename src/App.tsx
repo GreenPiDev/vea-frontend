@@ -7,11 +7,7 @@ import type { ArtworkIconPosition } from "./components/3d/ArtworkIconProjector";
 import { adaptApiExhibition, previewAccentColor } from "./components/3d/backendAdapter";
 import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSelect";
 import ArtworkDetailCard from "./components/ArtworkDetailCard";
-import AuthBar from "./components/auth/AuthBar";
-import ArtistPanel from "./components/panel/ArtistPanel";
-import CuratorPanel from "./components/panel/CuratorPanel";
-import SuperAdminPanel from "./components/panel/SuperAdminPanel";
-import BuyerPanel from "./components/panel/BuyerPanel";
+import Header from "./components/layout/Header";
 import { useAuth } from "./lib/auth/AuthContext";
 import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitions";
 import { useRealtimeQuerySync } from "./lib/socket/useRealtimeQuerySync";
@@ -27,7 +23,6 @@ const LOCAL_CARDS: ExhibitionCard[] = EXHIBITIONS.map((e) => ({
 
 export default function App() {
   const { t } = useTranslation();
-  const [screen, setScreen] = useState<"gallery" | "panel">("gallery");
   // Lets ArtworkList.tsx's "on display" links (opened in a new tab via
   // `/?exhibition=<id>`) drop the artist straight into that exhibition's 3D
   // scene, without needing a router — read once on mount. The URL cleanup
@@ -43,13 +38,14 @@ export default function App() {
   const [iconPositions, setIconPositions] = useState<ArtworkIconPosition[]>([]);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
+  const exhibitionSelectScrollRef = useRef<HTMLDivElement | null>(null);
   // Whether the pointer was actually locked (player was walking) at the
   // moment the info card opened — only re-request pointer lock on close if
   // it was, so opening the card before ever clicking into the scene doesn't
   // force a lock the visitor never asked for.
   const pointerWasLockedRef = useRef(false);
 
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { data: backendExhibitions } = usePublicExhibitions();
   useRealtimeQuerySync(isAuthenticated);
 
@@ -162,24 +158,6 @@ export default function App() {
     [backendExhibitions]
   );
 
-  if (screen === "panel") {
-    const onBack = () => setScreen("gallery");
-    switch (user?.role) {
-      case "SUPERADMIN":
-        return <SuperAdminPanel onBack={onBack} />;
-      case "ADMIN":
-        return <CuratorPanel onBack={onBack} />;
-      case "ARTIST":
-        return <ArtistPanel onBack={onBack} />;
-      default:
-        // Plain visitor/buyer — artist onboarding is invite-only now (a
-        // curator adds them via CuratorPanel's "Sanatçılarım"), so anyone
-        // without that role just tracks their own offers here instead of
-        // being forced into ArtistPanel's profile-creation form.
-        return <BuyerPanel onBack={onBack} />;
-    }
-  }
-
   if (!exhibition) {
     // Either nothing picked yet, or a backend exhibition is still loading
     // (backendId set, backendDetail not in yet), or adaptation failed (e.g.
@@ -189,8 +167,12 @@ export default function App() {
     }
     return (
       <>
-        <AuthBar onOpenPanel={() => setScreen("panel")} />
-        <ExhibitionSelect exhibitions={[...LOCAL_CARDS, ...backendCards]} onSelect={setSelectedId} />
+        <Header scrollTargetRef={exhibitionSelectScrollRef} />
+        <ExhibitionSelect
+          exhibitions={[...LOCAL_CARDS, ...backendCards]}
+          onSelect={setSelectedId}
+          containerRef={exhibitionSelectScrollRef}
+        />
       </>
     );
   }
