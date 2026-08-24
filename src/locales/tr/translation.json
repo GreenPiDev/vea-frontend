@@ -32,6 +32,8 @@
   "artworkNew": "+ Yeni Eser",
   "artworkEdit": "Düzenle",
   "artworkDelete": "Sil",
+  "artworkUnarchive": "Arşivden Çıkar",
+  "archiveConfirmMessage": "\"{{title}}\" adlı eseri arşivlemek istediğinizden emin misiniz?",
   "artworkPublish": "Yayınla",
   "artworkUnpublish": "Taslağa Al",
 
@@ -233,5 +235,28 @@
   "buyerOfferDecisionPending": "Sanatçı henüz karar vermedi",
   "buyerOfferDecisionApproved": "Sanatçı onayladı",
   "buyerOfferDecisionRejected": "Sanatçı reddetti",
-  "buyerOfferRejectedHint": "Yeni bir teklif verebilirsiniz."
+  "buyerOfferRejectedHint": "Yeni bir teklif verebilirsiniz.",
+
+  "removalBlockedMessage": "Eseriniz şu anda {{exhibitionTitle}} sergisinde sergilendiği için eserinizi arşive alamazsınız, sergiden kaldırma talebiniz var ise organizasyon yöneticinize başvuru gönderiniz.",
+  "removalRequestCancel": "Vazgeç",
+  "removalRequestSend": "Başvuru Gönder",
+  "removalRequestMessageLabel": "Talebiniz",
+  "removalRequestPlaceholder": "Bu eserin sergiden kaldırılmasını neden istediğinizi yazın...",
+  "removalRequestPending": "Talep bekleniyor",
+  "removalRequestResponsePlaceholder": "Sanatçıya bir yanıt yazın...",
+  "removalRequestsTitle": "Sergiden Kaldırma Talepleri",
+  "removalRequestEmpty": "Bekleyen bir kaldırma talebi yok.",
+  "removalRequestArtwork": "Eser",
+  "removalRequestMessageCol": "Sanatçının Mesajı",
+  "removalRequestStatusCol": "Durum",
+  "removalRequestActionCol": "Aksiyon",
+  "removalRequestStatusPending": "Bekliyor",
+  "removalRequestStatusApproved": "Onaylandı",
+  "removalRequestStatusRejected": "Reddedildi",
+  "removalRequestApprove": "Onayla",
+  "removalRequestReject": "Reddet",
+
+  "notifRemovalRequested": "\"{{artworkTitle}}\" için \"{{exhibitionTitle}}\" sergisinden kaldırma talebi geldi",
+  "notifRemovalDecisionApproved": "\"{{artworkTitle}}\" için kaldırma talebiniz onaylandı",
+  "notifRemovalDecisionRejected": "\"{{artworkTitle}}\" için kaldırma talebiniz reddedildi"
 }

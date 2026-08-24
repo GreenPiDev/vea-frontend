@@ -21,4 +21,6 @@ export const Paths = {
 
   OffersMineBuying: '/offers/mine/buying',
   OffersMineSelling: '/offers/mine/selling',
+
+  ArtworkRemovalRequests: '/artwork-removal-requests',
 } as const;

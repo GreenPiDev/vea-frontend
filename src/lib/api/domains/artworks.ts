@@ -45,6 +45,10 @@ export interface ApiArtwork {
   artistProfile?: { displayName: string; userId: string };
   /** Only present on GET /artworks/mine — which exhibition(s), if any, this artwork is currently placed in. */
   exhibitionLinks?: { exhibition: { id: string; title: string; status: 'DRAFT' | 'ACTIVE' | 'ENDED' } }[];
+  /** Only present on GET /artworks/mine — the artist's own still-PENDING removal request, if any (at most one per artwork+exhibition, see ArtworkRemovalRequestsService). */
+  removalRequests?: { id: string; status: 'PENDING'; exhibitionId: string }[];
+  /** Present on GET /artworks/:id and GET /exhibitions/:id's artworkLinks[].artwork — true once the artist has recorded an informal artistDecision: 'APPROVED' on some offer for this artwork (see Offer.artistDecision). Sold in practice even though the real Artwork.status/Offer.status may still say otherwise; the backend also rejects new offers once this is true. */
+  hasApprovedOffer?: boolean;
 }
 
 export function useMyArtworks() {
@@ -98,6 +102,19 @@ export function useSetArtworkStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: OwnerSettableArtworkStatus }) =>
       patch<ApiArtwork>({ path: `${Paths.Artworks}/${id}/status`, payload: { status } }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [Paths.ArtworksMine] }),
+  });
+}
+
+// PATCH /artworks/:id/unarchive — reactivates an ARCHIVED artwork back to
+// LISTED. Never touches exhibition placement (an ARCHIVED artwork can't
+// have a live ExhibitionArtwork link, see the backend's comment on
+// ArtworksService.unarchive) — the artist has to place it in a show again
+// themselves.
+export function useUnarchiveArtwork() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => patch<ApiArtwork>({ path: `${Paths.Artworks}/${id}/unarchive` }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [Paths.ArtworksMine] }),
   });
 }

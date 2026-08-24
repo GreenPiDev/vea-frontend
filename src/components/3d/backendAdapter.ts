@@ -71,6 +71,7 @@ function toRenderableArtwork(link: ApiExhibitionArtwork, exhibitionId: string, p
     currency: artwork.currency,
     status: artwork.status,
     sellerId: artwork.artistProfile?.userId,
+    hasApprovedOffer: artwork.hasApprovedOffer,
   };
 }
 

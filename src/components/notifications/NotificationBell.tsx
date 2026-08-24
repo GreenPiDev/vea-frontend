@@ -28,6 +28,16 @@ function renderMessage(n: ApiNotification, t: (key: string, opts?: Record<string
       const key = payload.decision === 'APPROVED' ? 'notifOfferDecisionApproved' : 'notifOfferDecisionRejected';
       return t(key, { artworkTitle: payload.artworkTitle });
     }
+    case 'ARTWORK_REMOVAL_REQUESTED':
+      return t('notifRemovalRequested', {
+        artworkTitle: payload.artworkTitle,
+        exhibitionTitle: payload.exhibitionTitle,
+      });
+    case 'ARTWORK_REMOVAL_DECIDED': {
+      const key =
+        payload.decision === 'APPROVED' ? 'notifRemovalDecisionApproved' : 'notifRemovalDecisionRejected';
+      return t(key, { artworkTitle: payload.artworkTitle });
+    }
     default:
       return n.type;
   }

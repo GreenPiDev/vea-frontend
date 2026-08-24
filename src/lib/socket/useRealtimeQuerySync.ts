@@ -23,7 +23,17 @@ interface RealtimeInvalidation {
 export const REALTIME_INVALIDATION_MAP: RealtimeInvalidation[] = [
   {
     event: SOCKET_EVENTS.NotificationCreated,
-    invalidateKeys: [[Paths.Notifications], [Paths.Notifications, 'unread-count']],
+    invalidateKeys: [
+      [Paths.Notifications],
+      [Paths.Notifications, 'unread-count'],
+      // Both removal-request event types (requested/decided) piggyback on
+      // this same generic notification event — see NotificationBell.tsx's
+      // renderMessage — so refreshing these two keeps the curator's
+      // "Sergiden Kaldırma Talepleri" table and the artist's own
+      // ArtworkList.tsx pending-badge live without a page reload.
+      [Paths.ArtworkRemovalRequests, 'organization'],
+      [Paths.ArtworksMine],
+    ],
   },
 ];
 

@@ -41,6 +41,8 @@ export interface Artwork {
   status?: "DRAFT" | "LISTED" | "IN_EXHIBITION" | "SOLD" | "ARCHIVED";
   /** The artist's User.id (ArtistProfile.userId) — lets the UI proactively hide the offer form on the viewer's own artwork instead of only relying on the backend's 403. */
   sellerId?: string;
+  /** Mirrors ApiArtwork.hasApprovedOffer — true once the artist has recorded an informal "approved" decision on an offer for this artwork. Treated the same as status === 'SOLD' by ArtworkDetailCard, even though the real Artwork.status may not have flipped. */
+  hasApprovedOffer?: boolean;
 }
 
 /** Standard museum hanging-line: center of artwork ~1.65m from the floor. */

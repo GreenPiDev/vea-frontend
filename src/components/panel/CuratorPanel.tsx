@@ -6,14 +6,15 @@ import ExhibitionArtworkPlacement from './ExhibitionArtworkPlacement';
 import OrgArtistList from './OrgArtistList';
 import OrgOfferTable from './OrgOfferTable';
 import ExhibitionStatsList from './ExhibitionStatsList';
+import RemovalRequestTable from './RemovalRequestTable';
 import PanelLayout from '../layout/PanelLayout';
-import { ArtworkIcon, ChartIcon, GalleryIcon, PeopleIcon } from '../layout/icons';
+import { ArtworkIcon, ChartIcon, GalleryIcon, PeopleIcon, RemovalRequestIcon } from '../layout/icons';
 
 interface CuratorPanelProps {
   onBack: () => void;
 }
 
-type Section = 'exhibitions' | 'artists' | 'offers' | 'stats';
+type Section = 'exhibitions' | 'artists' | 'offers' | 'removalRequests' | 'stats';
 
 // Admin/curator screen: exhibition creation + artwork placement, split out
 // of ArtistPanel.tsx so artists (who only manage their own artwork/portfolio)
@@ -34,6 +35,7 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
     { id: 'exhibitions', label: t('exhibitionListTitle'), icon: <GalleryIcon /> },
     { id: 'artists', label: t('curatorArtistsTitle'), icon: <PeopleIcon /> },
     { id: 'offers', label: t('orgOffersTitle'), icon: <ArtworkIcon /> },
+    { id: 'removalRequests', label: t('removalRequestsTitle'), icon: <RemovalRequestIcon /> },
     { id: 'stats', label: t('curatorStatsTitle'), icon: <ChartIcon /> },
   ];
 
@@ -78,6 +80,13 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
         <div className="flex flex-col gap-4">
           <h2 className="text-lg font-semibold text-brand-900">{t('orgOffersTitle')}</h2>
           <OrgOfferTable />
+        </div>
+      )}
+
+      {section === 'removalRequests' && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold text-brand-900">{t('removalRequestsTitle')}</h2>
+          <RemovalRequestTable />
         </div>
       )}
 

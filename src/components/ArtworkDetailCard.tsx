@@ -52,7 +52,11 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
       { onSuccess: (data) => setViewCount(data.count) },
     );
   }, [artwork.artworkId, exhibitionId, recordViewMutate]);
-  const isSold = artwork.status === 'SOLD';
+  // hasApprovedOffer is the informal "artist already accepted a buyer"
+  // signal (see Offer.artistDecision) — treated the same as the real SOLD
+  // status here even though Artwork.status may not have flipped yet, since
+  // the backend also refuses new offers once it's true (see OffersService.create).
+  const isSold = artwork.status === 'SOLD' || artwork.hasApprovedOffer === true;
   const isOwnArtwork = isAuthenticated && user?.id === artwork.sellerId;
 
   const priceLabel =

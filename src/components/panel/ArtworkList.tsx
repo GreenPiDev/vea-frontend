@@ -1,5 +1,14 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useArtworkMutations, useMyArtworks, useSetArtworkStatus, type ApiArtwork } from '../../lib/api/domains/artworks';
+import {
+  useArtworkMutations,
+  useMyArtworks,
+  useSetArtworkStatus,
+  useUnarchiveArtwork,
+  type ApiArtwork,
+} from '../../lib/api/domains/artworks';
+import RemovalRequestModal from './RemovalRequestModal';
+import ArchiveConfirmModal from './ArchiveConfirmModal';
 
 const STATUS_KEYS: Record<ApiArtwork['status'], string> = {
   DRAFT: 'statusDraft',
@@ -18,6 +27,9 @@ export default function ArtworkList({ onEdit }: ArtworkListProps) {
   const { data: artworks, isLoading } = useMyArtworks();
   const { remove } = useArtworkMutations();
   const setStatus = useSetArtworkStatus();
+  const unarchive = useUnarchiveArtwork();
+  const [removalRequestFor, setRemovalRequestFor] = useState<ApiArtwork | null>(null);
+  const [confirmDeleteFor, setConfirmDeleteFor] = useState<ApiArtwork | null>(null);
 
   if (isLoading) return null;
 
@@ -26,6 +38,7 @@ export default function ArtworkList({ onEdit }: ArtworkListProps) {
   }
 
   return (
+    <>
     <ul className="flex flex-col gap-2">
       {artworks.map((artwork) => (
         <li
@@ -80,12 +93,54 @@ export default function ArtworkList({ onEdit }: ArtworkListProps) {
             <button onClick={() => onEdit(artwork)} className="text-brand-700 underline hover:text-brand-900">
               {t('artworkEdit')}
             </button>
-            <button onClick={() => remove.mutate(artwork.id)} className="text-red-600 underline hover:text-red-800">
-              {t('artworkDelete')}
-            </button>
+            {artwork.status === 'ARCHIVED' ? (
+              <button
+                onClick={() => unarchive.mutate(artwork.id)}
+                className="text-brand-700 underline hover:text-brand-900"
+              >
+                {t('artworkUnarchive')}
+              </button>
+            ) : artwork.removalRequests && artwork.removalRequests.length > 0 ? (
+              <span className="text-xs text-brand-500">{t('removalRequestPending')}</span>
+            ) : artwork.exhibitionLinks && artwork.exhibitionLinks.length > 0 ? (
+              <button
+                onClick={() => setRemovalRequestFor(artwork)}
+                className="text-red-600 underline hover:text-red-800"
+              >
+                {t('artworkDelete')}
+              </button>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteFor(artwork)}
+                className="text-red-600 underline hover:text-red-800"
+              >
+                {t('artworkDelete')}
+              </button>
+            )}
           </div>
         </li>
       ))}
     </ul>
+
+      {removalRequestFor && removalRequestFor.exhibitionLinks?.[0] && (
+        <RemovalRequestModal
+          artworkId={removalRequestFor.id}
+          exhibitionId={removalRequestFor.exhibitionLinks[0].exhibition.id}
+          exhibitionTitle={removalRequestFor.exhibitionLinks[0].exhibition.title}
+          onClose={() => setRemovalRequestFor(null)}
+        />
+      )}
+
+      {confirmDeleteFor && (
+        <ArchiveConfirmModal
+          artworkTitle={confirmDeleteFor.title}
+          onConfirm={() => {
+            remove.mutate(confirmDeleteFor.id);
+            setConfirmDeleteFor(null);
+          }}
+          onCancel={() => setConfirmDeleteFor(null)}
+        />
+      )}
+    </>
   );
 }

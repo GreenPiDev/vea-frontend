@@ -86,6 +86,15 @@ export function BellIcon({ className }: IconProps) {
   );
 }
 
+export function RemovalRequestIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6h12z" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
 export function LogoutIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

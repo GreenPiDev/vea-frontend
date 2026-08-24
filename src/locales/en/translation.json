@@ -32,6 +32,8 @@
   "artworkNew": "+ New Artwork",
   "artworkEdit": "Edit",
   "artworkDelete": "Delete",
+  "artworkUnarchive": "Unarchive",
+  "archiveConfirmMessage": "Are you sure you want to archive \"{{title}}\"?",
   "artworkPublish": "Publish",
   "artworkUnpublish": "Move to Draft",
 
@@ -233,5 +235,28 @@
   "buyerOfferDecisionPending": "The artist hasn't decided yet",
   "buyerOfferDecisionApproved": "The artist approved",
   "buyerOfferDecisionRejected": "The artist rejected",
-  "buyerOfferRejectedHint": "You can submit a new offer."
+  "buyerOfferRejectedHint": "You can submit a new offer.",
+
+  "removalBlockedMessage": "Your artwork is currently on display in {{exhibitionTitle}}, so you can't archive it. If you'd like it taken down, please send a request to your organization's curator.",
+  "removalRequestCancel": "Cancel",
+  "removalRequestSend": "Send Request",
+  "removalRequestMessageLabel": "Your request",
+  "removalRequestPlaceholder": "Explain why you'd like this artwork removed from the exhibition...",
+  "removalRequestPending": "Request pending",
+  "removalRequestResponsePlaceholder": "Write a response to the artist...",
+  "removalRequestsTitle": "Removal Requests",
+  "removalRequestEmpty": "No pending removal requests.",
+  "removalRequestArtwork": "Artwork",
+  "removalRequestMessageCol": "Artist's Message",
+  "removalRequestStatusCol": "Status",
+  "removalRequestActionCol": "Action",
+  "removalRequestStatusPending": "Pending",
+  "removalRequestStatusApproved": "Approved",
+  "removalRequestStatusRejected": "Rejected",
+  "removalRequestApprove": "Approve",
+  "removalRequestReject": "Reject",
+
+  "notifRemovalRequested": "Removal request for \"{{artworkTitle}}\" from \"{{exhibitionTitle}}\"",
+  "notifRemovalDecisionApproved": "Your removal request for \"{{artworkTitle}}\" was approved",
+  "notifRemovalDecisionRejected": "Your removal request for \"{{artworkTitle}}\" was rejected"
 }
