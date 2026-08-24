@@ -4,7 +4,7 @@
 // generic `update` (a full PATCH /artworks/:id) doesn't cover.
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Paths } from '../paths';
-import { patch } from '../client';
+import { patch, postFormData } from '../client';
 import { useApiGetList, useApiMutations } from '../factory';
 
 export interface ApiArtistArtworkStats {
@@ -76,6 +76,21 @@ export function useOrganizationArtworks() {
 
 export function useArtworkMutations() {
   return useApiMutations<ApiArtwork>(Paths.Artworks, [Paths.ArtworksMine]);
+}
+
+// POST /artworks/upload-image (multipart) — uploads to the caller's own
+// Cloudinary folder (VEA/<env>/artworks/<slugified-artist-name>) and hands
+// back a secure_url the caller submits as ApiArtwork.imageUrl in a normal
+// create/update call. Doesn't touch any Artwork row itself, so no cache to
+// invalidate here.
+export function useUploadArtworkImage() {
+  return useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return postFormData<{ url: string }>(`${Paths.Artworks}/upload-image`, formData);
+    },
+  });
 }
 
 export function useSetArtworkStatus() {

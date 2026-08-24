@@ -1,8 +1,17 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_CURRENCIES, type SupportedCurrency } from '../../lib/currencies';
-import { useArtworkMutations, type ApiArtwork, type ArtworkCategory, type ArtworkOrientation } from '../../lib/api/domains/artworks';
+import {
+  useArtworkMutations,
+  useUploadArtworkImage,
+  type ApiArtwork,
+  type ArtworkCategory,
+  type ArtworkOrientation,
+} from '../../lib/api/domains/artworks';
 import { ApiError } from '../../lib/api/client';
+
+const ALLOWED_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
 
 const ORIENTATIONS: ArtworkOrientation[] = ['PORTRAIT', 'LANDSCAPE', 'SQUARE'];
 const CATEGORIES: ArtworkCategory[] = ['PAINTING', 'SCULPTURE', 'PHOTOGRAPHY', 'OTHER'];
@@ -36,15 +45,59 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
   const [category, setCategory] = useState<ArtworkCategory>(editing?.category ?? 'PAINTING');
   const [priceAmount, setPriceAmount] = useState(editing ? String(editing.priceAmount / 100) : '');
   const [currency, setCurrency] = useState<SupportedCurrency>((editing?.currency as SupportedCurrency) ?? 'TRY');
-  const [imageUrl, setImageUrl] = useState(editing?.imageUrl ?? '');
+  const [imageUrl] = useState(editing?.imageUrl ?? '');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState(editing?.imageUrl ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const { create, update } = useArtworkMutations();
-  const isPending = create.isPending || update.isPending;
+  const uploadImage = useUploadArtworkImage();
+  const isPending = create.isPending || update.isPending || uploadImage.isPending;
 
-  function handleSubmit(e: FormEvent) {
+  // Object URL for the local file preview — must be revoked on change/unmount
+  // or the blob it points at leaks for the tab's lifetime.
+  useEffect(() => {
+    if (!imageFile) return;
+    const objectUrl = URL.createObjectURL(imageFile);
+    setImagePreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [imageFile]);
+
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.type)) {
+      setError(t('artworkFormImageTypeError'));
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      setError(t('artworkFormImageSizeError'));
+      return;
+    }
+    setImageFile(file);
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const onError = (err: unknown) => setError(err instanceof ApiError ? err.message : t('artworkFormError'));
+
+    let finalImageUrl = imageUrl;
+    if (imageFile) {
+      try {
+        const result = await uploadImage.mutateAsync(imageFile);
+        finalImageUrl = result.url;
+      } catch (err) {
+        onError(err);
+        return;
+      }
+    }
+    if (!finalImageUrl) {
+      setError(t('artworkFormImageRequired'));
+      return;
+    }
 
     const payload = {
       title,
@@ -56,10 +109,8 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
       category,
       priceAmount: Math.round(Number(priceAmount) * 100),
       currency,
-      imageUrl,
+      imageUrl: finalImageUrl,
     };
-
-    const onError = (err: unknown) => setError(err instanceof ApiError ? err.message : t('artworkFormError'));
 
     if (editing) {
       update.mutate({ id: editing.id, updates: payload }, { onSuccess: onDone, onError });
@@ -190,14 +241,17 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
       </div>
 
       <label className="flex flex-col gap-1 text-sm text-brand-800">
-        {t('artworkFormImageUrl')}
+        {t('artworkFormImage')}
         <input
-          required
-          type="url"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+          type="file"
+          accept={ALLOWED_IMAGE_MIME_TYPES.join(',')}
+          onChange={handleFileChange}
+          className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none file:mr-3 file:rounded file:border-0 file:bg-brand-100 file:px-3 file:py-1 file:text-brand-800 focus:border-brand-500"
         />
+        {uploadImage.isPending && <span className="text-xs text-brand-600">{t('artworkFormImageUploading')}</span>}
+        {imagePreview && (
+          <img src={imagePreview} alt="" className="mt-2 h-32 w-32 rounded-md object-cover" />
+        )}
       </label>
 
       <div className="mt-2 flex gap-2">
