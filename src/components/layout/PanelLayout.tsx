@@ -13,6 +13,10 @@ interface PanelLayoutProps {
   onSelectSection: (id: string) => void;
   onBack: () => void;
   children: ReactNode;
+  // Opts the content container out of the default max-w-6xl cap, e.g. for
+  // a wide table screen — off by default so forms/lists keep their
+  // current, more readable width.
+  fullWidth?: boolean;
 }
 
 // Shared dashboard shell (topbar + sidebar + content) for ArtistPanel and
@@ -21,7 +25,15 @@ interface PanelLayoutProps {
 // min-height) because #root has height:100%/overflow:hidden — only the
 // inner <main> scrolls, same fix documented in vea-frontend/CLAUDE.md's
 // "known environment quirk" section for other full-height panels.
-export default function PanelLayout({ title, navItems, activeSectionId, onSelectSection, onBack, children }: PanelLayoutProps) {
+export default function PanelLayout({
+  title,
+  navItems,
+  activeSectionId,
+  onSelectSection,
+  onBack,
+  children,
+  fullWidth,
+}: PanelLayoutProps) {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const [railOpen, setRailOpen] = useState(false);
@@ -86,7 +98,7 @@ export default function PanelLayout({ title, navItems, activeSectionId, onSelect
             "linear-gradient(rgba(15, 10, 6, 0.72), rgba(15, 10, 6, 0.72)), url('/sanat-galerisi.jpg')",
         }}
       >
-        <div className="max-w-6xl px-6 py-8">{children}</div>
+        <div className={`px-6 py-8 ${fullWidth ? 'w-full' : 'max-w-6xl'}`}>{children}</div>
       </main>
 
       <div

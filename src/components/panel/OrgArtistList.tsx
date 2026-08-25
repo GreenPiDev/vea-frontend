@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAddMyOrgArtist, useMyOrgArtists, useRemoveMyOrgArtist } from '../../lib/api/domains/organizations';
+import { useAddMyOrgArtist, useMyOrgArtists, useRemoveMyOrgArtist, type ApiOrgArtist } from '../../lib/api/domains/organizations';
 import { ApiError } from '../../lib/api/client';
+import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
+import Tooltip from '../layout/Tooltip';
+import { TrashIcon } from '../layout/icons';
 
 // Same list+add+remove shape as OrgAdminList.tsx, but "mine" — the ADMIN's
 // own organization, no id prop needed (backend derives it from the JWT).
@@ -18,33 +21,47 @@ export default function OrgArtistList() {
     setError(null);
     addArtist.mutate(email, {
       onSuccess: () => setEmail(''),
-      onError: (err) => setError(err instanceof ApiError ? err.message : t('artistAddError')),
+      onError: (err: unknown) => setError(err instanceof ApiError ? err.message : t('artistAddError')),
     });
   }
+
+  const columns: GenericTableColumn<ApiOrgArtist>[] = [
+    {
+      key: 'email',
+      header: t('artistColEmail'),
+      render: (artist) => <span className="text-brand-900">{artist.email}</span>,
+    },
+    {
+      key: 'actions',
+      header: t('artworkListColActions'),
+      render: (artist) => (
+        <Tooltip label={t('artistRemove')} placement="top">
+          <button
+            type="button"
+            onClick={() => removeArtist.mutate(artist.id)}
+            aria-label={t('artistRemove')}
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-red-300 text-red-600 transition-colors hover:bg-red-50 hover:text-red-800"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </Tooltip>
+      ),
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-3">
       <h2 className="text-lg font-semibold text-white">{t('curatorArtistsTitle')}</h2>
 
-      {!isLoading && (!artists || artists.length === 0) && (
-        <p className="text-sm text-brand-200">{t('artistEmpty')}</p>
-      )}
+      <GenericTable
+        columns={columns}
+        data={artists}
+        getRowKey={(artist) => artist.id}
+        isLoading={isLoading}
+        emptyMessage={t('artistEmpty')}
+      />
 
-      <ul className="flex flex-col gap-2">
-        {artists?.map((artist) => (
-          <li key={artist.id} className="flex items-center justify-between gap-3 rounded-md bg-brand-50 px-4 py-3 shadow-sm">
-            <span className="text-sm text-brand-900">{artist.email}</span>
-            <button
-              onClick={() => removeArtist.mutate(artist.id)}
-              className="text-sm text-red-600 underline hover:text-red-800"
-            >
-              {t('artistRemove')}
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-md bg-brand-50 p-4 shadow-sm">
+      <form onSubmit={handleSubmit} className="flex max-w-xl flex-col gap-2 rounded-md bg-brand-50 p-4 shadow-sm">
         <label className="flex flex-col gap-1 text-sm text-brand-800">
           {t('artistEmailLabel')}
           <input

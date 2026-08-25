@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useOrganizationOffers, type ApiOffer } from '../../lib/api/domains/offers';
+import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
 
 const OFFER_STATUS_KEYS: Record<ApiOffer['status'], string> = {
   PENDING: 'offerStatusPending',
@@ -19,61 +20,76 @@ function formatAmount(amount: number, currency: string): string {
 // artist in this admin's organization, buyer identity included (unlike
 // ArtistOfferTable.tsx). No accept/reject action here — the admin only
 // observes the artist's own (informal) decision, see artistDecision's
-// comment in vea-api's OffersService.
+// comment in vea-api's OffersService. First consumer of GenericTable — see
+// its comment for the plan to migrate the other panel tables.
 export default function OrgOfferTable() {
   const { t } = useTranslation();
   const { data: offers, isLoading } = useOrganizationOffers();
 
-  if (isLoading) return null;
-
-  if (!offers || offers.length === 0) {
-    return <p className="text-sm text-brand-200">{t('orgOfferEmpty')}</p>;
-  }
+  const columns: GenericTableColumn<ApiOffer>[] = [
+    {
+      key: 'artist',
+      header: t('orgOfferArtist'),
+      render: (offer) => <span className="text-brand-900">{offer.artwork?.artistProfile?.displayName ?? '—'}</span>,
+    },
+    {
+      key: 'artwork',
+      header: t('orgOfferArtwork'),
+      render: (offer) => {
+        const exhibitionTitle = offer.artwork?.exhibitionLinks?.[0]?.exhibition.title;
+        return (
+          <>
+            <p className="font-medium text-brand-900">{offer.artwork?.title ?? offer.artworkId}</p>
+            {exhibitionTitle && <p className="text-xs text-brand-500">{exhibitionTitle}</p>}
+          </>
+        );
+      },
+    },
+    {
+      key: 'buyer',
+      header: t('orgOfferBuyer'),
+      render: (offer) => <span className="text-brand-700">{offer.buyer?.email ?? '—'}</span>,
+    },
+    {
+      key: 'amount',
+      header: t('orgOfferAmount'),
+      render: (offer) => <span className="text-brand-900">{formatAmount(offer.amount, offer.currency)}</span>,
+    },
+    {
+      key: 'status',
+      header: t('orgOfferStatus'),
+      render: (offer) => <span className="text-brand-700">{t(OFFER_STATUS_KEYS[offer.status])}</span>,
+    },
+    {
+      key: 'artistDecision',
+      header: t('orgOfferArtistDecision'),
+      render: (offer) => {
+        if (offer.artistDecision === 'APPROVED') {
+          return (
+            <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+              {t('orgOfferDecisionApproved')}
+            </span>
+          );
+        }
+        if (offer.artistDecision === 'REJECTED') {
+          return (
+            <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
+              {t('orgOfferDecisionRejected')}
+            </span>
+          );
+        }
+        return <span className="text-xs text-brand-500">—</span>;
+      },
+    },
+  ];
 
   return (
-    <div className="overflow-x-auto rounded-lg bg-brand-50 shadow-sm">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-brand-200 text-xs uppercase tracking-wide text-brand-600">
-            <th className="px-4 py-3 font-medium">{t('orgOfferArtist')}</th>
-            <th className="px-4 py-3 font-medium">{t('orgOfferArtwork')}</th>
-            <th className="px-4 py-3 font-medium">{t('orgOfferBuyer')}</th>
-            <th className="px-4 py-3 font-medium">{t('orgOfferAmount')}</th>
-            <th className="px-4 py-3 font-medium">{t('orgOfferStatus')}</th>
-            <th className="px-4 py-3 font-medium">{t('orgOfferArtistDecision')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {offers.map((offer) => {
-            const exhibitionTitle = offer.artwork?.exhibitionLinks?.[0]?.exhibition.title;
-            return (
-              <tr key={offer.id} className="border-b border-brand-100 last:border-0">
-                <td className="px-4 py-3 text-brand-900">{offer.artwork?.artistProfile?.displayName ?? '—'}</td>
-                <td className="px-4 py-3">
-                  <p className="font-medium text-brand-900">{offer.artwork?.title ?? offer.artworkId}</p>
-                  {exhibitionTitle && <p className="text-xs text-brand-500">{exhibitionTitle}</p>}
-                </td>
-                <td className="px-4 py-3 text-brand-700">{offer.buyer?.email ?? '—'}</td>
-                <td className="px-4 py-3 text-brand-900">{formatAmount(offer.amount, offer.currency)}</td>
-                <td className="px-4 py-3 text-brand-700">{t(OFFER_STATUS_KEYS[offer.status])}</td>
-                <td className="px-4 py-3">
-                  {offer.artistDecision === 'APPROVED' && (
-                    <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                      {t('orgOfferDecisionApproved')}
-                    </span>
-                  )}
-                  {offer.artistDecision === 'REJECTED' && (
-                    <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
-                      {t('orgOfferDecisionRejected')}
-                    </span>
-                  )}
-                  {!offer.artistDecision && <span className="text-xs text-brand-500">—</span>}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <GenericTable
+      columns={columns}
+      data={offers}
+      getRowKey={(offer) => offer.id}
+      isLoading={isLoading}
+      emptyMessage={t('orgOfferEmpty')}
+    />
   );
 }

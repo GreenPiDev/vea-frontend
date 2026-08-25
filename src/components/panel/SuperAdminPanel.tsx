@@ -30,6 +30,7 @@ export default function SuperAdminPanel({ onBack }: SuperAdminPanelProps) {
       activeSectionId="organizations"
       onSelectSection={() => {}}
       onBack={onBack}
+      fullWidth
     >
       <div className="flex flex-col gap-6">
         <OrganizationList selectedId={selectedOrgId} onSelect={setSelectedOrgId} />

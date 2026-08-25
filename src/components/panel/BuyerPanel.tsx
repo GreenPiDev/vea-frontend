@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { useMyOffersAsBuyer, type OfferStatus } from '../../lib/api/domains/offers';
+import { useMyOffersAsBuyer, type ApiOffer, type OfferStatus } from '../../lib/api/domains/offers';
 import PanelLayout from '../layout/PanelLayout';
 import { ArtworkIcon } from '../layout/icons';
+import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
 
 const STATUS_KEYS: Record<OfferStatus, string> = {
   PENDING: 'offerStatusPending',
@@ -13,6 +14,10 @@ const STATUS_KEYS: Record<OfferStatus, string> = {
   CANCELLED: 'offerStatusCancelled',
 };
 
+function formatAmount(amount: number, currency: string): string {
+  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(amount / 100);
+}
+
 interface BuyerPanelProps {
   onBack: () => void;
 }
@@ -23,12 +28,50 @@ interface BuyerPanelProps {
 // artist profile" form on someone who just wants to track their offers.
 // Read-only: accept/pay/deliver/release are seller/backend-owned state
 // transitions, out of scope here (see offer creation's own scope note in
-// ArtworkDetailCard.tsx).
+// ArtworkDetailCard.tsx). Third GenericTable consumer after
+// OrgOfferTable.tsx/ArtistOfferTable.tsx — same fullWidth pattern as those
+// two panels' offers tab.
 export default function BuyerPanel({ onBack }: BuyerPanelProps) {
   const { t } = useTranslation();
   const { data: offers, isLoading } = useMyOffersAsBuyer();
 
   const navItems = [{ id: 'offers', label: t('buyerPanelTitle'), icon: <ArtworkIcon /> }];
+
+  const columns: GenericTableColumn<ApiOffer>[] = [
+    {
+      key: 'artwork',
+      header: t('buyerOfferArtwork'),
+      render: (offer) => <span className="font-medium text-brand-900">{offer.artwork?.title ?? offer.artworkId}</span>,
+    },
+    {
+      key: 'amount',
+      header: t('buyerOfferAmount'),
+      render: (offer) => <span className="text-brand-900">{formatAmount(offer.amount, offer.currency)}</span>,
+    },
+    {
+      key: 'status',
+      header: t('buyerOfferStatus'),
+      render: (offer) => <span className="text-brand-700">{t(STATUS_KEYS[offer.status])}</span>,
+    },
+    {
+      key: 'decision',
+      header: t('buyerOfferDecisionCol'),
+      render: (offer) => {
+        if (offer.artistDecision === 'APPROVED') {
+          return <span className="text-xs font-medium text-green-700">{t('buyerOfferDecisionApproved')}</span>;
+        }
+        if (offer.artistDecision === 'REJECTED') {
+          return (
+            <>
+              <p className="text-xs font-medium text-red-700">{t('buyerOfferDecisionRejected')}</p>
+              <p className="text-xs text-brand-500">{t('buyerOfferRejectedHint')}</p>
+            </>
+          );
+        }
+        return <span className="text-xs text-brand-500">{t('buyerOfferDecisionPending')}</span>;
+      },
+    },
+  ];
 
   return (
     <PanelLayout
@@ -37,46 +80,18 @@ export default function BuyerPanel({ onBack }: BuyerPanelProps) {
       activeSectionId="offers"
       onSelectSection={() => {}}
       onBack={onBack}
+      fullWidth
     >
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold text-white">{t('buyerPanelTitle')}</h2>
 
-        {!isLoading && (!offers || offers.length === 0) && (
-          <p className="text-sm text-brand-200">{t('buyerOffersEmpty')}</p>
-        )}
-
-        <ul className="flex flex-col gap-2">
-          {offers?.map((offer) => (
-            <li
-              key={offer.id}
-              className="flex items-center justify-between gap-3 rounded-md bg-brand-50 px-4 py-3 shadow-sm"
-            >
-              <div>
-                <p className="text-sm font-medium text-brand-900">
-                  {offer.artwork?.title ?? offer.artworkId}
-                </p>
-                <p className="text-xs text-brand-600">{t(STATUS_KEYS[offer.status])}</p>
-                {offer.artistDecision === 'APPROVED' && (
-                  <p className="text-xs font-medium text-green-700">{t('buyerOfferDecisionApproved')}</p>
-                )}
-                {offer.artistDecision === 'REJECTED' && (
-                  <>
-                    <p className="text-xs font-medium text-red-700">{t('buyerOfferDecisionRejected')}</p>
-                    <p className="text-xs text-brand-500">{t('buyerOfferRejectedHint')}</p>
-                  </>
-                )}
-                {!offer.artistDecision && (
-                  <p className="text-xs text-brand-500">{t('buyerOfferDecisionPending')}</p>
-                )}
-              </div>
-              <p className="text-sm font-medium text-brand-900">
-                {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: offer.currency }).format(
-                  offer.amount / 100,
-                )}
-              </p>
-            </li>
-          ))}
-        </ul>
+        <GenericTable
+          columns={columns}
+          data={offers}
+          getRowKey={(offer) => offer.id}
+          isLoading={isLoading}
+          emptyMessage={t('buyerOffersEmpty')}
+        />
       </div>
     </PanelLayout>
   );

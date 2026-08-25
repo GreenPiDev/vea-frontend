@@ -40,6 +40,7 @@ export default function ArtistPanel({ onBack }: ArtistPanelProps) {
       activeSectionId={section}
       onSelectSection={(id) => setSection(id as Section)}
       onBack={onBack}
+      fullWidth={section === 'offers' || section === 'artworks' || section === 'stats'}
     >
       {isLoading && null}
 
@@ -69,10 +70,12 @@ export default function ArtistPanel({ onBack }: ArtistPanelProps) {
           </div>
 
           {formMode !== 'none' && (
-            <ArtworkForm
-              editing={formMode === 'create' ? undefined : formMode}
-              onDone={() => setFormMode('none')}
-            />
+            <div className="max-w-xl">
+              <ArtworkForm
+                editing={formMode === 'create' ? undefined : formMode}
+                onDone={() => setFormMode('none')}
+              />
+            </div>
           )}
 
           <ArtworkList onEdit={(artwork) => setFormMode(artwork)} />

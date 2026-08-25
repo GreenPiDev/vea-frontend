@@ -12,6 +12,9 @@ export interface ApiOrganization {
   id: string;
   name: string;
   createdAt: string;
+  /** Only present on GET /organizations (findAll's _count include) — admins is
+   * filtered to role ADMIN (the relation itself covers ADMIN + ARTIST). */
+  _count?: { admins: number; exhibitions: number };
 }
 
 export interface ApiOrgAdmin {

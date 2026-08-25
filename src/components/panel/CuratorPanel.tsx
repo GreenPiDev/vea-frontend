@@ -46,6 +46,13 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
       activeSectionId={section}
       onSelectSection={(id) => setSection(id as Section)}
       onBack={onBack}
+      fullWidth={
+        section === 'exhibitions' ||
+        section === 'artists' ||
+        section === 'offers' ||
+        section === 'removalRequests' ||
+        section === 'stats'
+      }
     >
       {section === 'exhibitions' && (
         <div className="flex flex-col gap-6">
@@ -61,7 +68,11 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
             )}
           </div>
 
-          {showExhibitionForm && <ExhibitionForm onDone={() => setShowExhibitionForm(false)} />}
+          {showExhibitionForm && (
+            <div className="max-w-xl">
+              <ExhibitionForm onDone={() => setShowExhibitionForm(false)} />
+            </div>
+          )}
 
           {placingExhibitionId && (
             <ExhibitionArtworkPlacement
