@@ -2,6 +2,9 @@ import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import SuperAdminPanel from "../components/panel/SuperAdminPanel";
 import CuratorPanel from "../components/panel/CuratorPanel";
 import NewExhibitionPage from "../components/panel/NewExhibitionPage";
+import NewExhibitionTemplatePage from "../components/panel/NewExhibitionTemplatePage";
+import EditExhibitionTemplatePage from "../components/panel/EditExhibitionTemplatePage";
+import ExhibitionTemplatePreviewPage from "../components/panel/ExhibitionTemplatePreviewPage";
 import AddArtworkPage from "../components/panel/AddArtworkPage";
 import ExhibitionPreviewPage from "../components/panel/ExhibitionPreviewPage";
 import ArtistPanel from "../components/panel/ArtistPanel";
@@ -58,6 +61,18 @@ export default function Dashboard() {
           <Route
             path="organization/exhibitions/preview/:exhibitionId"
             element={<ExhibitionPreviewPage />}
+          />
+          <Route
+            path="organization/exhibition-templates/new"
+            element={<NewExhibitionTemplatePage onBack={onBack} />}
+          />
+          <Route
+            path="organization/exhibition-templates/:templateId/edit"
+            element={<EditExhibitionTemplatePage onBack={onBack} />}
+          />
+          <Route
+            path="organization/exhibition-templates/preview/:templateId"
+            element={<ExhibitionTemplatePreviewPage />}
           />
           <Route path="organization/:section" element={<CuratorPanel onBack={onBack} />} />
           <Route path="*" element={<Navigate to="organization/exhibitions" replace />} />

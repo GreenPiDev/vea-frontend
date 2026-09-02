@@ -14,6 +14,7 @@ import type {
   ApiSceneConfig,
   CustomSceneConfig,
 } from "../../lib/api/domains/exhibitions";
+import type { ApiExhibitionTemplate } from "../../lib/api/domains/exhibitionTemplates";
 import type { Artwork } from "./artworks";
 import { EXHIBITIONS, type Exhibition, type ExhibitionTheme } from "./exhibitions";
 import {
@@ -148,12 +149,23 @@ export function previewAccentColor(config: ApiSceneConfig | null): string {
  * Returns null under the same "can't resolve" conditions as
  * adaptApiExhibition (missing sceneConfig, unknown templateId).
  */
-export function wallRunsForSceneConfig(config: ApiSceneConfig | null): (WallRunGeometry & { id: string })[] | null {
+/** A backend ExhibitionTemplate's wall runs, regardless of its roomShape.kind (rectangle or custom-drawn — same grid contract useRoomGridEditor/galleryLayout.ts's buildCustomRoomLayout uses for a custom Exhibition room). */
+function backendTemplateWallRuns(template: ApiExhibitionTemplate): (WallRunGeometry & { id: string })[] {
+  return template.roomShape.kind === "rectangle"
+    ? templateWallRuns([template.roomShape.width, template.roomShape.depth])
+    : buildCustomRoomLayout(template.roomShape.cells, template.wallHeight, template.roomShape.spawn).wallRuns;
+}
+
+export function wallRunsForSceneConfig(
+  config: ApiSceneConfig | null,
+  resolvedTemplate?: ApiExhibitionTemplate | null
+): (WallRunGeometry & { id: string })[] | null {
   if (!config) return null;
   if (config.kind === "template") {
     const template = EXHIBITIONS.find((e) => e.id === config.templateId);
-    if (!template || !template.roomSize) return null;
-    return templateWallRuns(template.roomSize);
+    if (template && template.roomSize) return templateWallRuns(template.roomSize);
+    if (resolvedTemplate) return backendTemplateWallRuns(resolvedTemplate);
+    return null;
   }
   return buildCustomRoomLayout(config.cells, config.wallHeight, config.spawn).wallRuns;
 }
@@ -174,28 +186,26 @@ export interface BlueprintLayout {
  * below is arbitrary (1) since none of the x/z values this reads depend on it,
  * only the unused ceiling/collider math does.
  */
-export function blueprintForSceneConfig(config: ApiSceneConfig | null): BlueprintLayout | null {
-  if (!config) return null;
-  if (config.kind === "template") {
-    const template = EXHIBITIONS.find((e) => e.id === config.templateId);
-    if (!template || !template.roomSize) return null;
-    const [W, D] = template.roomSize;
-    const { playerStart, playerStartYaw } = buildRoomLayout(template.roomSize, 1);
-    return {
-      cells: null,
-      bounds: { minX: -W / 2, maxX: W / 2, minZ: -D / 2, maxZ: D / 2 },
-      wallRuns: templateWallRuns(template.roomSize),
-      // rotate() is clockwise in SVG; yaw's convention (0 = -Z/"up" in this
-      // top-down mapping, increasing toward +X/"east") is the opposite
-      // sense, hence the negation — see SpawnOverride's yaw doc comment.
-      spawn: { x: playerStart[0], z: playerStart[2], rotationDeg: -(playerStartYaw * 180) / Math.PI },
-    };
-  }
-  const { layout, wallRuns } = buildCustomRoomLayout(config.cells, config.wallHeight, config.spawn);
+function rectangleBlueprint(roomSize: [number, number]): BlueprintLayout {
+  const [W, D] = roomSize;
+  const { playerStart, playerStartYaw } = buildRoomLayout(roomSize, 1);
+  return {
+    cells: null,
+    bounds: { minX: -W / 2, maxX: W / 2, minZ: -D / 2, maxZ: D / 2 },
+    wallRuns: templateWallRuns(roomSize),
+    // rotate() is clockwise in SVG; yaw's convention (0 = -Z/"up" in this
+    // top-down mapping, increasing toward +X/"east") is the opposite
+    // sense, hence the negation — see SpawnOverride's yaw doc comment.
+    spawn: { x: playerStart[0], z: playerStart[2], rotationDeg: -(playerStartYaw * 180) / Math.PI },
+  };
+}
+
+function customBlueprint(cells: GridCell[], wallHeight: number, spawn: { x: number; z: number; yaw: number }): BlueprintLayout {
+  const { layout, wallRuns } = buildCustomRoomLayout(cells, wallHeight, spawn);
   const [cx, cz] = layout.room.center;
   const [W, D] = layout.room.size;
   return {
-    cells: config.cells,
+    cells,
     bounds: { minX: cx - W / 2, maxX: cx + W / 2, minZ: cz - D / 2, maxZ: cz + D / 2 },
     wallRuns,
     spawn: {
@@ -204,6 +214,22 @@ export function blueprintForSceneConfig(config: ApiSceneConfig | null): Blueprin
       rotationDeg: -(layout.playerStartYaw * 180) / Math.PI,
     },
   };
+}
+
+export function blueprintForSceneConfig(
+  config: ApiSceneConfig | null,
+  resolvedTemplate?: ApiExhibitionTemplate | null
+): BlueprintLayout | null {
+  if (!config) return null;
+  if (config.kind === "template") {
+    const staticTemplate = EXHIBITIONS.find((e) => e.id === config.templateId);
+    if (staticTemplate?.roomSize) return rectangleBlueprint(staticTemplate.roomSize);
+    if (!resolvedTemplate) return null;
+    return resolvedTemplate.roomShape.kind === "rectangle"
+      ? rectangleBlueprint([resolvedTemplate.roomShape.width, resolvedTemplate.roomShape.depth])
+      : customBlueprint(resolvedTemplate.roomShape.cells, resolvedTemplate.wallHeight, resolvedTemplate.roomShape.spawn);
+  }
+  return customBlueprint(config.cells, config.wallHeight, config.spawn);
 }
 
 /**
@@ -219,16 +245,29 @@ export function adaptApiExhibition(exhibition: ApiExhibition): Exhibition | null
   const byWall = groupByWallRun(exhibition.artworkLinks ?? []);
 
   if (config.kind === "template") {
-    const template = EXHIBITIONS.find((e) => e.id === config.templateId);
-    if (!template || !template.roomSize) return null;
+    const staticTemplate = EXHIBITIONS.find((e) => e.id === config.templateId);
+    if (staticTemplate && staticTemplate.roomSize) {
+      const runs = templateWallRuns(staticTemplate.roomSize);
+      return {
+        ...staticTemplate,
+        id: exhibition.id,
+        name: exhibition.title,
+        artworks: placeAll(runs, staticTemplate.wallHeight, byWall, exhibition.id),
+      };
+    }
 
-    const runs = templateWallRuns(template.roomSize);
-    return {
-      ...template,
-      id: exhibition.id,
-      name: exhibition.title,
-      artworks: placeAll(runs, template.wallHeight, byWall, exhibition.id),
-    };
+    // Not a static preset — resolve against the org's own backend
+    // ExhibitionTemplate (only present when GET included the relation, i.e.
+    // came from useExhibition/useOwnExhibition, not a list endpoint).
+    const backendTemplate = exhibition.exhibitionTemplate;
+    if (!backendTemplate) return null;
+
+    const runs = backendTemplateWallRuns(backendTemplate);
+    return exhibitionFromBackendTemplate(
+      backendTemplate,
+      { id: exhibition.id, name: exhibition.title },
+      placeAll(runs, backendTemplate.wallHeight, byWall, exhibition.id)
+    );
   }
 
   const { layout, wallRuns } = buildCustomRoomLayout(config.cells, config.wallHeight, config.spawn);
@@ -242,4 +281,40 @@ export function adaptApiExhibition(exhibition: ApiExhibition): Exhibition | null
     artworks: placeAll(wallRuns, config.wallHeight, byWall, exhibition.id),
     theme: buildCustomTheme(config),
   };
+}
+
+/** Shared by adaptApiExhibition's backend-template branch and adaptExhibitionTemplate below — builds the renderable Exhibition shell from an ApiExhibitionTemplate, with whichever id/name/artworks the caller has (a real exhibition's own, or the template's own for an empty preview). */
+function exhibitionFromBackendTemplate(
+  backendTemplate: ApiExhibitionTemplate,
+  identity: { id: string; name: string },
+  artworks: Artwork[]
+): Exhibition {
+  const base = {
+    id: identity.id,
+    name: identity.name,
+    subtitle: backendTemplate.subtitle ?? "",
+    wallHeight: backendTemplate.wallHeight,
+    theme: backendTemplate.theme,
+    artworks,
+  };
+  if (backendTemplate.roomShape.kind === "rectangle") {
+    return { ...base, roomSize: [backendTemplate.roomShape.width, backendTemplate.roomShape.depth] };
+  }
+  const { layout } = buildCustomRoomLayout(
+    backendTemplate.roomShape.cells,
+    backendTemplate.wallHeight,
+    backendTemplate.roomShape.spawn
+  );
+  return { ...base, custom: true, customLayout: layout };
+}
+
+/**
+ * Renders a backend ExhibitionTemplate on its own, with no exhibition/
+ * artworks — used by the curator panel's "Önizle" action on the templates
+ * table (ExhibitionTemplatePreviewPage.tsx) so an admin can walk through
+ * what a template's empty room looks like before picking it for a real
+ * exhibition, the same 3D Scene component exhibition previews use.
+ */
+export function adaptExhibitionTemplate(template: ApiExhibitionTemplate): Exhibition {
+  return exhibitionFromBackendTemplate(template, { id: template.id, name: template.name }, []);
 }

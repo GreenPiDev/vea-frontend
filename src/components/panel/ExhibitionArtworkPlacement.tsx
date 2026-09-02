@@ -50,7 +50,7 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
   const [heightDrafts, setHeightDrafts] = useState<Record<string, string>>({});
 
   const runs = useMemo(
-    () => (exhibition ? wallRunsForSceneConfig(exhibition.sceneConfig) : null),
+    () => (exhibition ? wallRunsForSceneConfig(exhibition.sceneConfig, exhibition.exhibitionTemplate) : null),
     [exhibition]
   );
   const byWall = useMemo(() => groupByWallRun(exhibition?.artworkLinks ?? []), [exhibition]);
@@ -296,6 +296,7 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
 
       <ExhibitionBlueprint
         sceneConfig={exhibition.sceneConfig}
+        resolvedTemplate={exhibition.exhibitionTemplate}
         byWall={byWall}
         selectedWallId={selectedWallId}
         onSelectWall={setSelectedWallId}

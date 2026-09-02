@@ -15,13 +15,6 @@ import { useRealtimeQuerySync } from "./lib/socket/useRealtimeQuerySync";
 import { useExhibitionVisitorCount } from "./lib/socket/useExhibitionVisitorCount";
 import "./App.css";
 
-const LOCAL_CARDS: ExhibitionCard[] = EXHIBITIONS.map((e) => ({
-  id: e.id,
-  name: e.name,
-  subtitle: e.subtitle,
-  accent: e.theme.spotColor,
-}));
-
 export default function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -53,6 +46,13 @@ export default function App() {
   const { data: backendExhibitions } = usePublicExhibitions();
   useRealtimeQuerySync(isAuthenticated);
 
+  // The static demo templates (EXHIBITIONS) are no longer offered on the
+  // homepage selector or the exhibition-creation picker (see
+  // ExhibitionForm.tsx) — org-scoped backend ExhibitionTemplates replaced
+  // them as the "hazır şablon" source. This lookup stays only so that any
+  // already-existing exhibition/bookmark built on one of those 4 static ids
+  // (sceneConfig.kind:'template', templateId:'renaissance' etc.) keeps
+  // rendering — see backendAdapter.ts's identical fallback.
   const localExhibition = useMemo(
     () => (selectedId ? (EXHIBITIONS.find((e) => e.id === selectedId) ?? null) : null),
     [selectedId]
@@ -173,7 +173,7 @@ export default function App() {
       <>
         <Header scrollTargetRef={exhibitionSelectScrollRef} />
         <ExhibitionSelect
-          exhibitions={[...LOCAL_CARDS, ...backendCards]}
+          exhibitions={backendCards}
           onSelect={setSelectedId}
           containerRef={exhibitionSelectScrollRef}
         />

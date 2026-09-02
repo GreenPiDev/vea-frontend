@@ -32,6 +32,31 @@ export function GalleryIcon({ className }: IconProps) {
   );
 }
 
+// Floor-plan/blueprint glyph — distinguishes "Sergi Şablonları" (room
+// presets) from GalleryIcon's "Sergilerim" (a single walkable room) in the
+// curator sidebar, since both are gallery-adjacent concepts.
+export function TemplateIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M3 9h18M9 21V9" />
+    </svg>
+  );
+}
+
+// Screen-with-play-triangle glyph — "walk through this in the 3D scene"
+// (ExhibitionList.tsx / ExhibitionTemplateList.tsx's "Önizle" action).
+// Distinct from EyeIcon (visibility/publish toggle) and GalleryIcon (a room)
+// so all three "look"-adjacent actions in these tables read differently.
+export function PreviewIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <rect x="2" y="4" width="20" height="14" rx="2" />
+      <path d="M10 9l5 3-5 3V9z" />
+    </svg>
+  );
+}
+
 export function MenuIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

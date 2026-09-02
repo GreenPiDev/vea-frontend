@@ -9,7 +9,7 @@ import {
 } from '../../lib/api/domains/exhibitions';
 import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
 import Tooltip from '../layout/Tooltip';
-import { ArtworkIcon, EyeIcon, EyeOffIcon, GalleryIcon, TrashIcon, UndoIcon } from '../layout/icons';
+import { ArtworkIcon, EyeIcon, EyeOffIcon, PreviewIcon, TrashIcon, UndoIcon } from '../layout/icons';
 
 const STATUS_KEYS: Record<ApiExhibition['status'], string> = {
   DRAFT: 'exhibitionStatusDraft',
@@ -102,7 +102,7 @@ export default function ExhibitionList({ onPlace, onPreview }: ExhibitionListPro
               <ArtworkIcon className="h-4 w-4" />
             </ActionButton>
             <ActionButton label={t('exhibitionPreview')} onClick={() => onPreview(exhibition.id)}>
-              <GalleryIcon className="h-4 w-4" />
+              <PreviewIcon className="h-4 w-4" />
             </ActionButton>
             {exhibition.status === 'DRAFT' && (
               <ActionButton

@@ -9,6 +9,7 @@ import { Paths } from '../paths';
 import { useApiGet, useApiGetList, useApiMutations } from '../factory';
 import { patch, post, remove } from '../client';
 import type { ApiArtwork } from './artworks';
+import type { ApiExhibitionTemplate } from './exhibitionTemplates';
 
 // Mirrors vea-api's src/exhibitions/dto/scene-config.dto.ts discriminated
 // union (keep the two in sync by hand, same cross-repo caveat as
@@ -72,6 +73,8 @@ export interface ApiExhibition {
   _count?: { artworkLinks: number };
   /** Only present on GET /exhibitions/:id (findOneForView) — list endpoints (usePublicExhibitions/useMyExhibitions) don't include it. */
   artworkLinks?: ApiExhibitionArtwork[];
+  /** Only present on GET /exhibitions/:id and GET /exhibitions/mine/:id — resolved when sceneConfig.kind==='template' and templateId points at a real backend ExhibitionTemplate (not one of the static EXHIBITIONS presets). See backendAdapter.ts's adaptApiExhibition. */
+  exhibitionTemplate?: ApiExhibitionTemplate | null;
 }
 
 export function usePublicExhibitions() {

@@ -1,11 +1,14 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ApiExhibitionArtwork, ApiSceneConfig } from '../../lib/api/domains/exhibitions';
+import type { ApiExhibitionTemplate } from '../../lib/api/domains/exhibitionTemplates';
 import { blueprintForSceneConfig } from '../3d/backendAdapter';
 import { placeArtworksAlongWall } from '../3d/galleryLayout';
 
 interface ExhibitionBlueprintProps {
   sceneConfig: ApiSceneConfig | null;
+  /** The exhibition's resolved backend ExhibitionTemplate (if sceneConfig.templateId points at one, not a static EXHIBITIONS preset) — lets blueprintForSceneConfig fall back to it for room size. */
+  resolvedTemplate?: ApiExhibitionTemplate | null;
   /** wallRunId -> its placed links, sorted by order — same shape ExhibitionArtworkPlacement.tsx already derives via groupByWallRun(exhibition.artworkLinks). */
   byWall: Map<string, ApiExhibitionArtwork[]>;
   selectedWallId?: string | null;
@@ -28,9 +31,9 @@ const WALL_NUMBER_FONT_SIZE = 0.5;
  * placeArtworksAlongWall), just projected onto the x/z plane instead of
  * rendered in Three.js. Pure SVG, no dependency on the 3D scene stack.
  */
-export default function ExhibitionBlueprint({ sceneConfig, byWall, selectedWallId, onSelectWall }: ExhibitionBlueprintProps) {
+export default function ExhibitionBlueprint({ sceneConfig, resolvedTemplate, byWall, selectedWallId, onSelectWall }: ExhibitionBlueprintProps) {
   const { t } = useTranslation();
-  const blueprint = useMemo(() => blueprintForSceneConfig(sceneConfig), [sceneConfig]);
+  const blueprint = useMemo(() => blueprintForSceneConfig(sceneConfig, resolvedTemplate), [sceneConfig, resolvedTemplate]);
 
   const thumbnails = useMemo(() => {
     if (!blueprint) return [];
