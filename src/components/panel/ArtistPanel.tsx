@@ -1,16 +1,14 @@
-import { useState } from 'react';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMyArtistProfile } from '../../lib/api/domains/artistProfiles';
 import { ApiError } from '../../lib/api/client';
 import ArtistProfileForm from './ArtistProfileForm';
 import ArtistProfileView from './ArtistProfileView';
-import ArtworkForm from './ArtworkForm';
 import ArtworkList from './ArtworkList';
 import ArtistOfferTable from './ArtistOfferTable';
 import ArtistStatsTable from './ArtistStatsTable';
-import type { ApiArtwork } from '../../lib/api/domains/artworks';
 import PanelLayout from '../layout/PanelLayout';
-import { ArtworkIcon, ChartIcon, GalleryIcon, PeopleIcon } from '../layout/icons';
+import { useArtistNavItems } from './artistNavItems';
 
 interface ArtistPanelProps {
   onBack: () => void;
@@ -18,27 +16,28 @@ interface ArtistPanelProps {
 
 type Section = 'profile' | 'artworks' | 'offers' | 'stats';
 
+const SECTIONS: Section[] = ['profile', 'artworks', 'offers', 'stats'];
+
 export default function ArtistPanel({ onBack }: ArtistPanelProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { section: sectionParam } = useParams<{ section: string }>();
   const { data: profile, isLoading, error } = useMyArtistProfile();
-  const [formMode, setFormMode] = useState<'none' | 'create' | ApiArtwork>('none');
-  const [section, setSection] = useState<Section>('artworks');
+  const navItems = useArtistNavItems();
 
   const hasNoProfile = error instanceof ApiError && error.status === 404;
 
-  const navItems = [
-    { id: 'profile', label: t('artistProfileSectionTitle'), icon: <PeopleIcon /> },
-    { id: 'artworks', label: t('artworkListTitle'), icon: <ArtworkIcon /> },
-    { id: 'offers', label: t('artistOffersTitle'), icon: <GalleryIcon /> },
-    { id: 'stats', label: t('artistStatsTitle'), icon: <ChartIcon /> },
-  ];
+  if (!sectionParam || !SECTIONS.includes(sectionParam as Section)) {
+    return <Navigate to="/dashboard/artist/artworks" replace />;
+  }
+  const section = sectionParam as Section;
 
   return (
     <PanelLayout
       title={t('artistPanelTitle')}
       navItems={navItems}
       activeSectionId={section}
-      onSelectSection={(id) => setSection(id as Section)}
+      onSelectSection={(id) => navigate(`/dashboard/artist/${id}`)}
       onBack={onBack}
       fullWidth={section === 'offers' || section === 'artworks' || section === 'stats'}
     >
@@ -59,26 +58,19 @@ export default function ArtistPanel({ onBack }: ArtistPanelProps) {
 
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-white">{t('artworkListTitle')}</h2>
-            {formMode === 'none' && (
-              <button
-                onClick={() => setFormMode('create')}
-                className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
-              >
-                {t('artworkNew')}
-              </button>
-            )}
+            <button
+              onClick={() => navigate('/dashboard/artist/artworks/new-artwork')}
+              className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
+            >
+              {t('artworkNew')}
+            </button>
           </div>
 
-          {formMode !== 'none' && (
-            <div className="max-w-xl">
-              <ArtworkForm
-                editing={formMode === 'create' ? undefined : formMode}
-                onDone={() => setFormMode('none')}
-              />
-            </div>
-          )}
+          <p className="rounded-md border border-brand-300 bg-brand-100 px-3 py-2 text-sm text-brand-800">
+            {t('artworkPublishHint')}
+          </p>
 
-          <ArtworkList onEdit={(artwork) => setFormMode(artwork)} />
+          <ArtworkList onEdit={(artwork) => navigate(`/dashboard/artist/artworks/edit/${artwork.id}`)} />
         </div>
       )}
 

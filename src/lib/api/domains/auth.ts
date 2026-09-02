@@ -11,7 +11,7 @@ export interface ApiUser {
   id: string;
   email: string;
   phone: string | null;
-  role: 'VISITOR' | 'ARTIST' | 'INSTITUTION' | 'ADMIN' | 'SUPERADMIN';
+  role: 'VISITOR' | 'SELLER' | 'GALLERY_ADMIN' | 'SUPERADMIN';
   /** Set for ADMIN (which org's shared exhibition pool they manage) and for
    * ARTIST (which org's curator invited them) — null otherwise. */
   organizationId: string | null;

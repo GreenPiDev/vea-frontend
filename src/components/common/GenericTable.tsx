@@ -27,6 +27,8 @@ interface GenericTableProps<T> {
   isLoading?: boolean;
   emptyMessage: string;
   expandable?: GenericTableExpandable<T>;
+  /** Extra classes appended to a row's <tr> — e.g. ExhibitionList.tsx dims soft-deleted rows behind its "Kaldırılan sergileri göster" toggle. */
+  getRowClassName?: (row: T) => string;
 }
 
 // Shared read/write table shell for panel screens (curator/artist/superadmin
@@ -35,7 +37,7 @@ interface GenericTableProps<T> {
 // (borders, header style, empty/loading state, optional row expansion).
 // OrgOfferTable.tsx is the first consumer; other panel tables migrate to
 // this incrementally, not in one pass.
-export default function GenericTable<T>({ columns, data, getRowKey, isLoading, emptyMessage, expandable }: GenericTableProps<T>) {
+export default function GenericTable<T>({ columns, data, getRowKey, isLoading, emptyMessage, expandable, getRowClassName }: GenericTableProps<T>) {
   if (isLoading) return null;
 
   if (!data || data.length === 0) {
@@ -88,7 +90,7 @@ export default function GenericTable<T>({ columns, data, getRowKey, isLoading, e
               return (
                 <Fragment key={rowKey}>
                   <tr
-                    className={`border-b border-brand-100 last:border-0 ${expandable ? 'cursor-pointer hover:bg-brand-100/60' : ''}`}
+                    className={`border-b border-brand-100 last:border-0 ${expandable ? 'cursor-pointer hover:bg-brand-100/60' : ''} ${getRowClassName?.(row) ?? ''}`}
                     onClick={expandable ? () => expandable.onToggle(row) : undefined}
                   >
                     {expandable && (

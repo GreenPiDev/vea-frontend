@@ -1,8 +1,15 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useExhibitionMutations, useMyExhibitions, useSetExhibitionStatus, type ApiExhibition } from '../../lib/api/domains/exhibitions';
+import {
+  useExhibitionMutations,
+  useMyExhibitions,
+  useRestoreExhibition,
+  useSetExhibitionStatus,
+  type ApiExhibition,
+} from '../../lib/api/domains/exhibitions';
 import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
 import Tooltip from '../layout/Tooltip';
-import { ArtworkIcon, EyeIcon, TrashIcon } from '../layout/icons';
+import { ArtworkIcon, EyeIcon, EyeOffIcon, TrashIcon, UndoIcon } from '../layout/icons';
 
 const STATUS_KEYS: Record<ApiExhibition['status'], string> = {
   DRAFT: 'exhibitionStatusDraft',
@@ -49,9 +56,11 @@ function ActionButton({
 
 export default function ExhibitionList({ onPlace }: ExhibitionListProps) {
   const { t } = useTranslation();
-  const { data: exhibitions, isLoading } = useMyExhibitions();
+  const [showRemoved, setShowRemoved] = useState(false);
+  const { data: exhibitions, isLoading } = useMyExhibitions(showRemoved);
   const { remove } = useExhibitionMutations();
   const setStatus = useSetExhibitionStatus();
+  const restore = useRestoreExhibition();
 
   const columns: GenericTableColumn<ApiExhibition>[] = [
     {
@@ -65,38 +74,71 @@ export default function ExhibitionList({ onPlace }: ExhibitionListProps) {
       render: (exhibition) => <span className="text-brand-700">{t(STATUS_KEYS[exhibition.status])}</span>,
     },
     {
+      key: 'artist',
+      header: t('exhibitionListColArtist'),
+      render: (exhibition) => (
+        <span className="text-brand-700">
+          {exhibition.artistProfile?.displayName ?? t('exhibitionListArtistNone')}
+        </span>
+      ),
+    },
+    {
       key: 'actions',
       header: t('artworkListColActions'),
-      render: (exhibition) => (
-        <div className="flex items-center gap-2">
-          <ActionButton label={t('placementTitle')} onClick={() => onPlace(exhibition.id)}>
-            <ArtworkIcon className="h-4 w-4" />
+      render: (exhibition) =>
+        exhibition.deletedAt ? (
+          <ActionButton label={t('exhibitionRestore')} onClick={() => restore.mutate(exhibition.id)}>
+            <UndoIcon className="h-4 w-4" />
           </ActionButton>
-          {exhibition.status === 'DRAFT' && (
-            <ActionButton
-              label={t('exhibitionPublish')}
-              onClick={() => setStatus.mutate({ id: exhibition.id, status: 'ACTIVE' })}
-            >
-              <EyeIcon className="h-4 w-4" />
+        ) : (
+          <div className="flex items-center gap-2">
+            <ActionButton label={t('placementTitle')} onClick={() => onPlace(exhibition.id)}>
+              <ArtworkIcon className="h-4 w-4" />
             </ActionButton>
-          )}
-          {exhibition.status === 'DRAFT' && (
+            {exhibition.status === 'DRAFT' && (
+              <ActionButton
+                label={t('exhibitionPublish')}
+                onClick={() => setStatus.mutate({ id: exhibition.id, status: 'ACTIVE' })}
+              >
+                <EyeIcon className="h-4 w-4" />
+              </ActionButton>
+            )}
+            {exhibition.status === 'ACTIVE' && (
+              <ActionButton
+                label={t('exhibitionUnpublish')}
+                onClick={() => setStatus.mutate({ id: exhibition.id, status: 'DRAFT' })}
+              >
+                <EyeOffIcon className="h-4 w-4" />
+              </ActionButton>
+            )}
             <ActionButton label={t('exhibitionDelete')} tone="danger" onClick={() => remove.mutate(exhibition.id)}>
               <TrashIcon className="h-4 w-4" />
             </ActionButton>
-          )}
-        </div>
-      ),
+          </div>
+        ),
     },
   ];
 
   return (
-    <GenericTable
-      columns={columns}
-      data={exhibitions}
-      getRowKey={(exhibition) => exhibition.id}
-      isLoading={isLoading}
-      emptyMessage={t('exhibitionEmpty')}
-    />
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setShowRemoved((prev) => !prev)}
+          className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
+        >
+          {showRemoved ? t('exhibitionHideRemoved') : t('exhibitionShowRemoved')}
+        </button>
+      </div>
+
+      <GenericTable
+        columns={columns}
+        data={exhibitions}
+        getRowKey={(exhibition) => exhibition.id}
+        isLoading={isLoading}
+        emptyMessage={t('exhibitionEmpty')}
+        getRowClassName={(exhibition) => (exhibition.deletedAt ? 'opacity-40' : '')}
+      />
+    </div>
   );
 }

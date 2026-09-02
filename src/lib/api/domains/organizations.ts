@@ -23,6 +23,8 @@ export interface ApiOrgAdmin {
   name: string | null;
   role: string;
   createdAt: string;
+  /** Only present on GET /organizations/mine/artists (listArtists' select) — null until the invited artist has created their ArtistProfile. Lets ExhibitionForm.tsx offer this artist for the exhibition's optional solo-show pin; artworkCount feeds OrgArtistList.tsx's roster table. */
+  artistProfile?: { id: string; displayName: string; _count: { artworks: number } } | null;
 }
 
 export function useOrganizations() {

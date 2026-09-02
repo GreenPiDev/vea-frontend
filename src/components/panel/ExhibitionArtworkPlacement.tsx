@@ -74,10 +74,16 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
 
   // LISTED only — public list also includes IN_EXHIBITION artworks (already
   // showing somewhere else), which shouldn't be offered here as if free.
+  // When the exhibition was pinned to a single artist at creation
+  // (Exhibition.artistProfileId — see ExhibitionForm.tsx), narrow the picker
+  // to just that artist's own artworks instead of the whole organization.
   const availableArtworks = isFull
     ? []
     : (orgArtworks ?? []).filter(
-        (artwork) => artwork.status === 'LISTED' && !placedArtworkIds.has(artwork.id)
+        (artwork) =>
+          artwork.status === 'LISTED' &&
+          !placedArtworkIds.has(artwork.id) &&
+          (!exhibition.artistProfileId || artwork.artistProfileId === exhibition.artistProfileId)
       );
 
   function wallLabel(run: WallRunGeometry & { id: string }): string {

@@ -1,20 +1,20 @@
-import { useState } from 'react';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import ExhibitionForm from './ExhibitionForm';
 import ExhibitionList from './ExhibitionList';
-import ExhibitionArtworkPlacement from './ExhibitionArtworkPlacement';
 import OrgArtistList from './OrgArtistList';
 import OrgOfferTable from './OrgOfferTable';
 import ExhibitionStatsList from './ExhibitionStatsList';
 import RemovalRequestTable from './RemovalRequestTable';
 import PanelLayout from '../layout/PanelLayout';
-import { ArtworkIcon, ChartIcon, GalleryIcon, PeopleIcon, RemovalRequestIcon } from '../layout/icons';
+import { useCuratorNavItems } from './curatorNavItems';
 
 interface CuratorPanelProps {
   onBack: () => void;
 }
 
-type Section = 'exhibitions' | 'artists' | 'offers' | 'removalRequests' | 'stats';
+type Section = 'exhibitions' | 'artists' | 'offers' | 'removal-requests' | 'stats';
+
+const SECTIONS: Section[] = ['exhibitions', 'artists', 'offers', 'removal-requests', 'stats'];
 
 // Admin/curator screen: exhibition creation + artwork placement, split out
 // of ArtistPanel.tsx so artists (who only manage their own artwork/portfolio)
@@ -27,30 +27,27 @@ type Section = 'exhibitions' | 'artists' | 'offers' | 'removalRequests' | 'stats
 // "İstatistikler" (ExhibitionStatsList) — visitor/view counts.
 export default function CuratorPanel({ onBack }: CuratorPanelProps) {
   const { t } = useTranslation();
-  const [section, setSection] = useState<Section>('exhibitions');
-  const [showExhibitionForm, setShowExhibitionForm] = useState(false);
-  const [placingExhibitionId, setPlacingExhibitionId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { section: sectionParam } = useParams<{ section: string }>();
+  const navItems = useCuratorNavItems();
 
-  const navItems = [
-    { id: 'exhibitions', label: t('exhibitionListTitle'), icon: <GalleryIcon /> },
-    { id: 'artists', label: t('curatorArtistsTitle'), icon: <PeopleIcon /> },
-    { id: 'offers', label: t('orgOffersTitle'), icon: <ArtworkIcon /> },
-    { id: 'removalRequests', label: t('removalRequestsTitle'), icon: <RemovalRequestIcon /> },
-    { id: 'stats', label: t('curatorStatsTitle'), icon: <ChartIcon /> },
-  ];
+  if (!sectionParam || !SECTIONS.includes(sectionParam as Section)) {
+    return <Navigate to="/dashboard/organization/exhibitions" replace />;
+  }
+  const section = sectionParam as Section;
 
   return (
     <PanelLayout
       title={t('curatorPanelTitle')}
       navItems={navItems}
       activeSectionId={section}
-      onSelectSection={(id) => setSection(id as Section)}
+      onSelectSection={(id) => navigate(`/dashboard/organization/${id}`)}
       onBack={onBack}
       fullWidth={
         section === 'exhibitions' ||
         section === 'artists' ||
         section === 'offers' ||
-        section === 'removalRequests' ||
+        section === 'removal-requests' ||
         section === 'stats'
       }
     >
@@ -58,30 +55,19 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
         <div className="flex flex-col gap-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-white">{t('exhibitionListTitle')}</h2>
-            {!showExhibitionForm && (
-              <button
-                onClick={() => setShowExhibitionForm(true)}
-                className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
-              >
-                {t('exhibitionNew')}
-              </button>
-            )}
+            <button
+              onClick={() => navigate('/dashboard/organization/exhibitions/new-exhibition')}
+              className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-800"
+            >
+              {t('exhibitionNew')}
+            </button>
           </div>
 
-          {showExhibitionForm && (
-            <div className="max-w-xl">
-              <ExhibitionForm onDone={() => setShowExhibitionForm(false)} />
-            </div>
-          )}
-
-          {placingExhibitionId && (
-            <ExhibitionArtworkPlacement
-              exhibitionId={placingExhibitionId}
-              onDone={() => setPlacingExhibitionId(null)}
-            />
-          )}
-
-          <ExhibitionList onPlace={setPlacingExhibitionId} />
+          <ExhibitionList
+            onPlace={(exhibitionId) =>
+              navigate(`/dashboard/organization/exhibitions/add-artwork/${exhibitionId}`)
+            }
+          />
         </div>
       )}
 
@@ -94,7 +80,7 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
         </div>
       )}
 
-      {section === 'removalRequests' && (
+      {section === 'removal-requests' && (
         <div className="flex flex-col gap-4">
           <h2 className="text-lg font-semibold text-white">{t('removalRequestsTitle')}</h2>
           <RemovalRequestTable />

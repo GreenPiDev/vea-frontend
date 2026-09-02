@@ -4,6 +4,7 @@ import { EXHIBITIONS } from '../3d/exhibitions';
 import type { GridCell } from '../3d/galleryLayout';
 import { CEILING_TEXTURES, FLOOR_TEXTURES, WALL_TEXTURES, type SurfaceTexture } from '../3d/surfaceTextures';
 import { useExhibitionMutations, type CustomSceneConfig, type TemplateSceneConfig } from '../../lib/api/domains/exhibitions';
+import { useMyOrgArtists } from '../../lib/api/domains/organizations';
 import { ApiError } from '../../lib/api/client';
 import './ExhibitionForm.css';
 
@@ -77,6 +78,7 @@ interface ExhibitionFormProps {
 export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
   const { t } = useTranslation();
   const { create } = useExhibitionMutations();
+  const { data: orgArtists } = useMyOrgArtists();
   const [error, setError] = useState<string | null>(null);
 
   const [title, setTitle] = useState('');
@@ -84,6 +86,13 @@ export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [maxArtworks, setMaxArtworks] = useState('');
+  const [artistProfileId, setArtistProfileId] = useState('');
+
+  // Only artists who've actually created their ArtistProfile can be pinned
+  // to an exhibition (Exhibition.artistProfileId references ArtistProfile,
+  // not User) — an invited artist who hasn't finished onboarding yet has no
+  // id to offer here.
+  const eligibleArtists = (orgArtists ?? []).filter((artist) => artist.artistProfile);
   const [roomType, setRoomType] = useState<RoomType>('template');
   const [templateId, setTemplateId] = useState(EXHIBITIONS[0]?.id ?? '');
 
@@ -183,6 +192,7 @@ export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
       startDate,
       endDate,
       maxArtworks: maxArtworks ? Number(maxArtworks) : undefined,
+      artistProfileId: artistProfileId || undefined,
       sceneConfig,
     };
 
@@ -211,6 +221,22 @@ export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
           onChange={(e) => setDescription(e.target.value)}
           className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
         />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-brand-800">
+        {t('exhibitionFormArtist')}
+        <select
+          value={artistProfileId}
+          onChange={(e) => setArtistProfileId(e.target.value)}
+          className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+        >
+          <option value="">{t('exhibitionFormArtistNone')}</option>
+          {eligibleArtists.map((artist) => (
+            <option key={artist.artistProfile!.id} value={artist.artistProfile!.id}>
+              {artist.artistProfile!.displayName}
+            </option>
+          ))}
+        </select>
       </label>
 
       <div className="grid grid-cols-2 gap-3">

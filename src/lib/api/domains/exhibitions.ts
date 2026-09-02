@@ -62,6 +62,12 @@ export interface ApiExhibition {
   /** Curator-set cap on how many artworks may ever be placed at once. Null/unset = unlimited. */
   maxArtworks: number | null;
   createdAt: string;
+  /** Soft-delete marker (see vea-api's Exhibition.deletedAt comment) — null = visible, set = "Kaldırıldı" (curator's own table shows it grayed out behind the includeRemoved toggle; public/other-org views never see it at all). */
+  deletedAt?: string | null;
+  /** Optional "solo show" artist, set at creation — see vea-api's Exhibition.artistProfileId comment. Null = mixed/group exhibition, artwork placement offers every org artist same as before this field existed. */
+  artistProfileId?: string | null;
+  /** Only present on GET /exhibitions/mine (findOwn's include) — the resolved artist for the table/placement filter. */
+  artistProfile?: { id: string; displayName: string } | null;
   /** Only present on GET /exhibitions/:id (findOneForView) — list endpoints (usePublicExhibitions/useMyExhibitions) don't include it. */
   artworkLinks?: ApiExhibitionArtwork[];
 }
@@ -76,8 +82,12 @@ export function useExhibition(id: string) {
   });
 }
 
-export function useMyExhibitions() {
-  return useApiGetList<ApiExhibition>(Paths.ExhibitionsMine);
+// includeRemoved=false (default) is what ExhibitionList.tsx's table shows
+// until the curator toggles "Kaldırılan sergileri göster"; ExhibitionStatsList.tsx
+// always passes true so a soft-deleted exhibition never drops out of stats.
+export function useMyExhibitions(includeRemoved = false) {
+  const path = includeRemoved ? `${Paths.ExhibitionsMine}?includeRemoved=true` : Paths.ExhibitionsMine;
+  return useApiGetList<ApiExhibition>(path, [Paths.ExhibitionsMine, { includeRemoved }]);
 }
 
 // GET /exhibitions/mine/:id — owner-only full detail (any status, including
@@ -94,21 +104,37 @@ export function useExhibitionMutations() {
   return useApiMutations<ApiExhibition>(Paths.Exhibitions, [Paths.ExhibitionsMine]);
 }
 
-// Dedicated PATCH /exhibitions/:id/status endpoint (forward-only state
-// machine on the backend: DRAFT->ACTIVE->ENDED) — not covered by the
-// generic `update` mutation above, same pattern as artworks.ts's
-// useSetArtworkStatus.
+// Dedicated PATCH /exhibitions/:id/status endpoint — DRAFT<->ACTIVE->ENDED
+// (ACTIVE->DRAFT, "Yayından Kaldır", added 2026-09-02; ENDED stays terminal)
+// — not covered by the generic `update` mutation above, same pattern as
+// artworks.ts's useSetArtworkStatus.
 export function useSetExhibitionStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: 'ACTIVE' | 'ENDED' }) =>
+    mutationFn: ({ id, status }: { id: string; status: 'ACTIVE' | 'ENDED' | 'DRAFT' }) =>
       patch<ApiExhibition>({ path: `${Paths.Exhibitions}/${id}/status`, payload: { status } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [Paths.ExhibitionsMine] });
-      // DRAFT->ACTIVE/ACTIVE->ENDED both change what the public list (GET
-      // /exhibitions) returns — without this the gallery selector can keep
-      // showing stale visibility for up to its 60s staleTime after a
-      // publish, in the same browser tab that just published it.
+      // DRAFT->ACTIVE/ACTIVE->ENDED/ACTIVE->DRAFT all change what the public
+      // list (GET /exhibitions) returns — without this the gallery selector
+      // can keep showing stale visibility for up to its 60s staleTime after
+      // a publish/unpublish, in the same browser tab that just did it.
+      queryClient.invalidateQueries({ queryKey: [Paths.Exhibitions] });
+    },
+  });
+}
+
+// PATCH /exhibitions/:id/restore — undoes remove()'s soft delete (clears
+// deletedAt). Only meaningful from the curator table's "Kaldırılan
+// sergileri göster" view, where a removed row's action becomes "Geri Getir"
+// instead of the usual place/status/delete controls.
+export function useRestoreExhibition() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      patch<ApiExhibition>({ path: `${Paths.Exhibitions}/${id}/restore`, payload: {} }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [Paths.ExhibitionsMine] });
       queryClient.invalidateQueries({ queryKey: [Paths.Exhibitions] });
     },
   });

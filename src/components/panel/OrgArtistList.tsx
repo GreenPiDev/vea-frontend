@@ -27,9 +27,33 @@ export default function OrgArtistList() {
 
   const columns: GenericTableColumn<ApiOrgArtist>[] = [
     {
+      key: 'name',
+      header: t('artistColName'),
+      render: (artist) =>
+        artist.artistProfile ? (
+          <span className="text-brand-900">{artist.artistProfile.displayName}</span>
+        ) : (
+          <span className="text-xs text-brand-500">{t('artistProfilePending')}</span>
+        ),
+    },
+    {
       key: 'email',
       header: t('artistColEmail'),
       render: (artist) => <span className="text-brand-900">{artist.email}</span>,
+    },
+    {
+      key: 'joined',
+      header: t('artistColJoined'),
+      render: (artist) => (
+        <span className="text-brand-700">{new Date(artist.createdAt).toLocaleDateString('tr-TR')}</span>
+      ),
+    },
+    {
+      key: 'artworkCount',
+      header: t('artistColArtworkCount'),
+      render: (artist) => (
+        <span className="text-brand-700">{artist.artistProfile?._count.artworks ?? 0}</span>
+      ),
     },
     {
       key: 'actions',
@@ -61,7 +85,7 @@ export default function OrgArtistList() {
         emptyMessage={t('artistEmpty')}
       />
 
-      <form onSubmit={handleSubmit} className="flex max-w-xl flex-col gap-2 rounded-md bg-brand-50 p-4 shadow-sm">
+      <form onSubmit={handleSubmit} className="flex w-full flex-col gap-2 rounded-md bg-brand-50 p-4 shadow-sm">
         <label className="flex flex-col gap-1 text-sm text-brand-800">
           {t('artistEmailLabel')}
           <input

@@ -22,9 +22,10 @@ interface SidebarProps {
 // Desktop: a fixed, icon-only rail that expands on hover (overlaying the
 // content, not reflowing it) — see PanelLayout's fixed md:pl-16 offset.
 // Mobile: a separate right-side slide-in drawer with the same items, opened
-// via PanelLayout's hamburger button. No router — active section is plain
-// local state (vea-frontend intentionally has no react-router, see
-// vea-frontend/CLAUDE.md), so links are buttons, not NavLink.
+// via PanelLayout's hamburger button. activeId/onSelect are driven by the
+// URL (see Dashboard.tsx's per-role routes) but items stay plain buttons,
+// not NavLink, since PanelLayout's callers navigate via useNavigate rather
+// than rendering literal hrefs here.
 export default function Sidebar({
   items,
   activeId,

@@ -30,7 +30,10 @@ function VisitorCountCell({ exhibitionId }: { exhibitionId: string }) {
 // every exhibition's paintings together would be unreadable.
 export default function ExhibitionStatsList() {
   const { t } = useTranslation();
-  const { data: exhibitions, isLoading } = useMyExhibitions();
+  // Always includeRemoved — a soft-deleted (kaldırılmış) exhibition must
+  // never drop out of the curator's own analytics, that's the entire point
+  // of soft delete over a hard one (see vea-api's Exhibition.deletedAt).
+  const { data: exhibitions, isLoading } = useMyExhibitions(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { data: stats, isLoading: statsLoading } = useExhibitionStats(expandedId ?? '');
   // Offer counts are derived client-side from the same org-wide offer list
