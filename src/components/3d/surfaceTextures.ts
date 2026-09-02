@@ -49,3 +49,11 @@ export function findTexture(list: SurfaceTexture[], id: string | undefined): Sur
   if (!id) return null;
   return list.find((t) => t.id === id) ?? null;
 }
+
+// Neutral base scans used to give a *custom-color* room (artist picked an RGB color instead of a preset
+// texture) subtle real-world surface variation — the color tints these instead of painting a perfectly flat
+// MeshStandardMaterial, which read as artificial/matte-paint-swatch flat. Picked for being visually neutral
+// enough that tinting reads as "painted plaster/sealed concrete", not as their own distinct pattern.
+export const DEFAULT_WALL_TEXTURE = WALL_TEXTURES[0]; // Plaster001 — flat plaster
+export const DEFAULT_FLOOR_TEXTURE = FLOOR_TEXTURES[4]; // Concrete048 — sealed concrete
+export const DEFAULT_CEILING_TEXTURE = CEILING_TEXTURES[0]; // Plaster003 — matte plaster
