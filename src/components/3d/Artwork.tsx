@@ -27,12 +27,8 @@ export default function Artwork({ data }: { data: ArtworkData }) {
 
   return (
     <group position={data.position} rotation={[0, data.rotationY, 0]}>
-      {/* Frame — skipped when the artist marked their uploaded image as already framed (see artworks.ts's `frame` doc comment). "modernBlack" is a flat solid-color default for unframed backend artworks, everything else is a real photo-scanned material. */}
-      {data.frame === "modernBlack" ? (
-        <SolidFrameMesh size={frameSize} />
-      ) : data.frame ? (
-        <FrameMesh style={data.frame} size={frameSize} />
-      ) : null}
+      {/* Frame — skipped when the artist marked their uploaded image as already framed (see artworks.ts's `frame` doc comment). "modernBlack" is the default for unframed backend artworks, all styles now render as real photo-scanned material. */}
+      {data.frame ? <FrameMesh style={data.frame} size={frameSize} /> : null}
 
 
       {/* Canvas */}
@@ -72,24 +68,8 @@ export default function Artwork({ data }: { data: ArtworkData }) {
   );
 }
 
-/** Flat matte-black box, no texture — the default frame given to a backend artwork whose artist marked their uploaded image as unframed. Deliberately simple/cheap (no useTexture load) since it's the common case for real user-uploaded content, unlike the two curated demo materials below. */
-function SolidFrameMesh({ size }: { size: [number, number, number] }) {
-  return (
-    <mesh position={[0, 0, -FRAME_DEPTH / 2]} castShadow>
-      <boxGeometry args={size} />
-      <meshStandardMaterial color="#111111" roughness={0.35} metalness={0.15} />
-    </mesh>
-  );
-}
-
-/** Real photo-scanned gold/walnut material on the frame box, tiled to the frame's own size (see textureUv.ts) so every painting shares just two textures total. */
-function FrameMesh({
-  style,
-  size,
-}: {
-  style: Exclude<FrameStyle, "modernBlack">;
-  size: [number, number, number];
-}) {
+/** Real photo-scanned material on the frame box (gold/walnut scans, or the same gold scan re-tinted for "modernBlack" — see frameTextures.ts), tiled to the frame's own size (see textureUv.ts). */
+function FrameMesh({ style, size }: { style: FrameStyle; size: [number, number, number] }) {
   const frameStyle = FRAME_TEXTURES[style];
   const urls = frameStyle.metalnessMap
     ? [frameStyle.map, frameStyle.roughnessMap, frameStyle.metalnessMap]
@@ -118,8 +98,9 @@ function FrameMesh({
         metalnessMap,
         metalness: frameStyle.metalness,
         roughness: frameStyle.roughness,
+        color: frameStyle.color ?? "#ffffff",
       }),
-    [map, roughnessMap, metalnessMap, frameStyle.metalness, frameStyle.roughness]
+    [map, roughnessMap, metalnessMap, frameStyle.metalness, frameStyle.roughness, frameStyle.color]
   );
 
   const geometry = useMemo(
@@ -136,13 +117,34 @@ export function ArtworkLight({ data }: { data: ArtworkData }) {
   // Fixed rail height for every fixture on this wall (independent of the artwork's own hanging height) —
   // like a real museum track, only the aim angle changes per painting, not the lamp row's height.
   const lightY = layout.wallHeight - 0.4;
+  // How far the visible housing sticks out from the wall — kept short so the fixture reads as wall-mounted,
+  // not hovering in the middle of the room.
+  const wallStandoff = 0.3;
+  // The actual (invisible) light-emitting point sits farther out than the housing looks. With the emitter
+  // this close to the wall, its beam axis is nearly parallel to the wall surface, so the cone's outer rays
+  // graze the wall and land near the fixture regardless of the target's height, instead of converging where
+  // aimed. Pulling the real emission point out gives the beam a steep enough angle to land squarely on each
+  // painting at its own height — the housing mesh is just cosmetic and stays close to the wall.
+  const beamStandoff = 1.6;
   const normal = useMemo(
     () => new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), data.rotationY),
     [data.rotationY]
   );
+  const housingPosition = useMemo<[number, number, number]>(
+    () => [
+      data.position[0] + normal.x * wallStandoff,
+      lightY,
+      data.position[2] + normal.z * wallStandoff,
+    ],
+    [data.position, normal, lightY, wallStandoff]
+  );
   const lightPosition = useMemo<[number, number, number]>(
-    () => [data.position[0] + normal.x * 1.9, lightY, data.position[2] + normal.z * 1.9],
-    [data.position, normal, lightY]
+    () => [
+      data.position[0] + normal.x * beamStandoff,
+      lightY,
+      data.position[2] + normal.z * beamStandoff,
+    ],
+    [data.position, normal, lightY, beamStandoff]
   );
   const target = useMemo(() => {
     const obj = new THREE.Object3D();
@@ -152,9 +154,9 @@ export function ArtworkLight({ data }: { data: ArtworkData }) {
 
   // Orients the visible housing so its lens faces the painting, matching the spotLight's own aim.
   const fixtureQuaternion = useMemo(() => {
-    const direction = new THREE.Vector3(...data.position).sub(new THREE.Vector3(...lightPosition)).normalize();
+    const direction = new THREE.Vector3(...data.position).sub(new THREE.Vector3(...housingPosition)).normalize();
     return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), direction);
-  }, [lightPosition, data.position]);
+  }, [housingPosition, data.position]);
 
   // Arm sticks straight out of the wall (horizontal, along the wall normal) from a bracket just above the
   // painting, rather than dropping from the ceiling — reads as a picture light mounted on the wall itself.
@@ -163,7 +165,7 @@ export function ArtworkLight({ data }: { data: ArtworkData }) {
     [normal]
   );
   const wallOffset = 0.05;
-  const armLength = 1.9 - wallOffset;
+  const armLength = wallStandoff - wallOffset;
   const wallAnchor: [number, number, number] = [
     data.position[0] + normal.x * wallOffset,
     lightY,
@@ -195,7 +197,7 @@ export function ArtworkLight({ data }: { data: ArtworkData }) {
           <meshStandardMaterial color="#1a1a1a" roughness={0.4} metalness={0.6} />
         </mesh>
       </group>
-      <group position={lightPosition} quaternion={fixtureQuaternion}>
+      <group position={housingPosition} quaternion={fixtureQuaternion}>
         <mesh castShadow>
           <cylinderGeometry args={[0.09, 0.11, 0.22, 16]} />
           <meshStandardMaterial color="#1c1c1c" roughness={0.35} metalness={0.5} />
