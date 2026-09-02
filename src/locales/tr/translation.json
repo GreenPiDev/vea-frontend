@@ -59,6 +59,7 @@
   "artworkFormPrice": "Fiyat",
   "artworkFormMaxDiscount": "Maksimum İskonto (%)",
   "artworkFormMaxDiscountPlaceholder": "Sınırsız (opsiyonel)",
+  "artworkFormMinOfferHint": "Bu esere verilebilecek minimum teklif: {{amount}}",
   "artworkFormCurrency": "Para Birimi",
   "artworkFormImage": "Görsel",
   "artworkFormImageUploading": "Görsel yükleniyor...",

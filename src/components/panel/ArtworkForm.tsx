@@ -125,6 +125,19 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
     }
   }
 
+  // Same Math.ceil(priceAmount * (1 - pct/100)) minor-unit formula
+  // OffersService.create enforces server-side — shown live here so the
+  // artist sees what floor they're setting, same idea as
+  // ArtworkDetailCard.tsx's buyer-facing minimum-amount warning.
+  const priceMajor = Number(priceAmount);
+  const discountPct = Number(maxDiscountPercent);
+  const minOfferLabel =
+    maxDiscountPercent && priceAmount && !Number.isNaN(priceMajor) && !Number.isNaN(discountPct)
+      ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(
+          Math.ceil(priceMajor * 100 * (1 - discountPct / 100)) / 100
+        )
+      : null;
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg bg-brand-50 p-6 shadow-sm">
       <label className="flex flex-col gap-1 text-sm text-brand-800">
@@ -272,6 +285,7 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
           placeholder={t('artworkFormMaxDiscountPlaceholder')}
           className="w-40 rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
         />
+        {minOfferLabel && <span className="text-xs text-brand-600">{t('artworkFormMinOfferHint', { amount: minOfferLabel })}</span>}
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-brand-800">
