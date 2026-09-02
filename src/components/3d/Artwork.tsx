@@ -133,10 +133,16 @@ function FrameMesh({
 
 export function ArtworkLight({ data }: { data: ArtworkData }) {
   const { exhibition, layout } = useExhibition();
-  const lightY = Math.min(layout.wallHeight - 0.4, data.position[1] + 3.5);
+  // Fixed rail height for every fixture on this wall (independent of the artwork's own hanging height) —
+  // like a real museum track, only the aim angle changes per painting, not the lamp row's height.
+  const lightY = layout.wallHeight - 0.4;
   const normal = useMemo(
     () => new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), data.rotationY),
     [data.rotationY]
+  );
+  const lightPosition = useMemo<[number, number, number]>(
+    () => [data.position[0] + normal.x * 1.9, lightY, data.position[2] + normal.z * 1.9],
+    [data.position, normal, lightY]
   );
   const target = useMemo(() => {
     const obj = new THREE.Object3D();
@@ -144,15 +150,31 @@ export function ArtworkLight({ data }: { data: ArtworkData }) {
     return obj;
   }, [data.position]);
 
+  // Orients the visible housing so its lens faces the painting, matching the spotLight's own aim.
+  const fixtureQuaternion = useMemo(() => {
+    const direction = new THREE.Vector3(...data.position).sub(new THREE.Vector3(...lightPosition)).normalize();
+    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), direction);
+  }, [lightPosition, data.position]);
+
+  // Arm sticks straight out of the wall (horizontal, along the wall normal) from a bracket just above the
+  // painting, rather than dropping from the ceiling — reads as a picture light mounted on the wall itself.
+  const armQuaternion = useMemo(
+    () => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal),
+    [normal]
+  );
+  const wallOffset = 0.05;
+  const armLength = 1.9 - wallOffset;
+  const wallAnchor: [number, number, number] = [
+    data.position[0] + normal.x * wallOffset,
+    lightY,
+    data.position[2] + normal.z * wallOffset,
+  ];
+
   return (
     <>
       <primitive object={target} />
       <spotLight
-        position={[
-          data.position[0] + normal.x * 1.9,
-          lightY,
-          data.position[2] + normal.z * 1.9,
-        ]}
+        position={lightPosition}
         target={target}
         angle={0.32}
         penumbra={0.45}
@@ -161,6 +183,33 @@ export function ArtworkLight({ data }: { data: ArtworkData }) {
         decay={2}
         color={exhibition.theme.spotColor}
       />
+
+      {/* Visible wall-mounted picture light so the glow on the canvas reads as coming from a real lamp, not thin air */}
+      <mesh position={wallAnchor}>
+        <boxGeometry args={[0.12, 0.09, 0.06]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.4} metalness={0.6} />
+      </mesh>
+      <group position={[wallAnchor[0] + normal.x * (armLength / 2), lightY, wallAnchor[2] + normal.z * (armLength / 2)]} quaternion={armQuaternion}>
+        <mesh>
+          <cylinderGeometry args={[0.015, 0.015, armLength, 8]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.4} metalness={0.6} />
+        </mesh>
+      </group>
+      <group position={lightPosition} quaternion={fixtureQuaternion}>
+        <mesh castShadow>
+          <cylinderGeometry args={[0.09, 0.11, 0.22, 16]} />
+          <meshStandardMaterial color="#1c1c1c" roughness={0.35} metalness={0.5} />
+        </mesh>
+        <mesh position={[0, -0.12, 0]}>
+          <circleGeometry args={[0.095, 16]} />
+          <meshStandardMaterial
+            color="#0a0a0a"
+            emissive={exhibition.theme.spotColor}
+            emissiveIntensity={1.4}
+            roughness={0.5}
+          />
+        </mesh>
+      </group>
     </>
   );
 }
