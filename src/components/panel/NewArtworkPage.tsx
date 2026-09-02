@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ArtworkForm from './ArtworkForm';
 import PanelLayout from '../layout/PanelLayout';
+import BackLink from '../layout/BackLink';
 import { useArtistNavItems } from './artistNavItems';
 
 interface NewArtworkPageProps {
@@ -29,6 +30,7 @@ export default function NewArtworkPage({ onBack }: NewArtworkPageProps) {
       fullWidth
     >
       <div className="flex flex-col gap-6">
+        <BackLink to="/dashboard/artist/artworks" />
         <h2 className="text-lg font-semibold text-white">{t('artworkNew')}</h2>
         <ArtworkForm onDone={() => navigate('/dashboard/artist/artworks')} />
       </div>

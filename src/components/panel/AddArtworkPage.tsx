@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ExhibitionArtworkPlacement from './ExhibitionArtworkPlacement';
 import PanelLayout from '../layout/PanelLayout';
+import BackLink from '../layout/BackLink';
 import { useCuratorNavItems } from './curatorNavItems';
 
 interface AddArtworkPageProps {
@@ -29,12 +30,15 @@ export default function AddArtworkPage({ onBack }: AddArtworkPageProps) {
       onBack={onBack}
       fullWidth
     >
-      {exhibitionId && (
-        <ExhibitionArtworkPlacement
-          exhibitionId={exhibitionId}
-          onDone={() => navigate('/dashboard/organization/exhibitions')}
-        />
-      )}
+      <div className="flex flex-col gap-4">
+        <BackLink to="/dashboard/organization/exhibitions" />
+        {exhibitionId && (
+          <ExhibitionArtworkPlacement
+            exhibitionId={exhibitionId}
+            onDone={() => navigate('/dashboard/organization/exhibitions')}
+          />
+        )}
+      </div>
     </PanelLayout>
   );
 }

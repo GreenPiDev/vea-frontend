@@ -67,7 +67,7 @@ export default function Dashboard() {
             element={<NewExhibitionTemplatePage onBack={onBack} />}
           />
           <Route
-            path="organization/exhibition-templates/:templateId/edit"
+            path="organization/exhibition-templates/edit/:templateId"
             element={<EditExhibitionTemplatePage onBack={onBack} />}
           />
           <Route

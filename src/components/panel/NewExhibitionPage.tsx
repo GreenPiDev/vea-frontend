@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ExhibitionForm from './ExhibitionForm';
 import PanelLayout from '../layout/PanelLayout';
+import BackLink from '../layout/BackLink';
 import { useCuratorNavItems } from './curatorNavItems';
 
 interface NewExhibitionPageProps {
@@ -27,6 +28,7 @@ export default function NewExhibitionPage({ onBack }: NewExhibitionPageProps) {
       fullWidth
     >
       <div className="flex flex-col gap-6">
+        <BackLink to="/dashboard/organization/exhibitions" />
         <h2 className="text-lg font-semibold text-white">{t('exhibitionNew')}</h2>
         <ExhibitionForm onDone={() => navigate('/dashboard/organization/exhibitions')} />
       </div>

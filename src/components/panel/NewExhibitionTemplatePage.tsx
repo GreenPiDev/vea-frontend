@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ExhibitionTemplateForm from './ExhibitionTemplateForm';
 import PanelLayout from '../layout/PanelLayout';
+import BackLink from '../layout/BackLink';
 import { useCuratorNavItems } from './curatorNavItems';
 
 interface NewExhibitionTemplatePageProps {
@@ -26,6 +27,7 @@ export default function NewExhibitionTemplatePage({ onBack }: NewExhibitionTempl
       fullWidth
     >
       <div className="flex flex-col gap-6">
+        <BackLink to="/dashboard/organization/exhibition-templates" />
         <h2 className="text-lg font-semibold text-white">{t('exhibitionTemplateNew')}</h2>
         <ExhibitionTemplateForm onDone={() => navigate('/dashboard/organization/exhibition-templates')} />
       </div>

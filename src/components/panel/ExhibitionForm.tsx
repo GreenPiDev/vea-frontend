@@ -7,6 +7,7 @@ import { useMyOrgArtists } from '../../lib/api/domains/organizations';
 import { ApiError } from '../../lib/api/client';
 import TexturePicker from './TexturePicker';
 import RoomGrid from './RoomGrid';
+import DateField from './DateField';
 import { useRoomGridEditor } from './useRoomGridEditor';
 import './ExhibitionForm.css';
 
@@ -144,26 +145,8 @@ export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
       </label>
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-sm text-brand-800">
-          {t('exhibitionFormStartDate')}
-          <input
-            required
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-brand-800">
-          {t('exhibitionFormEndDate')}
-          <input
-            required
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
-          />
-        </label>
+        <DateField id="exhibition-start-date" label={t('exhibitionFormStartDate')} value={startDate} onChange={setStartDate} required />
+        <DateField id="exhibition-end-date" label={t('exhibitionFormEndDate')} value={endDate} onChange={setEndDate} required />
       </div>
 
       <label className="flex flex-col gap-1 text-sm text-brand-800">

@@ -19,6 +19,7 @@
 
   "panelOpen": "Admin Dashboard",
   "panelBackToGallery": "Back to Gallery",
+  "backToPreviousPage": "← Back to Previous Page",
 
   "profileCreateTitle": "Create Artist Profile",
   "profileCreateSubtitle": "You need an artist profile before you can add artworks. You can edit your biography later.",
@@ -125,6 +126,13 @@
   "exhibitionListArtistNone": "—",
   "exhibitionFormStartDate": "Start Date",
   "exhibitionFormEndDate": "End Date",
+  "dateFieldPlaceholder": "DD.MM.YYYY",
+  "calendarOpen": "Open Calendar",
+  "calendarPrevMonth": "Previous Month",
+  "calendarNextMonth": "Next Month",
+  "calendarMonth": "Month",
+  "calendarYear": "Year",
+  "calendarToday": "Today",
   "exhibitionFormMaxArtworks": "Max Artworks (optional)",
   "exhibitionFormMaxArtworksPlaceholder": "Unlimited",
   "exhibitionFormRoomType": "Room Type",

@@ -90,7 +90,7 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
 
           <ExhibitionTemplateList
             onEdit={(templateId) =>
-              navigate(`/dashboard/organization/exhibition-templates/${templateId}/edit`)
+              navigate(`/dashboard/organization/exhibition-templates/edit/${templateId}`)
             }
             onPreview={(templateId) =>
               navigate(`/dashboard/organization/exhibition-templates/preview/${templateId}`)

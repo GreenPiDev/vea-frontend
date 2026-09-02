@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useMyArtworks } from '../../lib/api/domains/artworks';
 import ArtworkForm from './ArtworkForm';
 import PanelLayout from '../layout/PanelLayout';
+import BackLink from '../layout/BackLink';
 import { useArtistNavItems } from './artistNavItems';
 
 interface EditArtworkPageProps {
@@ -34,6 +35,7 @@ export default function EditArtworkPage({ onBack }: EditArtworkPageProps) {
       fullWidth
     >
       <div className="flex flex-col gap-6">
+        <BackLink to="/dashboard/artist/artworks" />
         <h2 className="text-lg font-semibold text-white">{t('artworkEdit')}</h2>
         {isLoading && null}
         {!isLoading && !artwork && <p className="text-sm text-brand-200">{t('artworkEditNotFound')}</p>}

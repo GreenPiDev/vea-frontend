@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ExhibitionTemplateForm from './ExhibitionTemplateForm';
 import PanelLayout from '../layout/PanelLayout';
+import BackLink from '../layout/BackLink';
 import { useCuratorNavItems } from './curatorNavItems';
 import { useOwnExhibitionTemplate } from '../../lib/api/domains/exhibitionTemplates';
 
@@ -9,7 +10,7 @@ interface EditExhibitionTemplatePageProps {
   onBack: () => void;
 }
 
-// /dashboard/organization/exhibition-templates/:templateId/edit
+// /dashboard/organization/exhibition-templates/edit/:templateId
 export default function EditExhibitionTemplatePage({ onBack }: EditExhibitionTemplatePageProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ export default function EditExhibitionTemplatePage({ onBack }: EditExhibitionTem
       fullWidth
     >
       <div className="flex flex-col gap-6">
+        <BackLink to="/dashboard/organization/exhibition-templates" />
         <h2 className="text-lg font-semibold text-white">{t('exhibitionTemplateEdit')}</h2>
         {!isLoading && template && (
           <ExhibitionTemplateForm

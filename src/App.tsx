@@ -151,6 +151,23 @@ export default function App() {
     }
   }, []);
 
+  // Keeps selectedId in sync with the URL param on every change, not just
+  // its initial value — selecting a card below navigates to
+  // /exhibition/:id rather than calling setSelectedId directly, so the
+  // address bar actually reflects which exhibition is open
+  // (deep-linkable/shareable, same as ArtworkList.tsx's "on display" links
+  // already relied on), and a browser-back from /exhibition/:id to /home
+  // correctly drops back to the selector instead of leaving the 3D scene
+  // mounted under a URL that no longer names an exhibition.
+  const isInitialRouteSync = useRef(true);
+  useEffect(() => {
+    if (isInitialRouteSync.current) {
+      isInitialRouteSync.current = false;
+      return;
+    }
+    setSelectedId(routeExhibitionId ?? null);
+  }, [routeExhibitionId]);
+
   const backendCards: ExhibitionCard[] = useMemo(
     () =>
       (backendExhibitions ?? []).map((e) => ({
@@ -174,7 +191,7 @@ export default function App() {
         <Header scrollTargetRef={exhibitionSelectScrollRef} />
         <ExhibitionSelect
           exhibitions={backendCards}
-          onSelect={setSelectedId}
+          onSelect={(id) => navigate(`/exhibition/${id}`)}
           containerRef={exhibitionSelectScrollRef}
         />
       </>

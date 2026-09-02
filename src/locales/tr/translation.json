@@ -19,6 +19,7 @@
 
   "panelOpen": "Yönetim Paneli",
   "panelBackToGallery": "Sergiye Dön",
+  "backToPreviousPage": "← Önceki Sayfaya Dön",
 
   "profileCreateTitle": "Sanatçı Profili Oluştur",
   "profileCreateSubtitle": "Eser ekleyebilmek için önce bir sanatçı profili oluşturmalısınız. Biyografinizi daha sonra düzenleyebilirsiz.",
@@ -125,6 +126,13 @@
   "exhibitionListArtistNone": "—",
   "exhibitionFormStartDate": "Başlangıç Tarihi",
   "exhibitionFormEndDate": "Bitiş Tarihi",
+  "dateFieldPlaceholder": "GG.AA.YYYY",
+  "calendarOpen": "Takvimi Aç",
+  "calendarPrevMonth": "Önceki Ay",
+  "calendarNextMonth": "Sonraki Ay",
+  "calendarMonth": "Ay",
+  "calendarYear": "Yıl",
+  "calendarToday": "Bugün",
   "exhibitionFormMaxArtworks": "Maks. Eser Sayısı (opsiyonel)",
   "exhibitionFormMaxArtworksPlaceholder": "Sınırsız",
   "exhibitionFormRoomType": "Oda Tipi",
