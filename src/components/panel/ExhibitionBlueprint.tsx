@@ -9,11 +9,16 @@ interface ExhibitionBlueprintProps {
   /** wallRunId -> its placed links, sorted by order — same shape ExhibitionArtworkPlacement.tsx already derives via groupByWallRun(exhibition.artworkLinks). */
   byWall: Map<string, ApiExhibitionArtwork[]>;
   selectedWallId?: string | null;
+  /** Lets the floor plan double as a wall picker — clicking a wall (or its number) calls this with the same run.id the wall-button row above uses, so the two stay in sync either way. Optional so the blueprint still works as a read-only sketch wherever a picker doesn't make sense. */
+  onSelectWall?: (wallId: string) => void;
 }
 
 const MARGIN = 1;
 const WALL_STROKE = 0.15;
+const WALL_HIT_STROKE = 0.6;
 const THUMB_SIZE = 0.7;
+const WALL_NUMBER_INSET = 0.5;
+const WALL_NUMBER_FONT_SIZE = 0.5;
 
 /**
  * Top-down floor-plan sketch of an exhibition room: floor shape, walls,
@@ -23,7 +28,7 @@ const THUMB_SIZE = 0.7;
  * placeArtworksAlongWall), just projected onto the x/z plane instead of
  * rendered in Three.js. Pure SVG, no dependency on the 3D scene stack.
  */
-export default function ExhibitionBlueprint({ sceneConfig, byWall, selectedWallId }: ExhibitionBlueprintProps) {
+export default function ExhibitionBlueprint({ sceneConfig, byWall, selectedWallId, onSelectWall }: ExhibitionBlueprintProps) {
   const { t } = useTranslation();
   const blueprint = useMemo(() => blueprintForSceneConfig(sceneConfig), [sceneConfig]);
 
@@ -87,18 +92,62 @@ export default function ExhibitionBlueprint({ sceneConfig, byWall, selectedWallI
           />
         )}
 
-        {wallRuns.map((run) => (
-          <line
-            key={run.id}
-            x1={run.orientation === 'horizontal' ? run.start : run.fixed}
-            y1={run.orientation === 'horizontal' ? run.fixed : run.start}
-            x2={run.orientation === 'horizontal' ? run.end : run.fixed}
-            y2={run.orientation === 'horizontal' ? run.fixed : run.end}
-            strokeWidth={WALL_STROKE}
-            strokeLinecap="square"
-            className={run.id === selectedWallId ? 'stroke-brand-900' : 'stroke-brand-700'}
-          />
-        ))}
+        {wallRuns.map((run, i) => {
+          // Matches ExhibitionArtworkPlacement.tsx's wallNumbers map 1:1 —
+          // both number this same wallRuns array (from the identical
+          // wallRunsForSceneConfig/blueprintForSceneConfig derivation) in
+          // array order, so "wall 3" here is always "wall 3" on the buttons.
+          const number = i + 1;
+          const mid = (run.start + run.end) / 2;
+          // Nudge the number inward off the wall line (opposite `outward`)
+          // so it sits inside the floor area instead of off-canvas past the
+          // wall.
+          const numX = run.orientation === 'horizontal' ? mid : run.fixed - run.outward * WALL_NUMBER_INSET;
+          const numZ = run.orientation === 'horizontal' ? run.fixed - run.outward * WALL_NUMBER_INSET : mid;
+          const selected = run.id === selectedWallId;
+          const x1 = run.orientation === 'horizontal' ? run.start : run.fixed;
+          const y1 = run.orientation === 'horizontal' ? run.fixed : run.start;
+          const x2 = run.orientation === 'horizontal' ? run.end : run.fixed;
+          const y2 = run.orientation === 'horizontal' ? run.fixed : run.end;
+          return (
+            <g
+              key={run.id}
+              onClick={onSelectWall ? () => onSelectWall(run.id) : undefined}
+              className={onSelectWall ? 'cursor-pointer' : undefined}
+            >
+              {onSelectWall && (
+                <line
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  strokeWidth={WALL_HIT_STROKE}
+                  strokeLinecap="square"
+                  stroke="transparent"
+                />
+              )}
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                strokeWidth={WALL_STROKE}
+                strokeLinecap="square"
+                className={selected ? 'stroke-green-600' : 'stroke-brand-700'}
+              />
+              <text
+                x={numX}
+                y={numZ}
+                fontSize={WALL_NUMBER_FONT_SIZE}
+                textAnchor="middle"
+                dominantBaseline="central"
+                className={selected ? 'fill-green-700 font-bold' : 'fill-brand-700'}
+              >
+                {number}
+              </text>
+            </g>
+          );
+        })}
 
         {thumbnails.map((thumb) => (
           <image

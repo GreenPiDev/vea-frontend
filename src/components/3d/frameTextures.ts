@@ -14,6 +14,11 @@ export interface FrameTextureData {
 }
 
 export const FRAME_TEXTURES: Record<"gold" | "walnut", FrameTextureData> = {
+  // "modernBlack" (the default frame for a backend artwork whose artist
+  // marked their image as unframed, see artworks.ts's `frame` doc comment)
+  // deliberately isn't in here — it's a flat solid color, not a photo-
+  // scanned material, so Artwork.tsx renders it via a plain
+  // MeshStandardMaterial instead of loading textures through this map.
   gold: {
     map: "/textures/Metal048A/color.jpg",
     roughnessMap: "/textures/Metal048A/roughness.jpg",

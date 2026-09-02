@@ -27,8 +27,12 @@ export default function Artwork({ data }: { data: ArtworkData }) {
 
   return (
     <group position={data.position} rotation={[0, data.rotationY, 0]}>
-      {/* Frame — skipped for backend-sourced artworks, whose uploaded image already includes its own frame (see artworks.ts's `frame` doc comment) */}
-      {data.frame ? <FrameMesh style={data.frame} size={frameSize} /> : null}
+      {/* Frame — skipped when the artist marked their uploaded image as already framed (see artworks.ts's `frame` doc comment). "modernBlack" is a flat solid-color default for unframed backend artworks, everything else is a real photo-scanned material. */}
+      {data.frame === "modernBlack" ? (
+        <SolidFrameMesh size={frameSize} />
+      ) : data.frame ? (
+        <FrameMesh style={data.frame} size={frameSize} />
+      ) : null}
 
 
       {/* Canvas */}
@@ -68,12 +72,22 @@ export default function Artwork({ data }: { data: ArtworkData }) {
   );
 }
 
+/** Flat matte-black box, no texture — the default frame given to a backend artwork whose artist marked their uploaded image as unframed. Deliberately simple/cheap (no useTexture load) since it's the common case for real user-uploaded content, unlike the two curated demo materials below. */
+function SolidFrameMesh({ size }: { size: [number, number, number] }) {
+  return (
+    <mesh position={[0, 0, -FRAME_DEPTH / 2]} castShadow>
+      <boxGeometry args={size} />
+      <meshStandardMaterial color="#111111" roughness={0.35} metalness={0.15} />
+    </mesh>
+  );
+}
+
 /** Real photo-scanned gold/walnut material on the frame box, tiled to the frame's own size (see textureUv.ts) so every painting shares just two textures total. */
 function FrameMesh({
   style,
   size,
 }: {
-  style: FrameStyle;
+  style: Exclude<FrameStyle, "modernBlack">;
   size: [number, number, number];
 }) {
   const frameStyle = FRAME_TEXTURES[style];

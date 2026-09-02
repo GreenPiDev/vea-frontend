@@ -3,6 +3,7 @@ import SuperAdminPanel from "../components/panel/SuperAdminPanel";
 import CuratorPanel from "../components/panel/CuratorPanel";
 import NewExhibitionPage from "../components/panel/NewExhibitionPage";
 import AddArtworkPage from "../components/panel/AddArtworkPage";
+import ExhibitionPreviewPage from "../components/panel/ExhibitionPreviewPage";
 import ArtistPanel from "../components/panel/ArtistPanel";
 import NewArtworkPage from "../components/panel/NewArtworkPage";
 import EditArtworkPage from "../components/panel/EditArtworkPage";
@@ -53,6 +54,10 @@ export default function Dashboard() {
           <Route
             path="organization/exhibitions/add-artwork/:exhibitionId"
             element={<AddArtworkPage onBack={onBack} />}
+          />
+          <Route
+            path="organization/exhibitions/preview/:exhibitionId"
+            element={<ExhibitionPreviewPage />}
           />
           <Route path="organization/:section" element={<CuratorPanel onBack={onBack} />} />
           <Route path="*" element={<Navigate to="organization/exhibitions" replace />} />

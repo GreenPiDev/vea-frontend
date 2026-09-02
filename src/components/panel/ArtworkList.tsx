@@ -72,32 +72,36 @@ export default function ArtworkList({ onEdit }: ArtworkListProps) {
       render: (artwork) => (
         <div className="flex items-center gap-3">
           <img src={artwork.imageUrl} alt={artwork.title} className="h-12 w-12 rounded object-cover" />
-          <div>
-            <p className="text-sm font-medium text-brand-900">{artwork.title}</p>
-            {artwork.exhibitionLinks && artwork.exhibitionLinks.length > 0 && (
-              <p className="text-xs text-brand-500">
-                {artwork.exhibitionLinks.map((link, i) => (
-                  <span key={link.exhibition.id}>
-                    {i > 0 && ', '}
-                    {link.exhibition.status === 'DRAFT' ? (
-                      t('artworkInDraftExhibition', { title: link.exhibition.title })
-                    ) : (
-                      <a
-                        href={`/?exhibition=${link.exhibition.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-brand-700"
-                      >
-                        {t('artworkInExhibition', { title: link.exhibition.title })}
-                      </a>
-                    )}
-                  </span>
-                ))}
-              </p>
-            )}
-          </div>
+          <p className="text-sm font-medium text-brand-900">{artwork.title}</p>
         </div>
       ),
+    },
+    {
+      key: 'exhibition',
+      header: t('artworkListColExhibition'),
+      render: (artwork) =>
+        artwork.exhibitionLinks && artwork.exhibitionLinks.length > 0 ? (
+          <div className="flex flex-col gap-1 text-xs text-brand-500">
+            {artwork.exhibitionLinks.map((link) => (
+              <span key={link.exhibition.id}>
+                {link.exhibition.status === 'DRAFT' ? (
+                  t('artworkInDraftExhibition', { title: link.exhibition.title })
+                ) : (
+                  <a
+                    href={`/exhibition/${link.exhibition.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-brand-700"
+                  >
+                    {t('artworkInExhibition', { title: link.exhibition.title })}
+                  </a>
+                )}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="text-xs text-brand-400">—</span>
+        ),
     },
     {
       key: 'status',

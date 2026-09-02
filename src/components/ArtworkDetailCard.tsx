@@ -66,9 +66,24 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
         )
       : null;
 
+  // Artist-set floor (Artwork.maxDiscountPercent) — same
+  // Math.ceil(priceAmount * (1 - pct/100)) formula OffersService.create
+  // enforces server-side; this is only a UX convenience so the buyer sees
+  // the constraint and the button disables before hitting a 400.
+  const minAmountMajor =
+    artwork.priceAmount != null && artwork.maxDiscountPercent != null
+      ? Math.ceil(artwork.priceAmount * (1 - artwork.maxDiscountPercent / 100)) / 100
+      : null;
+  const enteredAmount = Number(amount);
+  const belowMinimum = minAmountMajor != null && amount !== '' && enteredAmount < minAmountMajor;
+  const minAmountLabel =
+    minAmountMajor != null && artwork.currency
+      ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: artwork.currency }).format(minAmountMajor)
+      : null;
+
   function handleSubmitOffer(e: FormEvent) {
     e.preventDefault();
-    if (!artwork.artworkId) return;
+    if (!artwork.artworkId || belowMinimum) return;
     setOfferError(null);
     createOffer.mutate(
       { artworkId: artwork.artworkId, amount: Math.round(Number(amount) * 100) },
@@ -109,6 +124,12 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
         {artwork.technique && (
           <p className="mb-1 text-sm text-brand-700">
             {t('artworkDetailTechnique', { technique: artwork.technique })}
+          </p>
+        )}
+
+        {artwork.framed != null && (
+          <p className="mb-1 text-sm text-brand-700">
+            {t(artwork.framed ? 'artworkDetailFramed' : 'artworkDetailUnframed')}
           </p>
         )}
 
@@ -164,9 +185,14 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
                   onChange={(e) => setAmount(e.target.value)}
                   className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
                 />
+                {minAmountLabel && (
+                  <p className="text-sm font-medium text-red-600">
+                    {t('artworkOfferMinAmount', { amount: minAmountLabel })}
+                  </p>
+                )}
                 <button
                   type="submit"
-                  disabled={createOffer.isPending}
+                  disabled={createOffer.isPending || belowMinimum}
                   className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
                 >
                   {createOffer.isPending ? t('artworkOfferSending') : t('artworkOfferSubmit')}

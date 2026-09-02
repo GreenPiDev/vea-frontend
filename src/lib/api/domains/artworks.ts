@@ -30,12 +30,16 @@ export interface ApiArtwork {
   heightCm: number;
   widthCm: number;
   orientation: ArtworkOrientation;
+  /** Whether the artist's uploaded image already shows its own physical frame — false means the 3D scene adds a default modern-black frame mesh (see components/3d/backendAdapter.ts's toRenderableArtwork), and the detail card says "unframed"/"framed" either way (ArtworkDetailCard.tsx). */
+  framed: boolean;
   story: string | null;
   conditionStatus: ArtworkConditionStatus | null;
   conditionNotes: string | null;
   note: string | null;
   category: ArtworkCategory;
   priceAmount: number;
+  /** Whole-percent cap (0-100) on how far a buyer's offer may undercut priceAmount, artist-set per artwork. Null = no floor. Enforced by the backend (OffersService.create), not just a frontend hint — ArtworkDetailCard.tsx's disabled-button/warning is a UX convenience on top of that. */
+  maxDiscountPercent: number | null;
   currency: string;
   imageUrl: string;
   model3dUrl: string | null;

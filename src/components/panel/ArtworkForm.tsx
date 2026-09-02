@@ -42,6 +42,10 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
   const [heightCm, setHeightCm] = useState(editing?.heightCm?.toString() ?? '');
   const [widthCm, setWidthCm] = useState(editing?.widthCm?.toString() ?? '');
   const [orientation, setOrientation] = useState<ArtworkOrientation>(editing?.orientation ?? 'LANDSCAPE');
+  const [framed, setFramed] = useState(editing?.framed ?? false);
+  const [maxDiscountPercent, setMaxDiscountPercent] = useState(
+    editing?.maxDiscountPercent != null ? String(editing.maxDiscountPercent) : ''
+  );
   const [category, setCategory] = useState<ArtworkCategory>(editing?.category ?? 'PAINTING');
   const [priceAmount, setPriceAmount] = useState(editing ? String(editing.priceAmount / 100) : '');
   const [currency, setCurrency] = useState<SupportedCurrency>((editing?.currency as SupportedCurrency) ?? 'TRY');
@@ -106,6 +110,8 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
       heightCm: Number(heightCm),
       widthCm: Number(widthCm),
       orientation,
+      framed,
+      maxDiscountPercent: maxDiscountPercent ? Number(maxDiscountPercent) : undefined,
       category,
       priceAmount: Math.round(Number(priceAmount) * 100),
       currency,
@@ -196,6 +202,20 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
         </select>
       </label>
 
+      <div className="flex flex-col gap-1 text-sm text-brand-800">
+        <span>{t('artworkFormFramed')}</span>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={framed} onChange={() => setFramed(true)} />
+            {t('artworkFormFramedYes')}
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={!framed} onChange={() => setFramed(false)} />
+            {t('artworkFormFramedNo')}
+          </label>
+        </div>
+      </div>
+
       <label className="flex flex-col gap-1 text-sm text-brand-800">
         {t('artworkFormCategory')}
         <select
@@ -239,6 +259,20 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
           </select>
         </label>
       </div>
+
+      <label className="flex flex-col gap-1 text-sm text-brand-800">
+        {t('artworkFormMaxDiscount')}
+        <input
+          type="number"
+          min={0}
+          max={100}
+          step={1}
+          value={maxDiscountPercent}
+          onChange={(e) => setMaxDiscountPercent(e.target.value)}
+          placeholder={t('artworkFormMaxDiscountPlaceholder')}
+          className="w-40 rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+        />
+      </label>
 
       <label className="flex flex-col gap-1 text-sm text-brand-800">
         {t('artworkFormImage')}

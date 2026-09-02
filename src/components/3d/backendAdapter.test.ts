@@ -14,12 +14,14 @@ function makeArtwork(overrides: Partial<ApiArtwork> = {}): ApiArtwork {
     heightCm: 180,
     widthCm: 120,
     orientation: "PORTRAIT",
+    framed: false,
     story: null,
     conditionStatus: null,
     conditionNotes: null,
     note: null,
     category: "PAINTING",
     priceAmount: 100000,
+    maxDiscountPercent: null,
     currency: "TRY",
     imageUrl: "https://example.com/painting.jpg",
     model3dUrl: null,
@@ -88,8 +90,25 @@ describe("adaptApiExhibition", () => {
     expect(result!.wallHeight).toBe(preset.wallHeight);
     expect(result!.theme).toEqual(preset.theme);
     expect(result!.artworks).toHaveLength(1);
-    expect(result!.artworks![0].frame).toBeNull();
+    // Default makeArtwork() sets framed: false, so backendAdapter should
+    // hang a default frame around the bare canvas.
+    expect(result!.artworks![0].frame).toBe("modernBlack");
     expect(result!.artworks![0].artist).toBe("Test Artist");
+  });
+
+  it("skips the default frame mesh when the artist marked their artwork as already framed", () => {
+    const preset = EXHIBITIONS[0];
+    const result = adaptApiExhibition(
+      makeExhibition({
+        sceneConfig: { kind: "template", templateId: preset.id },
+        artworkLinks: [
+          makeLink({ positionData: { wallRunId: "north" }, artwork: makeArtwork({ framed: true }) }),
+        ],
+      })
+    );
+
+    expect(result!.artworks![0].frame).toBeNull();
+    expect(result!.artworks![0].framed).toBe(true);
   });
 
   it("uses positionData.heightY as a curator hang-height override when set", () => {

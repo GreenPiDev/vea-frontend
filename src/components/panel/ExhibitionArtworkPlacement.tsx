@@ -8,7 +8,7 @@ import {
 } from '../../lib/api/domains/exhibitions';
 import { useOrganizationArtworks, type ApiArtwork } from '../../lib/api/domains/artworks';
 import { groupByWallRun, wallRunsForSceneConfig } from '../3d/backendAdapter';
-import { FLOOR_CLEARANCE, type WallRunGeometry } from '../3d/galleryLayout';
+import { FLOOR_CLEARANCE } from '../3d/galleryLayout';
 import { ApiError } from '../../lib/api/client';
 import Tooltip from '../layout/Tooltip';
 import { CheckIcon, TrashIcon } from '../layout/icons';
@@ -18,13 +18,6 @@ import ExhibitionBlueprint from './ExhibitionBlueprint';
 function defaultHangHeight(artwork: ApiArtwork): number {
   return artwork.heightCm / 100 / 2 + FLOOR_CLEARANCE;
 }
-
-const NAMED_WALL_KEYS: Record<string, string> = {
-  north: 'placementWallNorth',
-  south: 'placementWallSouth',
-  east: 'placementWallEast',
-  west: 'placementWallWest',
-};
 
 interface ExhibitionArtworkPlacementProps {
   exhibitionId: string;
@@ -101,13 +94,13 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
         (artwork) => artwork.status === 'LISTED' && (artwork.exhibitionLinks?.length ?? 0) === 0
       );
 
-  function wallLabel(run: WallRunGeometry & { id: string }): string {
-    const namedKey = NAMED_WALL_KEYS[run.id];
-    if (namedKey) return t(namedKey);
-    const length = (run.end - run.start).toFixed(1);
-    const orientation = t(run.orientation === 'horizontal' ? 'placementWallHorizontal' : 'placementWallVertical');
-    return `${orientation} (${length}m)`;
-  }
+  // Numbers each wall 1..N in the button row's order, matching the exact
+  // order blueprintForSceneConfig()/ExhibitionBlueprint.tsx derives its own
+  // wallRuns in (same underlying templateWallRuns/buildCustomRoomLayout
+  // call, same inputs) — so a wall's number here is guaranteed to line up
+  // with the same number drawn on the floor plan, without threading a
+  // shared map through props.
+  const wallNumbers = new Map(runs.map((run, i) => [run.id, i + 1]));
 
   function handleAdd(artwork: ApiArtwork) {
     if (!selectedWallId) return;
@@ -164,7 +157,7 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
                 : 'border-brand-300 bg-white text-brand-800 hover:bg-brand-100'
             }`}
           >
-            {wallLabel(run)} ({byWall.get(run.id)?.length ?? 0})
+            {t('placementWallNumber', { number: wallNumbers.get(run.id) })} ({byWall.get(run.id)?.length ?? 0})
           </button>
         ))}
       </div>
@@ -301,7 +294,12 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <ExhibitionBlueprint sceneConfig={exhibition.sceneConfig} byWall={byWall} selectedWallId={selectedWallId} />
+      <ExhibitionBlueprint
+        sceneConfig={exhibition.sceneConfig}
+        byWall={byWall}
+        selectedWallId={selectedWallId}
+        onSelectWall={setSelectedWallId}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import Scene from "./components/3d/Scene";
 import { EXHIBITIONS } from "./components/3d/exhibitions";
@@ -23,15 +24,18 @@ const LOCAL_CARDS: ExhibitionCard[] = EXHIBITIONS.map((e) => ({
 
 export default function App() {
   const { t } = useTranslation();
-  // Lets ArtworkList.tsx's "on display" links (opened in a new tab via
-  // `/?exhibition=<id>`) drop the artist straight into that exhibition's 3D
-  // scene, without needing a router — read once on mount. The URL cleanup
+  const navigate = useNavigate();
+  // /exhibition/:id (ArtworkList.tsx's "on display" links, opened in a new
+  // tab) drops the artist straight into that exhibition's 3D scene. The
+  // older `/?exhibition=<id>` query-param form is still read as a fallback
+  // for any stale bookmarked links — read once on mount. The URL cleanup
   // (below, in an effect) is deliberately kept out of this initializer:
   // StrictMode double-invokes state initializers in dev, and a
   // read-then-strip side effect inside it would strip the query string on
   // the first invocation, then read nothing on the second — losing the id.
+  const { id: routeExhibitionId } = useParams<{ id?: string }>();
   const [selectedId, setSelectedId] = useState<string | null>(
-    () => new URLSearchParams(window.location.search).get("exhibition")
+    () => routeExhibitionId ?? new URLSearchParams(window.location.search).get("exhibition")
   );
   const [locked, setLocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -239,6 +243,7 @@ export default function App() {
           onClick={() => {
             setLocked(false);
             setSelectedId(null);
+            navigate("/home");
           }}
         >
           ← Sergiler

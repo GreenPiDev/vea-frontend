@@ -62,15 +62,18 @@ function toRenderableArtwork(link: ApiExhibitionArtwork, exhibitionId: string, p
     image: artwork.imageUrl,
     aspect: artwork.widthCm / artwork.heightCm,
     height: placement.height,
-    // Backend-sourced artworks never get an extra 3D frame mesh — the
-    // artist's uploaded image already includes its own frame.
-    frame: null,
+    // artwork.framed: true means the artist's uploaded image already shows
+    // its own physical frame (no extra mesh needed); false means we hang a
+    // default modern-black frame around the bare canvas.
+    frame: artwork.framed ? null : "modernBlack",
     position: placement.position,
     rotationY: placement.rotationY,
     artworkId: link.artworkId,
     technique: artwork.technique,
+    framed: artwork.framed,
     priceAmount: artwork.priceAmount,
     currency: artwork.currency,
+    maxDiscountPercent: artwork.maxDiscountPercent,
     status: artwork.status,
     sellerId: artwork.artistProfile?.userId,
     hasApprovedOffer: artwork.hasApprovedOffer,

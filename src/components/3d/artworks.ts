@@ -6,7 +6,7 @@
 
 import { WALL_CLEARANCE } from "./galleryLayout";
 
-export type FrameStyle = "gold" | "walnut";
+export type FrameStyle = "gold" | "walnut" | "modernBlack";
 
 export interface Artwork {
   id: string;
@@ -21,7 +21,7 @@ export interface Artwork {
   aspect: number;
   /** Physical height of the canvas on the wall, in meters. */
   height: number;
-  /** Undefined/null for backend-sourced artworks — the artist's uploaded image already includes its own frame, so no extra 3D frame mesh is rendered (see Artwork.tsx). Only the static demo ARTWORKS below use this. */
+  /** Static demo ARTWORKS below always set "gold"/"walnut". Backend-sourced artworks derive this from ApiArtwork.framed (see backendAdapter.ts's toRenderableArtwork): `framed: true` (the artist's uploaded image already shows its own frame) -> null, no extra mesh; `framed: false` -> "modernBlack", a default frame is rendered around the canvas. */
   frame?: FrameStyle | null;
   /** Center position of the canvas face, flush against the wall surface. */
   position: [number, number, number];
@@ -35,9 +35,13 @@ export interface Artwork {
   /** Real backend Artwork.id — distinct from `id` above, which for a backend artwork is the ExhibitionArtwork join-row id. Needed to POST an offer against the right artwork. */
   artworkId?: string;
   technique?: string | null;
+  /** Mirrors ApiArtwork.framed — drives ArtworkDetailCard.tsx's "framed"/"unframed" line, independent of `frame` above (which is what the 3D scene actually renders, "modernBlack" or null). */
+  framed?: boolean;
   /** Minor-unit price (e.g. kuruş/cent), mirrors ApiArtwork.priceAmount. */
   priceAmount?: number;
   currency?: string;
+  /** Mirrors ApiArtwork.maxDiscountPercent — ArtworkDetailCard.tsx uses this + priceAmount to disable the offer button and warn below the artist's set floor. Backend also enforces this independently (OffersService.create). */
+  maxDiscountPercent?: number | null;
   status?: "DRAFT" | "LISTED" | "IN_EXHIBITION" | "SOLD" | "ARCHIVED";
   /** The artist's User.id (ArtistProfile.userId) — lets the UI proactively hide the offer form on the viewer's own artwork instead of only relying on the backend's 403. */
   sellerId?: string;
