@@ -90,6 +90,7 @@
   "artworkInExhibition": "Sergileniyor: {{title}}",
   "artworkInDraftExhibition": "Taslak sergide yer alıyor: {{title}}",
   "placementByArtist": "({{name}})",
+  "placementPlacedElsewhere": "(Bu eser {{title}} sergisinde sergilenmektedir)",
 
   "exhibitionListTitle": "Sergilerim",
   "exhibitionEmpty": "Henüz sergi oluşturmadınız.",
@@ -109,6 +110,7 @@
   "exhibitionFormArtist": "Satıcı (opsiyonel)",
   "exhibitionFormArtistNone": "Seçilmedi (karma sergi)",
   "exhibitionListColArtist": "Sanatçı",
+  "exhibitionListColArtworkCount": "Eser Sayısı",
   "exhibitionListArtistNone": "—",
   "exhibitionFormStartDate": "Başlangıç Tarihi",
   "exhibitionFormEndDate": "Bitiş Tarihi",
@@ -138,6 +140,8 @@
   "exhibitionFormCancel": "Vazgeç",
   "exhibitionFormError": "Sergi kaydedilemedi",
 
+  "blueprintTitle": "Salon Krokisi",
+  "blueprintSpawnHint": "Koyu nokta ve ok, ziyaretçinin başlangıç konumu ve bakış yönünü gösterir.",
   "placementTitle": "Eser Yerleştir",
   "placementDone": "Bitti",
   "placementUnavailable": "Bu sergi için oda tanımlanmamış.",

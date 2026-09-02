@@ -18,7 +18,9 @@ import type { Artwork } from "./artworks";
 import { EXHIBITIONS, type Exhibition, type ExhibitionTheme } from "./exhibitions";
 import {
   buildCustomRoomLayout,
+  buildRoomLayout,
   placeArtworksAlongWall,
+  type GridCell,
   type WallRunGeometry,
 } from "./galleryLayout";
 
@@ -151,6 +153,54 @@ export function wallRunsForSceneConfig(config: ApiSceneConfig | null): (WallRunG
     return templateWallRuns(template.roomSize);
   }
   return buildCustomRoomLayout(config.cells, config.wallHeight, config.spawn).wallRuns;
+}
+
+export interface BlueprintLayout {
+  /** Occupied unit cells for a "custom" room's exact footprint (draw each as a 1x1 square) — null for "template", whose floor is just the bounding rectangle in `bounds`. */
+  cells: GridCell[] | null;
+  bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
+  wallRuns: (WallRunGeometry & { id: string })[];
+  /** Spawn position (x/z, meters) + facing already converted to SVG rotate() degrees (clockwise), for a top-down floor-plan marker. */
+  spawn: { x: number; z: number; rotationDeg: number };
+}
+
+/**
+ * Same idea as wallRunsForSceneConfig, but for panel/ExhibitionBlueprint.tsx's
+ * top-down floor-plan sketch — also needs the floor shape and spawn point,
+ * not just wall runs. wallHeight passed to buildRoomLayout/buildCustomRoomLayout
+ * below is arbitrary (1) since none of the x/z values this reads depend on it,
+ * only the unused ceiling/collider math does.
+ */
+export function blueprintForSceneConfig(config: ApiSceneConfig | null): BlueprintLayout | null {
+  if (!config) return null;
+  if (config.kind === "template") {
+    const template = EXHIBITIONS.find((e) => e.id === config.templateId);
+    if (!template || !template.roomSize) return null;
+    const [W, D] = template.roomSize;
+    const { playerStart, playerStartYaw } = buildRoomLayout(template.roomSize, 1);
+    return {
+      cells: null,
+      bounds: { minX: -W / 2, maxX: W / 2, minZ: -D / 2, maxZ: D / 2 },
+      wallRuns: templateWallRuns(template.roomSize),
+      // rotate() is clockwise in SVG; yaw's convention (0 = -Z/"up" in this
+      // top-down mapping, increasing toward +X/"east") is the opposite
+      // sense, hence the negation — see SpawnOverride's yaw doc comment.
+      spawn: { x: playerStart[0], z: playerStart[2], rotationDeg: -(playerStartYaw * 180) / Math.PI },
+    };
+  }
+  const { layout, wallRuns } = buildCustomRoomLayout(config.cells, config.wallHeight, config.spawn);
+  const [cx, cz] = layout.room.center;
+  const [W, D] = layout.room.size;
+  return {
+    cells: config.cells,
+    bounds: { minX: cx - W / 2, maxX: cx + W / 2, minZ: cz - D / 2, maxZ: cz + D / 2 },
+    wallRuns,
+    spawn: {
+      x: layout.playerStart[0],
+      z: layout.playerStart[2],
+      rotationDeg: -(layout.playerStartYaw * 180) / Math.PI,
+    },
+  };
 }
 
 /**

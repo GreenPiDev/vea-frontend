@@ -43,8 +43,8 @@ export interface ApiArtwork {
   createdAt: string;
   /** Only present when the backend embeds it (e.g. GET /exhibitions/:id's artworkLinks[].artwork, or GET /artworks for a curator's cross-artist picker) — not returned by /artworks/mine. Backend includes the full ArtistProfile row; `userId` lets the offer UI tell whether the current viewer owns this artwork. */
   artistProfile?: { displayName: string; userId: string };
-  /** Only present on GET /artworks/mine — which exhibition(s), if any, this artwork is currently placed in. */
-  exhibitionLinks?: { exhibition: { id: string; title: string; status: 'DRAFT' | 'ACTIVE' | 'ENDED' } }[];
+  /** Which exhibition(s), if any, this artwork is currently placed in. Present on GET /artworks/mine (with exhibition.status) and GET /artworks/organization (id+title only, no status) — the latter lets ExhibitionArtworkPlacement.tsx's picker gray out an artwork already placed in a *different* exhibition instead of silently omitting it. */
+  exhibitionLinks?: { exhibition: { id: string; title: string; status?: 'DRAFT' | 'ACTIVE' | 'ENDED' } }[];
   /** Only present on GET /artworks/mine — the artist's own still-PENDING removal request, if any (at most one per artwork+exhibition, see ArtworkRemovalRequestsService). */
   removalRequests?: { id: string; status: 'PENDING'; exhibitionId: string }[];
   /** Present on GET /artworks/:id and GET /exhibitions/:id's artworkLinks[].artwork — true once the artist has recorded an informal artistDecision: 'APPROVED' on some offer for this artwork (see Offer.artistDecision). Sold in practice even though the real Artwork.status/Offer.status may still say otherwise; the backend also rejects new offers once this is true. */

@@ -68,6 +68,8 @@ export interface ApiExhibition {
   artistProfileId?: string | null;
   /** Only present on GET /exhibitions/mine (findOwn's include) — the resolved artist for the table/placement filter. */
   artistProfile?: { id: string; displayName: string } | null;
+  /** Only present on GET /exhibitions/mine (findOwn's include) — how many artworks are currently placed, for ExhibitionList.tsx's "Eser Sayısı" column. */
+  _count?: { artworkLinks: number };
   /** Only present on GET /exhibitions/:id (findOneForView) — list endpoints (usePublicExhibitions/useMyExhibitions) don't include it. */
   artworkLinks?: ApiExhibitionArtwork[];
 }

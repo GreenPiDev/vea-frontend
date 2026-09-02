@@ -83,6 +83,11 @@ export default function ExhibitionList({ onPlace }: ExhibitionListProps) {
       ),
     },
     {
+      key: 'artworkCount',
+      header: t('exhibitionListColArtworkCount'),
+      render: (exhibition) => <span className="text-brand-700">{exhibition._count?.artworkLinks ?? 0}</span>,
+    },
+    {
       key: 'actions',
       header: t('artworkListColActions'),
       render: (exhibition) =>

@@ -10,6 +10,9 @@ import { useOrganizationArtworks, type ApiArtwork } from '../../lib/api/domains/
 import { groupByWallRun, wallRunsForSceneConfig } from '../3d/backendAdapter';
 import { FLOOR_CLEARANCE, type WallRunGeometry } from '../3d/galleryLayout';
 import { ApiError } from '../../lib/api/client';
+import Tooltip from '../layout/Tooltip';
+import { CheckIcon, TrashIcon } from '../layout/icons';
+import ExhibitionBlueprint from './ExhibitionBlueprint';
 
 /** Same formula placeArtworksAlongWall() falls back to when no curator override is set — used here only to pre-fill a sensible starting value in the height input, not as a hard default. */
 function defaultHangHeight(artwork: ApiArtwork): number {
@@ -72,18 +75,30 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
   const placedCount = placedArtworkIds.size;
   const isFull = exhibition.maxArtworks != null && placedCount >= exhibition.maxArtworks;
 
-  // LISTED only — public list also includes IN_EXHIBITION artworks (already
-  // showing somewhere else), which shouldn't be offered here as if free.
   // When the exhibition was pinned to a single artist at creation
   // (Exhibition.artistProfileId — see ExhibitionForm.tsx), narrow the picker
   // to just that artist's own artworks instead of the whole organization.
+  // Artworks already placed *in this* exhibition are excluded here (they're
+  // in the "placed on wall" list above instead) — everything else in this
+  // org, LISTED or not, is a candidate for one of the two lists below.
+  const pickerArtworks = (orgArtworks ?? []).filter(
+    (artwork) =>
+      !placedArtworkIds.has(artwork.id) &&
+      (!exhibition.artistProfileId || artwork.artistProfileId === exhibition.artistProfileId)
+  );
+  // An artwork can only ever be placed in one exhibition at a time (backend
+  // rejects a second placement, see vea-api's addArtwork) — exhibitionLinks
+  // being non-empty here means "already in a *different* exhibition"
+  // (this one's own links were already excluded via placedArtworkIds
+  // above), so it's shown grayed out with that exhibition's title instead
+  // of a silent omission or a confusing 409 on click.
+  const placedElsewhereArtworks = pickerArtworks.filter(
+    (artwork) => (artwork.exhibitionLinks?.length ?? 0) > 0
+  );
   const availableArtworks = isFull
     ? []
-    : (orgArtworks ?? []).filter(
-        (artwork) =>
-          artwork.status === 'LISTED' &&
-          !placedArtworkIds.has(artwork.id) &&
-          (!exhibition.artistProfileId || artwork.artistProfileId === exhibition.artistProfileId)
+    : pickerArtworks.filter(
+        (artwork) => artwork.status === 'LISTED' && (artwork.exhibitionLinks?.length ?? 0) === 0
       );
 
   function wallLabel(run: WallRunGeometry & { id: string }): string {
@@ -164,7 +179,14 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
             <ul className="flex flex-col gap-1">
               {(byWall.get(selectedWallId) ?? []).map((link) => (
                 <li key={link.id} className="flex items-center justify-between gap-2 rounded-md bg-white px-3 py-1.5 text-sm text-brand-900">
-                  <span>{link.artwork.title}</span>
+                  <span className="flex items-center gap-2">
+                    <img
+                      src={link.artwork.imageUrl}
+                      alt=""
+                      className="h-8 w-8 flex-shrink-0 rounded object-cover"
+                    />
+                    {link.artwork.title}
+                  </span>
                   <div className="flex items-center gap-2">
                     <label className="flex items-center gap-1 text-xs text-brand-700">
                       {t('placementHeightY')}
@@ -178,20 +200,26 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
                         className="w-16 rounded border border-brand-300 px-1.5 py-0.5 text-xs"
                       />
                     </label>
-                    <button
-                      onClick={() => handleUpdateHeight(selectedWallId, link.artworkId)}
-                      disabled={updateArtworkLink.isPending}
-                      className="text-brand-700 underline hover:text-brand-900 disabled:opacity-50"
-                    >
-                      {t('placementSaveHeight')}
-                    </button>
-                    <button
-                      onClick={() => handleRemove(link.artworkId)}
-                      disabled={removeArtwork.isPending}
-                      className="text-red-600 underline hover:text-red-800 disabled:opacity-50"
-                    >
-                      {t('placementRemove')}
-                    </button>
+                    <Tooltip label={t('placementSaveHeight')} placement="top">
+                      <button
+                        onClick={() => handleUpdateHeight(selectedWallId, link.artworkId)}
+                        disabled={updateArtworkLink.isPending}
+                        aria-label={t('placementSaveHeight')}
+                        className="flex h-8 w-8 items-center justify-center rounded-md border border-brand-300 text-brand-700 transition-colors hover:bg-brand-100 hover:text-brand-900 disabled:opacity-50"
+                      >
+                        <CheckIcon className="h-4 w-4" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip label={t('placementRemove')} placement="top">
+                      <button
+                        onClick={() => handleRemove(link.artworkId)}
+                        disabled={removeArtwork.isPending}
+                        aria-label={t('placementRemove')}
+                        className="flex h-8 w-8 items-center justify-center rounded-md border border-brand-300 text-red-600 transition-colors hover:bg-red-50 hover:text-red-800 disabled:opacity-50"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </Tooltip>
                   </div>
                 </li>
               ))}
@@ -201,16 +229,41 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-brand-800">{t('placementAddArtwork')}</p>
             {isFull && <p className="text-xs text-red-600">{t('placementCapReached')}</p>}
-            {!isFull && availableArtworks.length === 0 && (
+            {!isFull && availableArtworks.length === 0 && placedElsewhereArtworks.length === 0 && (
               <p className="text-xs text-brand-600">{t('placementNoAvailableArtworks')}</p>
             )}
             <ul className="flex flex-col gap-1">
+              {placedElsewhereArtworks.map((artwork) => (
+                <li
+                  key={artwork.id}
+                  className="flex items-center justify-between gap-2 rounded-md bg-white px-3 py-1.5 text-sm text-brand-400 opacity-50"
+                >
+                  <span className="flex items-center gap-2">
+                    <img
+                      src={artwork.imageUrl}
+                      alt=""
+                      className="h-8 w-8 flex-shrink-0 rounded object-cover"
+                    />
+                    {artwork.title}
+                    <span className="text-xs">
+                      {t('placementPlacedElsewhere', {
+                        title: artwork.exhibitionLinks?.[0]?.exhibition.title ?? '',
+                      })}
+                    </span>
+                  </span>
+                </li>
+              ))}
               {availableArtworks.map((artwork) => (
                 <li key={artwork.id} className="flex items-center justify-between gap-2 rounded-md bg-white px-3 py-1.5 text-sm text-brand-900">
-                  <span>
+                  <span className="flex items-center gap-2">
+                    <img
+                      src={artwork.imageUrl}
+                      alt=""
+                      className="h-8 w-8 flex-shrink-0 rounded object-cover"
+                    />
                     {artwork.title}
                     {artwork.artistProfile && (
-                      <span className="ml-1 text-xs text-brand-500">
+                      <span className="text-xs text-brand-500">
                         {t('placementByArtist', { name: artwork.artistProfile.displayName })}
                       </span>
                     )}
@@ -228,13 +281,16 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
                         className="w-16 rounded border border-brand-300 px-1.5 py-0.5 text-xs"
                       />
                     </label>
-                    <button
-                      onClick={() => handleAdd(artwork)}
-                      disabled={addArtwork.isPending}
-                      className="text-brand-700 underline hover:text-brand-900 disabled:opacity-50"
-                    >
-                      {t('placementAdd')}
-                    </button>
+                    <Tooltip label={t('placementAdd')} placement="top">
+                      <button
+                        onClick={() => handleAdd(artwork)}
+                        disabled={addArtwork.isPending}
+                        aria-label={t('placementAdd')}
+                        className="flex h-8 w-8 items-center justify-center rounded-md border border-brand-300 text-lg leading-none text-green-600 transition-colors hover:bg-green-50 hover:text-green-800 disabled:opacity-50"
+                      >
+                        +
+                      </button>
+                    </Tooltip>
                   </div>
                 </li>
               ))}
@@ -244,6 +300,8 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <ExhibitionBlueprint sceneConfig={exhibition.sceneConfig} byWall={byWall} selectedWallId={selectedWallId} />
     </div>
   );
 }

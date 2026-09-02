@@ -90,6 +90,7 @@
   "artworkInExhibition": "On display: {{title}}",
   "artworkInDraftExhibition": "In a draft exhibition: {{title}}",
   "placementByArtist": "({{name}})",
+  "placementPlacedElsewhere": "(This artwork is on display in {{title}})",
 
   "exhibitionListTitle": "My Exhibitions",
   "exhibitionEmpty": "You haven't created any exhibitions yet.",
@@ -109,6 +110,7 @@
   "exhibitionFormArtist": "Seller (optional)",
   "exhibitionFormArtistNone": "Not selected (mixed exhibition)",
   "exhibitionListColArtist": "Artist",
+  "exhibitionListColArtworkCount": "Artworks",
   "exhibitionListArtistNone": "—",
   "exhibitionFormStartDate": "Start Date",
   "exhibitionFormEndDate": "End Date",
@@ -138,6 +140,8 @@
   "exhibitionFormCancel": "Cancel",
   "exhibitionFormError": "Could not save the exhibition",
 
+  "blueprintTitle": "Room Blueprint",
+  "blueprintSpawnHint": "The dark dot and arrow show the visitor's starting position and facing direction.",
   "placementTitle": "Place Artworks",
   "placementDone": "Done",
   "placementUnavailable": "This exhibition has no room defined yet.",
