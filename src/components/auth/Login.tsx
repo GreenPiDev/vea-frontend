@@ -16,6 +16,9 @@ export default function Login({ onSuccess }: LoginProps) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Pre-launch convenience — backend echoes the OTP in the response while
+  // MailService is still a logging stub. Remove once real emails go out.
+  const [devCode, setDevCode] = useState<string | null>(null);
 
   const requestCode = useRequestCode();
   const verifyCode = useVerifyCode();
@@ -38,7 +41,10 @@ export default function Login({ onSuccess }: LoginProps) {
     e.preventDefault();
     setError(null);
     requestCode.mutate(email, {
-      onSuccess: () => setStep('code'),
+      onSuccess: ({ devCode }) => {
+        setDevCode(devCode);
+        setStep('code');
+      },
       onError: (err) => setError(getErrorMessage(err, 'authErrorSendFailed')),
     });
   }
@@ -97,6 +103,9 @@ export default function Login({ onSuccess }: LoginProps) {
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             className="w-full rounded-md border border-brand-300 bg-white px-3 py-2 text-center text-lg tracking-widest text-brand-900 outline-none focus:border-brand-500"
           />
+          {devCode && (
+            <p className="text-xs text-brand-500">{t('authDevCodeHint', { code: devCode })}</p>
+          )}
           <button
             type="submit"
             disabled={verifyCode.isPending || code.length !== 6}
@@ -110,6 +119,7 @@ export default function Login({ onSuccess }: LoginProps) {
               setStep('email');
               setCode('');
               setError(null);
+              setDevCode(null);
             }}
             className="cursor-pointer text-xs text-brand-600 underline"
           >

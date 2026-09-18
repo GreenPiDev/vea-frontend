@@ -9,6 +9,7 @@
   "authSendCode": "Doğrulama Kodu Gönder",
   "authSendingCode": "Gönderiliyor…",
   "authCodePlaceholder": "6 haneli kod",
+  "authDevCodeHint": "Dev kod: {{code}}",
   "authLogin": "Giriş Yap",
   "authVerifyingCode": "Doğrulanıyor…",
   "authUseDifferentEmail": "Farklı e-posta kullan",

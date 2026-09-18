@@ -23,8 +23,12 @@ export interface ApiUser {
 }
 
 export function useRequestCode() {
+  // devCode: pre-launch convenience since MailService is still a stub with
+  // no real email provider wired up — remove once real emails go out (see
+  // AuthController.requestCode on the backend).
   return useMutation({
-    mutationFn: (email: string) => post<{ status: string }>({ path: Paths.AuthRequestCode, payload: { email } }),
+    mutationFn: (email: string) =>
+      post<{ status: string; devCode: string }>({ path: Paths.AuthRequestCode, payload: { email } }),
   });
 }
 

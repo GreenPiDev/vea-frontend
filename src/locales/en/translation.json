@@ -9,6 +9,7 @@
   "authSendCode": "Send Verification Code",
   "authSendingCode": "Sending…",
   "authCodePlaceholder": "6-digit code",
+  "authDevCodeHint": "Dev code: {{code}}",
   "authLogin": "Sign In",
   "authVerifyingCode": "Verifying…",
   "authUseDifferentEmail": "Use a different email",
