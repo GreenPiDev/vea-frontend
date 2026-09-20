@@ -13,6 +13,10 @@ import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
 import Tooltip from '../layout/Tooltip';
 import { EditIcon, EyeIcon, EyeOffIcon, TrashIcon, UndoIcon } from '../layout/icons';
 
+function formatAmount(amount: number, currency: string): string {
+  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(amount / 100);
+}
+
 const STATUS_KEYS: Record<ApiArtwork['status'], string> = {
   DRAFT: 'statusDraft',
   LISTED: 'statusListed',
@@ -102,6 +106,15 @@ export default function ArtworkList({ onEdit }: ArtworkListProps) {
         ) : (
           <span className="text-xs text-brand-400">—</span>
         ),
+    },
+    {
+      key: 'price',
+      header: t('artworkListColPrice'),
+      render: (artwork) => (
+        <span className="whitespace-nowrap text-sm text-brand-900">
+          {formatAmount(artwork.priceAmount, artwork.currency)}
+        </span>
+      ),
     },
     {
       key: 'status',

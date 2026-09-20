@@ -35,6 +35,7 @@
   "artworkListTitle": "Eserlerim",
   "artworkListColArtwork": "Eser",
   "artworkListColExhibition": "Sergilendiği Yer",
+  "artworkListColPrice": "Fiyat",
   "artworkListColStatus": "Durum",
   "artworkListColActions": "İşlemler",
   "artworkEmpty": "Henüz eser eklemediniz.",

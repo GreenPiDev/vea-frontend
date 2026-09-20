@@ -35,6 +35,7 @@
   "artworkListTitle": "My Artworks",
   "artworkListColArtwork": "Artwork",
   "artworkListColExhibition": "Exhibited In",
+  "artworkListColPrice": "Price",
   "artworkListColStatus": "Status",
   "artworkListColActions": "Actions",
   "artworkEmpty": "You haven't added any artworks yet.",
