@@ -9,6 +9,7 @@ function makeArtwork(overrides: Partial<ApiArtwork> = {}): ApiArtwork {
     id: "artwork-1",
     artistProfileId: "profile-1",
     title: "Test Painting",
+    artistDisplayName: "Test Artist",
     technique: null,
     yearCreated: 1900,
     heightCm: 180,
@@ -129,7 +130,7 @@ describe("adaptApiExhibition", () => {
       makeExhibition({
         sceneConfig: { kind: "template", templateId: preset.id },
         artworkLinks: [
-          makeLink({ artwork: makeArtwork({ artistProfile: undefined }) }),
+          makeLink({ artwork: makeArtwork({ artistDisplayName: "", artistProfile: undefined }) }),
         ],
       })
     );

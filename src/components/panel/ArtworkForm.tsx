@@ -8,6 +8,7 @@ import {
   type ArtworkCategory,
   type ArtworkOrientation,
 } from '../../lib/api/domains/artworks';
+import { useMyArtistProfile } from '../../lib/api/domains/artistProfiles';
 import { ApiError } from '../../lib/api/client';
 
 const ALLOWED_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -37,6 +38,10 @@ interface ArtworkFormProps {
 export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
   const { t } = useTranslation();
   const [title, setTitle] = useState(editing?.title ?? '');
+  const [artistDisplayName, setArtistDisplayName] = useState(editing?.artistDisplayName ?? '');
+  const [artistDisplayNameTouched, setArtistDisplayNameTouched] = useState(Boolean(editing));
+  const [story, setStory] = useState(editing?.story ?? '');
+  const [note, setNote] = useState(editing?.note ?? '');
   const [technique, setTechnique] = useState(editing?.technique ?? '');
   const [yearCreated, setYearCreated] = useState(editing?.yearCreated?.toString() ?? '');
   const [heightCm, setHeightCm] = useState(editing?.heightCm?.toString() ?? '');
@@ -56,7 +61,17 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
 
   const { create, update } = useArtworkMutations();
   const uploadImage = useUploadArtworkImage();
+  const { data: myProfile } = useMyArtistProfile();
   const isPending = create.isPending || update.isPending || uploadImage.isPending;
+
+  // Default the artist name field to the logged-in user's own profile name
+  // — most artworks are self-published — but only until the user actually
+  // edits it themselves; some users enter artwork on behalf of other
+  // artists and need to overwrite this without fighting a re-fill.
+  useEffect(() => {
+    if (artistDisplayNameTouched || !myProfile) return;
+    setArtistDisplayName(myProfile.displayName);
+  }, [artistDisplayNameTouched, myProfile]);
 
   // Object URL for the local file preview — must be revoked on change/unmount
   // or the blob it points at leaks for the tab's lifetime.
@@ -105,6 +120,9 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
 
     const payload = {
       title,
+      artistDisplayName,
+      story: story || undefined,
+      note: note || undefined,
       technique: technique || undefined,
       yearCreated: yearCreated ? Number(yearCreated) : undefined,
       heightCm: Number(heightCm),
@@ -147,6 +165,31 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
           maxLength={200}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-brand-800">
+        {t('artworkFormArtist')}
+        <input
+          required
+          maxLength={200}
+          value={artistDisplayName}
+          onChange={(e) => {
+            setArtistDisplayNameTouched(true);
+            setArtistDisplayName(e.target.value);
+          }}
+          className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-brand-800">
+        {t('artworkFormManifesto')}
+        <textarea
+          maxLength={10000}
+          rows={4}
+          value={story}
+          onChange={(e) => setStory(e.target.value)}
           className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
         />
       </label>
@@ -286,6 +329,18 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
           className="w-40 rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
         />
         {minOfferLabel && <span className="text-xs text-brand-600">{t('artworkFormMinOfferHint', { amount: minOfferLabel })}</span>}
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-brand-800">
+        {t('artworkFormSpecialNotes')}
+        <textarea
+          maxLength={2000}
+          rows={3}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder={t('artworkFormSpecialNotesPlaceholder')}
+          className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+        />
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-brand-800">

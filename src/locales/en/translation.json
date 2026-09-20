@@ -50,6 +50,10 @@
   "artworkPublishHint": "Press the Publish button on each artwork's row so your organization can feature it in an exhibition.",
 
   "artworkFormTitle": "Artwork Title",
+  "artworkFormArtist": "Artist",
+  "artworkFormManifesto": "Manifesto (optional)",
+  "artworkFormSpecialNotes": "Special Notes (optional)",
+  "artworkFormSpecialNotesPlaceholder": "E.g. the piece's condition, storage/shipping requirements, etc.",
   "artworkFormTechnique": "Technique (optional)",
   "artworkFormYear": "Year Created (optional)",
   "artworkFormHeight": "Height (cm)",

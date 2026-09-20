@@ -50,6 +50,10 @@
   "artworkPublishHint": "Organizasyonun eserlerinizi sergileyebilmesi için eserleriniz olduğu satırdaki Yayınla butonuna basınız.",
 
   "artworkFormTitle": "Eser Başlığı",
+  "artworkFormArtist": "Sanatçı",
+  "artworkFormManifesto": "Manifesto (opsiyonel)",
+  "artworkFormSpecialNotes": "Özel Notlar (opsiyonel)",
+  "artworkFormSpecialNotesPlaceholder": "Örn. eserin kondisyonu, saklama/nakliye koşulları vb.",
   "artworkFormTechnique": "Teknik (opsiyonel)",
   "artworkFormYear": "Yapım Yılı (opsiyonel)",
   "artworkFormHeight": "Yükseklik (cm)",

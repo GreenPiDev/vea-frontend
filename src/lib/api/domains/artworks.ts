@@ -25,6 +25,8 @@ export interface ApiArtwork {
   id: string;
   artistProfileId: string;
   title: string;
+  /** Free-text override of the displayed artist name for this artwork — separate from artistProfile.displayName (see backend's ArtistDisplayName comment on the Artwork model). Required. */
+  artistDisplayName: string;
   technique: string | null;
   yearCreated: number | null;
   heightCm: number;

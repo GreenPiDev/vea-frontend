@@ -57,7 +57,7 @@ function toRenderableArtwork(link: ApiExhibitionArtwork, exhibitionId: string, p
   return {
     id: link.id,
     title: artwork.title,
-    artist: artwork.artistProfile?.displayName ?? "Bilinmeyen Sanatçı",
+    artist: artwork.artistDisplayName || artwork.artistProfile?.displayName || "Bilinmeyen Sanatçı",
     year: artwork.yearCreated ? String(artwork.yearCreated) : "",
     exhibitionId,
     image: artwork.imageUrl,
