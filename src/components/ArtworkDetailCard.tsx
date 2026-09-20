@@ -117,7 +117,7 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-brand-50 shadow-2xl md:flex-row"
+        className="relative flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-brand-50 shadow-2xl md:flex-row"
       >
         <button
           onClick={onClose}
@@ -131,7 +131,7 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
           type="button"
           onClick={() => setLightboxOpen(true)}
           aria-label={t('artworkDetailZoomLabel')}
-          className="group flex shrink-0 cursor-pointer flex-col items-center justify-center gap-2 bg-brand-950 pb-4 md:w-[48%]"
+          className="group flex shrink-0 cursor-pointer flex-col items-center justify-center gap-2 bg-brand-950 pb-4 md:w-[40%]"
         >
           <img
             src={artwork.image}
@@ -145,8 +145,8 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
           <div>
-            <h2 className="text-xl font-semibold leading-tight text-brand-900">{artwork.title}</h2>
-            <p className="mt-1 text-sm text-brand-600">
+            <h2 className="text-2xl font-semibold leading-tight text-brand-900">{artwork.title}</h2>
+            <p className="mt-1 text-base text-brand-600">
               {artwork.artist}
               {artwork.year ? ` · ${artwork.year}` : ''}
             </p>
@@ -154,32 +154,32 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
 
           <div className="flex flex-wrap gap-2">
             {artwork.category && (
-              <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-medium text-brand-800">
+              <span className="rounded-full bg-brand-100 px-3 py-1 text-sm font-medium text-brand-800">
                 {t(CATEGORY_KEYS[artwork.category])}
               </span>
             )}
             {artwork.framed != null && (
-              <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-medium text-brand-800">
+              <span className="rounded-full bg-brand-100 px-3 py-1 text-sm font-medium text-brand-800">
                 {t(artwork.framed ? 'artworkDetailFramed' : 'artworkDetailUnframed')}
               </span>
             )}
             {artwork.status && (
-              <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-medium text-brand-800">
+              <span className="rounded-full bg-brand-100 px-3 py-1 text-sm font-medium text-brand-800">
                 {t(STATUS_KEYS[artwork.status])}
               </span>
             )}
           </div>
 
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-base">
             {artwork.technique && (
               <div className="col-span-2">
-                <dt className="text-brand-500">{t('artworkDetailTechniqueLabel')}</dt>
+                <dt className="text-sm text-brand-500">{t('artworkDetailTechniqueLabel')}</dt>
                 <dd className="text-brand-800">{artwork.technique}</dd>
               </div>
             )}
             {artwork.heightCm != null && artwork.widthCm != null && (
               <div>
-                <dt className="text-brand-500">{t('artworkDetailDimensionsLabel')}</dt>
+                <dt className="text-sm text-brand-500">{t('artworkDetailDimensionsLabel')}</dt>
                 <dd className="text-brand-800">
                   {t('artworkDetailDimensions', { height: artwork.heightCm, width: artwork.widthCm })}
                 </dd>
@@ -187,7 +187,7 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
             )}
             {priceLabel && (
               <div>
-                <dt className="text-brand-500">{t('artworkFormPrice')}</dt>
+                <dt className="text-sm text-brand-500">{t('artworkFormPrice')}</dt>
                 <dd className="font-medium text-brand-900">{priceLabel}</dd>
               </div>
             )}
@@ -195,41 +195,41 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
 
           {artwork.story && (
             <div className="border-l-2 border-brand-300 pl-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-brand-500">
+              <p className="text-sm font-medium uppercase tracking-wide text-brand-500">
                 {t('artworkDetailManifestoLabel')}
               </p>
-              <p className="mt-1 whitespace-pre-line text-sm italic text-brand-700">{artwork.story}</p>
+              <p className="mt-1 whitespace-pre-line text-base italic text-brand-700">{artwork.story}</p>
             </div>
           )}
 
           {artwork.note && (
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-brand-500">
+              <p className="text-sm font-medium uppercase tracking-wide text-brand-500">
                 {t('artworkDetailSpecialNotesLabel')}
               </p>
-              <p className="mt-1 whitespace-pre-line text-sm text-brand-700">{artwork.note}</p>
+              <p className="mt-1 whitespace-pre-line text-base text-brand-700">{artwork.note}</p>
             </div>
           )}
 
           {viewCount !== null && (
-            <p className="text-xs text-brand-500">{t('artworkViewCount', { count: viewCount })}</p>
+            <p className="text-sm text-brand-500">{t('artworkViewCount', { count: viewCount })}</p>
           )}
 
           {!isPurchasable && (
-            <p className="text-sm text-brand-600">{t('artworkDetailDemoNotice')}</p>
+            <p className="text-base text-brand-600">{t('artworkDetailDemoNotice')}</p>
           )}
 
           {isPurchasable && isSold && (
-            <p className="text-sm text-brand-600">{t('artworkDetailSoldNotice')}</p>
+            <p className="text-base text-brand-600">{t('artworkDetailSoldNotice')}</p>
           )}
 
           {isPurchasable && !isSold && isOwnArtwork && (
-            <p className="text-sm text-brand-600">{t('artworkDetailOwnArtworkNotice')}</p>
+            <p className="text-base text-brand-600">{t('artworkDetailOwnArtworkNotice')}</p>
           )}
 
           {isPurchasable && !isSold && !isOwnArtwork && !isAuthenticated && (
             <div>
-              <p className="mb-2 text-sm text-brand-600">{t('artworkDetailLoginPrompt')}</p>
+              <p className="mb-2 text-base text-brand-600">{t('artworkDetailLoginPrompt')}</p>
               <Login />
             </div>
           )}
@@ -237,18 +237,18 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
           {isPurchasable && !isSold && !isOwnArtwork && isAuthenticated && (
             <div className="border-t border-brand-200 pt-4">
               {offerSent ? (
-                <p className="text-sm font-medium text-brand-800">{t('artworkOfferSuccess')}</p>
+                <p className="text-base font-medium text-brand-800">{t('artworkOfferSuccess')}</p>
               ) : !showOfferForm ? (
                 <button
                   type="button"
                   onClick={() => setShowOfferForm(true)}
-                  className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800"
+                  className="rounded-md bg-brand-700 px-3 py-2 text-base font-medium text-white hover:bg-brand-800"
                 >
                   {t('artworkOfferSubmit')}
                 </button>
               ) : (
                 <form onSubmit={handleSubmitOffer} className="flex flex-col gap-2">
-                  <label className="text-sm text-brand-700" htmlFor="artwork-offer-amount">
+                  <label className="text-base text-brand-700" htmlFor="artwork-offer-amount">
                     {t('artworkOfferAmountLabel')}
                   </label>
                   <input
@@ -263,21 +263,21 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
                       setAmount(e.target.value);
                       setShowMinAmountWarning(false);
                     }}
-                    className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+                    className="rounded-md border border-brand-300 bg-white px-3 py-2 text-base text-brand-900 outline-none focus:border-brand-500"
                   />
                   {showMinAmountWarning && belowMinimum && minAmountLabel && (
-                    <p className="text-sm font-medium text-red-600">
+                    <p className="text-base font-medium text-red-600">
                       {t('artworkOfferMinAmount', { amount: minAmountLabel })}
                     </p>
                   )}
                   <button
                     type="submit"
                     disabled={createOffer.isPending}
-                    className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
+                    className="rounded-md bg-brand-700 px-3 py-2 text-base font-medium text-white hover:bg-brand-800 disabled:opacity-50"
                   >
                     {createOffer.isPending ? t('artworkOfferSending') : t('artworkOfferSubmit')}
                   </button>
-                  {offerError && <p className="text-sm text-red-600">{offerError}</p>}
+                  {offerError && <p className="text-base text-red-600">{offerError}</p>}
                 </form>
               )}
             </div>
@@ -302,7 +302,7 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
           src={artwork.image}
           alt={artwork.title}
           onClick={(e) => e.stopPropagation()}
-          className="max-h-full max-w-full cursor-zoom-out object-contain"
+          className="h-full w-full cursor-zoom-out object-contain"
         />
       </div>
     )}

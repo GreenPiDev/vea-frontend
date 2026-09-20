@@ -101,6 +101,13 @@ export default function Player({ onLockChange }: PlayerProps) {
 
   return (
     <PointerLockControls
+      // Scoped to the canvas wrapper (see App.tsx) — without this, drei
+      // defaults to listening for clicks on the whole `document`, so
+      // clicking any UI on top of the scene (the artwork detail card, its
+      // image lightbox, HUD buttons) would silently re-engage pointer lock
+      // behind it, hijacking the mouse into camera look while that UI is
+      // still open.
+      selector="#gallery-canvas-wrapper"
       onLock={() => onLockChange?.(true)}
       onUnlock={() => onLockChange?.(false)}
     />

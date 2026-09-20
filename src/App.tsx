@@ -126,16 +126,13 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedArtwork, nearestArtwork, locked]);
 
-  // Escape closes the open detail card (in addition to its own ✕ button).
-  useEffect(() => {
-    if (!selectedArtwork) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "Escape") return;
-      closeArtworkDetail();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedArtwork]);
+  // Escape deliberately does NOT close the open detail card — only its own
+  // ✕ button does. Browsers disqualify an Escape keypress from ever being
+  // a valid gesture for requestPointerLock() (it's reserved as the
+  // always-available pointer-lock exit key), so closing via Escape could
+  // never silently reacquire the lock like the ✕ click does — it would
+  // always need an extra click, unlike ✕. Keeping the only close path be
+  // one that's guaranteed to reacquire the lock avoids that inconsistency.
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(document.fullscreenElement != null);
@@ -200,15 +197,35 @@ export default function App() {
 
   return (
     <div className="app-root">
-      <Suspense fallback={<div className="loading-indicator" />}>
-        <Scene
-          key={exhibition.id}
-          exhibition={exhibition}
-          onLockChange={setLocked}
-          onIconPositionsChange={setIconPositions}
-          onCanvasReady={(el) => (canvasElRef.current = el)}
-        />
-      </Suspense>
+      {/* id targeted by Player.tsx's PointerLockControls `selector` — scopes
+          the "click re-engages pointer lock" behavior to clicks that land
+          on the 3D canvas itself, so clicking UI on top (detail card,
+          lightbox, HUD buttons) can't silently re-lock the camera behind it. */}
+      <div id="gallery-canvas-wrapper" className="gallery-canvas-wrapper">
+        <Suspense fallback={<div className="loading-indicator" />}>
+          <Scene
+            key={exhibition.id}
+            exhibition={exhibition}
+            onLockChange={setLocked}
+            onIconPositionsChange={setIconPositions}
+            onCanvasReady={(el) => (canvasElRef.current = el)}
+          />
+        </Suspense>
+
+        {/* Lives inside the wrapper (not as an app-root sibling) so a click
+            here still counts toward PointerLockControls' scoped `selector`
+            re-lock listener — this is the "click to start/resume" prompt. */}
+        <div className={`instructions-overlay ${locked || selectedArtwork ? "hidden" : ""}`}>
+          <div className="instructions-card">
+            <p className="instructions-title">{exhibition.name}</p>
+            <p className="instructions-text">
+              Galeride gezinmek için <strong>WASD</strong> tuşlarını, etrafa
+              bakmak için <strong>mouse</strong>'u kullanın.
+            </p>
+            <p className="instructions-hint">Başlamak için tıklayın · Çıkmak için ESC</p>
+          </div>
+        </div>
+      </div>
 
       {!selectedArtwork &&
         iconPositions
@@ -277,17 +294,6 @@ export default function App() {
         >
           {isFullscreen ? "⤡ Tam Ekrandan Çık" : "⤢ Tam Ekran"}
         </button>
-      </div>
-
-      <div className={`instructions-overlay ${locked || selectedArtwork ? "hidden" : ""}`}>
-        <div className="instructions-card">
-          <p className="instructions-title">{exhibition.name}</p>
-          <p className="instructions-text">
-            Galeride gezinmek için <strong>WASD</strong> tuşlarını, etrafa
-            bakmak için <strong>mouse</strong>'u kullanın.
-          </p>
-          <p className="instructions-hint">Başlamak için tıklayın · Çıkmak için ESC</p>
-        </div>
       </div>
     </div>
   );
