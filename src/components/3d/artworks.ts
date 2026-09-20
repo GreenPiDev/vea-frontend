@@ -37,6 +37,15 @@ export interface Artwork {
   technique?: string | null;
   /** Mirrors ApiArtwork.framed — drives ArtworkDetailCard.tsx's "framed"/"unframed" line, independent of `frame` above (which is what the 3D scene actually renders, "modernBlack" or null). */
   framed?: boolean;
+  /** Mirrors ApiArtwork.category — ArtworkDetailCard.tsx shows a localized label. */
+  category?: "PAINTING" | "SCULPTURE" | "PHOTOGRAPHY" | "OTHER";
+  /** Physical size in cm, mirrors ApiArtwork.heightCm/widthCm — shown as "H x W cm" in ArtworkDetailCard.tsx. Distinct from `height`, which is the on-wall render height in meters. */
+  heightCm?: number;
+  widthCm?: number;
+  /** Mirrors ApiArtwork.story ("Manifesto" in the artist panel form) — the artist's own statement about the piece. */
+  story?: string | null;
+  /** Mirrors ApiArtwork.note ("Özel Notlar" in the artist panel form) — free-text caretaking/condition notes. */
+  note?: string | null;
   /** Minor-unit price (e.g. kuruş/cent), mirrors ApiArtwork.priceAmount. */
   priceAmount?: number;
   currency?: string;
