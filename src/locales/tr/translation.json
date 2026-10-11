@@ -186,6 +186,9 @@
   "exhibitionTemplateFormSubmitCreate": "Şablonu Oluştur",
   "exhibitionTemplateFormSubmitUpdate": "Şablonu Güncelle",
   "exhibitionTemplateFormError": "Şablon kaydedilemedi",
+  "exhibitionTemplateFormRangeHint": "{{min}} - {{max}} metre arasında olmalı",
+  "exhibitionTemplateFormEmptyError": "Bu alan boş bırakılamaz",
+  "exhibitionTemplateFormRangeError": "{{min}} - {{max}} metre arasında bir değer girin",
 
   "blueprintTitle": "Salon Krokisi",
   "blueprintSpawnHint": "Koyu nokta ve ok, ziyaretçinin başlangıç konumu ve bakış yönünü gösterir.",

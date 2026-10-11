@@ -186,6 +186,9 @@
   "exhibitionTemplateFormSubmitCreate": "Create Template",
   "exhibitionTemplateFormSubmitUpdate": "Update Template",
   "exhibitionTemplateFormError": "Could not save the template",
+  "exhibitionTemplateFormRangeHint": "Must be between {{min}} and {{max}} meters",
+  "exhibitionTemplateFormEmptyError": "This field cannot be left empty",
+  "exhibitionTemplateFormRangeError": "Enter a value between {{min}} and {{max}} meters",
 
   "blueprintTitle": "Room Blueprint",
   "blueprintSpawnHint": "The dark dot and arrow show the visitor's starting position and facing direction.",

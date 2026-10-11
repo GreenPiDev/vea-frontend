@@ -14,6 +14,17 @@ import './ExhibitionForm.css';
 
 type ShapeKind = 'rectangle' | 'custom';
 
+const RECT_WIDTH_RANGE = { min: 4, max: 60 };
+const RECT_DEPTH_RANGE = { min: 4, max: 60 };
+const WALL_HEIGHT_RANGE = { min: 2.5, max: 20 };
+
+function parseDimension(raw: string, range: { min: number; max: number }) {
+  const value = Number(raw);
+  const isEmpty = raw.trim() === '';
+  const isValid = !isEmpty && Number.isFinite(value) && value >= range.min && value <= range.max;
+  return { value, isEmpty, isValid };
+}
+
 interface ExhibitionTemplateFormProps {
   editing?: ApiExhibitionTemplate;
   onDone: () => void;
@@ -37,12 +48,12 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
   const [subtitle, setSubtitle] = useState(editing?.subtitle ?? '');
   const [shapeKind, setShapeKind] = useState<ShapeKind>(editing?.roomShape.kind ?? 'rectangle');
   const [rectWidth, setRectWidth] = useState(
-    editing?.roomShape.kind === 'rectangle' ? editing.roomShape.width : 14
+    String(editing?.roomShape.kind === 'rectangle' ? editing.roomShape.width : 14)
   );
   const [rectDepth, setRectDepth] = useState(
-    editing?.roomShape.kind === 'rectangle' ? editing.roomShape.depth : 10
+    String(editing?.roomShape.kind === 'rectangle' ? editing.roomShape.depth : 10)
   );
-  const [wallHeight, setWallHeight] = useState(editing?.wallHeight ?? 6);
+  const [wallHeight, setWallHeight] = useState(String(editing?.wallHeight ?? 6));
   const [wallColor, setWallColor] = useState(editing?.wallColor ?? '#efe4cf');
   const [floorColor, setFloorColor] = useState(editing?.floorColor ?? '#8a6a45');
   const [ceilingColor, setCeilingColor] = useState(editing?.ceilingColor ?? '#f7f0e0');
@@ -64,8 +75,13 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
   const usageCount = editing?._count?.exhibitions ?? 0;
   const isShapeLocked = usageCount > 0;
 
+  const rectWidthCheck = parseDimension(rectWidth, RECT_WIDTH_RANGE);
+  const rectDepthCheck = parseDimension(rectDepth, RECT_DEPTH_RANGE);
+  const wallHeightCheck = parseDimension(wallHeight, WALL_HEIGHT_RANGE);
+
   const isPending = create.isPending || update.isPending;
-  const canSubmit = isShapeLocked || shapeKind === 'rectangle' || grid.canSubmit;
+  const isRectangleValid = isShapeLocked || shapeKind !== 'rectangle' || (rectWidthCheck.isValid && rectDepthCheck.isValid);
+  const canSubmit = wallHeightCheck.isValid && isRectangleValid && (isShapeLocked || shapeKind === 'rectangle' || grid.canSubmit);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -74,7 +90,7 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
     const roomShape = isShapeLocked
       ? undefined
       : shapeKind === 'rectangle'
-        ? ({ kind: 'rectangle' as const, width: rectWidth, depth: rectDepth })
+        ? ({ kind: 'rectangle' as const, width: rectWidthCheck.value, depth: rectDepthCheck.value })
         : ({
             kind: 'custom' as const,
             cells: grid.floorCellList,
@@ -85,7 +101,7 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
       name,
       subtitle: subtitle || undefined,
       roomShape,
-      wallHeight,
+      wallHeight: wallHeightCheck.value,
       wallColor,
       floorColor,
       ceilingColor,
@@ -150,25 +166,43 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
               {t('exhibitionTemplateFormRoomWidth')}
               <input
                 type="number"
-                min={4}
-                max={60}
+                min={RECT_WIDTH_RANGE.min}
+                max={RECT_WIDTH_RANGE.max}
                 step={0.5}
                 value={rectWidth}
-                onChange={(e) => setRectWidth(Number(e.target.value) || 4)}
+                onChange={(e) => setRectWidth(e.target.value)}
                 className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
               />
+              {rectWidthCheck.isEmpty ? (
+                <span className="text-xs text-red-600">{t('exhibitionTemplateFormEmptyError')}</span>
+              ) : !rectWidthCheck.isValid ? (
+                <span className="text-xs text-red-600">
+                  {t('exhibitionTemplateFormRangeError', RECT_WIDTH_RANGE)}
+                </span>
+              ) : (
+                <span className="text-xs text-brand-500">{t('exhibitionTemplateFormRangeHint', RECT_WIDTH_RANGE)}</span>
+              )}
             </label>
             <label className="flex flex-col gap-1 text-sm text-brand-800">
               {t('exhibitionTemplateFormRoomDepth')}
               <input
                 type="number"
-                min={4}
-                max={60}
+                min={RECT_DEPTH_RANGE.min}
+                max={RECT_DEPTH_RANGE.max}
                 step={0.5}
                 value={rectDepth}
-                onChange={(e) => setRectDepth(Number(e.target.value) || 4)}
+                onChange={(e) => setRectDepth(e.target.value)}
                 className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
               />
+              {rectDepthCheck.isEmpty ? (
+                <span className="text-xs text-red-600">{t('exhibitionTemplateFormEmptyError')}</span>
+              ) : !rectDepthCheck.isValid ? (
+                <span className="text-xs text-red-600">
+                  {t('exhibitionTemplateFormRangeError', RECT_DEPTH_RANGE)}
+                </span>
+              ) : (
+                <span className="text-xs text-brand-500">{t('exhibitionTemplateFormRangeHint', RECT_DEPTH_RANGE)}</span>
+              )}
             </label>
           </>
         )}
@@ -176,13 +210,22 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
           {t('exhibitionFormWallHeight')}
           <input
             type="number"
-            min={2.5}
-            max={20}
+            min={WALL_HEIGHT_RANGE.min}
+            max={WALL_HEIGHT_RANGE.max}
             step={0.5}
             value={wallHeight}
-            onChange={(e) => setWallHeight(Number(e.target.value) || 6)}
+            onChange={(e) => setWallHeight(e.target.value)}
             className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
           />
+          {wallHeightCheck.isEmpty ? (
+            <span className="text-xs text-red-600">{t('exhibitionTemplateFormEmptyError')}</span>
+          ) : !wallHeightCheck.isValid ? (
+            <span className="text-xs text-red-600">
+              {t('exhibitionTemplateFormRangeError', WALL_HEIGHT_RANGE)}
+            </span>
+          ) : (
+            <span className="text-xs text-brand-500">{t('exhibitionTemplateFormRangeHint', WALL_HEIGHT_RANGE)}</span>
+          )}
         </label>
       </div>
 
