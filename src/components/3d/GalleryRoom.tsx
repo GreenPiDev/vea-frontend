@@ -125,7 +125,7 @@ function TexturedPlane({
   );
 
   return (
-    <mesh position={position} rotation={rotation} receiveShadow material={material}>
+    <mesh position={position} rotation={rotation} material={material}>
       <planeGeometry args={size} />
     </mesh>
   );
@@ -184,8 +184,6 @@ function TexturedWalls({
           position={wall.position}
           geometry={geometries[i]}
           material={material}
-          castShadow
-          receiveShadow
         />
       ))}
     </>

@@ -24,7 +24,6 @@ export default function Baseboards() {
           key={`baseboard-${wall.id}`}
           position={[wall.position[0], BASEBOARD_HEIGHT / 2, wall.position[2]]}
           material={material}
-          receiveShadow
         >
           <boxGeometry args={[wall.size[0] + 0.02, BASEBOARD_HEIGHT, wall.size[2] + 0.02]} />
         </mesh>

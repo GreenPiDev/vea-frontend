@@ -37,23 +37,22 @@ export default function Scene({
 
   return (
     <Canvas
-      shadows
       dpr={dpr}
       gl={{ antialias: false, toneMapping: THREE.ACESFilmicToneMapping }}
       camera={{ fov: 65, near: 0.1, far: 100, position: layout.playerStart }}
-      onCreated={({ gl, scene }) => {
+      onCreated={({ gl }) => {
         gl.outputColorSpace = THREE.SRGBColorSpace;
-        scene.fog = new THREE.Fog(exhibition.theme.fogColor, 14, 40);
-        // Nothing in the gallery moves except the camera, so shadow maps
-        // only need to be baked once instead of every frame.
-        gl.shadowMap.autoUpdate = false;
-        gl.shadowMap.needsUpdate = true;
         onCanvasReady?.(gl.domElement);
       }}
     >
       <PerformanceMonitor
         onIncline={() => setDpr(1.5)}
         onDecline={() => setDpr(1)}
+        // A borderline device can incline/decline back and forth every few seconds,
+        // which reads to the user as FPS randomly swinging. Once drei detects that
+        // oscillation (default: 3 flip-flops), settle on the conservative resolution
+        // instead of letting it keep bouncing.
+        onFallback={() => setDpr(1)}
       />
       <color attach="background" args={[exhibition.theme.backgroundColor]} />
       <ExhibitionProvider exhibition={exhibition} layout={layout}>

@@ -12,6 +12,39 @@ const FRAME_DEPTH = 0.05;
 // re-tuning every theme's value by hand.
 const SPOT_INTENSITY_SCALE = 0.6;
 
+// The picture-light fixture's metal parts (base/arms/bar) use the same fixed color+roughness+metalness on
+// every single painting in every exhibition — only their geometry/position differs. Previously each Artwork
+// instance declared these as inline JSX materials, so a 50-painting exhibition silently allocated ~150 GPU
+// material instances for visually identical black metal. One shared instance per part renders byte-identical
+// pixels at a fraction of the state-change cost.
+const FIXTURE_BASE_MATERIAL = new THREE.MeshStandardMaterial({ color: "#1a1a1a", roughness: 0.4, metalness: 0.6 });
+const FIXTURE_ARM_MATERIAL = new THREE.MeshStandardMaterial({ color: "#1a1a1a", roughness: 0.35, metalness: 0.6 });
+const FIXTURE_BAR_MATERIAL = new THREE.MeshStandardMaterial({ color: "#1c1c1c", roughness: 0.3, metalness: 0.6 });
+
+// The LED strip's emissive color follows the exhibition's theme (spotColor), so it can't be one global
+// constant like the parts above — but every painting within the same exhibition shares the same theme, so
+// one material per color (not per painting) is still correct. Small cache, never grows past the handful of
+// themes actually in use at once.
+const ledStripMaterialCache = new Map<string, THREE.MeshStandardMaterial>();
+function getLedStripMaterial(spotColor: string) {
+  let material = ledStripMaterialCache.get(spotColor);
+  if (!material) {
+    material = new THREE.MeshStandardMaterial({
+      color: "#0a0a0a",
+      emissive: spotColor,
+      emissiveIntensity: 1.4,
+      roughness: 0.5,
+    });
+    ledStripMaterialCache.set(spotColor, material);
+  }
+  return material;
+}
+
+// Same idea as the LED strip cache above, but keyed by frame style — every painting using, say,
+// "modernBlack" gets the exact same frame look, so there's no reason for each one to own its own
+// MeshStandardMaterial (and its own map/roughnessMap/metalnessMap bindings) when they're all identical.
+const frameMaterialCache = new Map<FrameStyle, THREE.MeshStandardMaterial>();
+
 /** A single framed, lit, labeled painting mounted flush on a gallery wall. */
 export default function Artwork({ data }: { data: ArtworkData }) {
   const texture = useTexture(data.image);
@@ -93,18 +126,20 @@ function FrameMesh({ style, size }: { style: FrameStyle; size: [number, number, 
     }
   }, [map, roughnessMap, metalnessMap]);
 
-  const material = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        map,
-        roughnessMap,
-        metalnessMap,
-        metalness: frameStyle.metalness,
-        roughness: frameStyle.roughness,
-        color: frameStyle.color ?? "#ffffff",
-      }),
-    [map, roughnessMap, metalnessMap, frameStyle.metalness, frameStyle.roughness, frameStyle.color]
-  );
+  const material = useMemo(() => {
+    const cached = frameMaterialCache.get(style);
+    if (cached) return cached;
+    const created = new THREE.MeshStandardMaterial({
+      map,
+      roughnessMap,
+      metalnessMap,
+      metalness: frameStyle.metalness,
+      roughness: frameStyle.roughness,
+      color: frameStyle.color ?? "#ffffff",
+    });
+    frameMaterialCache.set(style, created);
+    return created;
+  }, [style, map, roughnessMap, metalnessMap, frameStyle.metalness, frameStyle.roughness, frameStyle.color]);
 
   const geometry = useMemo(
     () => buildTexturedBoxGeometry(size, frameStyle.tileSize),
@@ -112,7 +147,7 @@ function FrameMesh({ style, size }: { style: FrameStyle; size: [number, number, 
   );
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  return <mesh position={[0, 0, -FRAME_DEPTH / 2]} geometry={geometry} material={material} castShadow />;
+  return <mesh position={[0, 0, -FRAME_DEPTH / 2]} geometry={geometry} material={material} />;
 }
 
 export function ArtworkLight({ data }: { data: ArtworkData }) {
@@ -257,33 +292,28 @@ export function ArtworkLight({ data }: { data: ArtworkData }) {
       />
 
       {/* Wall-mounted base — spans both arms' attach points so they read as one fixture, not two floating hooks */}
-      <mesh position={basePosition} quaternion={baseQuaternion}>
+      <mesh position={basePosition} quaternion={baseQuaternion} material={FIXTURE_BASE_MATERIAL}>
         <cylinderGeometry args={[0.055, 0.055, baseLength, 20]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.4} metalness={0.6} />
       </mesh>
 
       {/* Two curved support arms */}
       {armCenters.map((center, i) => (
-        <mesh key={i} position={center} quaternion={armGeometry.quaternion}>
+        <mesh key={i} position={center} quaternion={armGeometry.quaternion} material={FIXTURE_ARM_MATERIAL}>
           <torusGeometry args={[armGeometry.radius, 0.016, 8, 24, Math.PI]} />
-          <meshStandardMaterial color="#1a1a1a" roughness={0.35} metalness={0.6} />
         </mesh>
       ))}
 
       {/* Light bar */}
-      <mesh position={barPosition} quaternion={barQuaternion} castShadow>
+      <mesh position={barPosition} quaternion={barQuaternion} material={FIXTURE_BAR_MATERIAL}>
         <cylinderGeometry args={[barRadius, barRadius, barLength, 20]} />
-        <meshStandardMaterial color="#1c1c1c" roughness={0.3} metalness={0.6} />
       </mesh>
       {/* Glowing LED strip along the bar's underside */}
-      <mesh position={stripPosition} quaternion={stripQuaternion}>
+      <mesh
+        position={stripPosition}
+        quaternion={stripQuaternion}
+        material={getLedStripMaterial(exhibition.theme.spotColor)}
+      >
         <boxGeometry args={[barLength * 0.88, 0.014, 0.02]} />
-        <meshStandardMaterial
-          color="#0a0a0a"
-          emissive={exhibition.theme.spotColor}
-          emissiveIntensity={1.4}
-          roughness={0.5}
-        />
       </mesh>
     </>
   );
