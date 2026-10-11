@@ -1,18 +1,10 @@
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import Scene from '../3d/Scene';
-import type { ArtworkIconPosition } from '../3d/ArtworkIconProjector';
 import { adaptApiExhibition } from '../3d/backendAdapter';
 import { useOwnExhibition } from '../../lib/api/domains/exhibitions';
-import LoadingScreen from '../common/LoadingScreen';
-import { useMinimumLoadingTime } from '../../lib/useMinimumLoadingTime';
+import { useMinimumLoadingTime, GALLERY_SCENE_MIN_LOADING_MS } from '../../lib/useMinimumLoadingTime';
+import ExhibitionPreviewScene from './ExhibitionPreviewScene';
 import '../../App.css';
-
-// Markalı LoadingScreen'in hızlı bağlantılarda tek karelik bir "çakma" gibi
-// görünmesini önler — gerçek bir gecikme eklemiyor, sadece gösterimi en az
-// bu kadar sürdürüyor (bkz. useMinimumLoadingTime.ts).
-const MIN_LOADING_SCREEN_MS = 1500;
 
 // /dashboard/organization/exhibitions/preview/:exhibitionId — lets a curator
 // walk through their own exhibition in the real 3D scene before publishing
@@ -20,98 +12,24 @@ const MIN_LOADING_SCREEN_MS = 1500;
 // uses useOwnExhibition/GET /exhibitions/mine/:id instead, same owner-only
 // endpoint ExhibitionArtworkPlacement.tsx already relies on — its Prisma
 // include already carries artworkLinks, so adaptApiExhibition works
-// unmodified). Deliberately a trimmed copy of App.tsx's scene-rendering
-// branch: no artwork detail card / offer form (an admin previewing their own
-// unpublished show shouldn't see a "make an offer" button), no visitor
-// counter (nothing to count pre-publish), just look-around + a way back. No
-// `onBack` prop, unlike the panel pages — this renders full-bleed outside
-// PanelLayout, so there's no header chrome to wire a back arrow into; the
-// HUD button below is the only way out.
+// unmodified). The actual rendering (canvas, instructions, HUD) lives in
+// ExhibitionPreviewScene.tsx, shared with ExhibitionTemplatePreviewPage.tsx —
+// this component is just the data-fetching/adaptation glue for the
+// exhibition case.
 export default function ExhibitionPreviewPage() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const { exhibitionId } = useParams<{ exhibitionId: string }>();
-  const [locked, setLocked] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [, setIconPositions] = useState<ArtworkIconPosition[]>([]);
 
   const { data: backendDetail, isLoading } = useOwnExhibition(exhibitionId ?? '');
   const exhibition = useMemo(() => (backendDetail ? adaptApiExhibition(backendDetail) : null), [backendDetail]);
-  const showLoadingScreen = useMinimumLoadingTime(isLoading, MIN_LOADING_SCREEN_MS);
-
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(document.fullscreenElement != null);
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
-
-  function backToExhibitions() {
-    setLocked(false);
-    navigate('/dashboard/organization/exhibitions');
-  }
-
-  if (showLoadingScreen) {
-    return <LoadingScreen />;
-  }
-
-  if (!exhibition) {
-    return (
-      <div className="app-root flex items-center justify-center">
-        <div className="instructions-card">
-          <p className="instructions-title">{t('exhibitionPreviewUnavailable')}</p>
-          <button className="hud-button mt-3" onClick={backToExhibitions}>
-            {t('exhibitionPreviewBack')}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const showLoadingScreen = useMinimumLoadingTime(isLoading, GALLERY_SCENE_MIN_LOADING_MS);
 
   return (
-    <div className="app-root">
-      {/* id targeted by Player.tsx's PointerLockControls `selector` — scopes
-          the "click re-engages pointer lock" behavior to clicks that land
-          on the 3D canvas itself, matching App.tsx's gallery route. */}
-      <div id="gallery-canvas-wrapper" className="gallery-canvas-wrapper">
-        <Suspense fallback={<LoadingScreen />}>
-          <Scene key={exhibition.id} exhibition={exhibition} onLockChange={setLocked} onIconPositionsChange={setIconPositions} />
-        </Suspense>
-
-        {/* Lives inside the wrapper (not as an app-root sibling) so a click
-            here still counts toward PointerLockControls' scoped `selector`
-            re-lock listener — this is the "click to start/resume" prompt. */}
-        <div className={`instructions-overlay ${locked ? 'hidden' : ''}`}>
-          <div className="instructions-card">
-            <p className="instructions-title">{exhibition.name}</p>
-            <p className="instructions-text">
-              Galeride gezinmek için <strong>WASD</strong> tuşlarını, etrafa bakmak için <strong>mouse</strong>'u kullanın.
-            </p>
-            <p className="instructions-hint">Başlamak için tıklayın · Çıkmak için ESC</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="fixed right-3 top-3 z-40 rounded-md bg-black/55 px-3 py-1.5 text-sm font-medium text-white backdrop-blur">
-        {t('exhibitionPreviewBadge')}
-      </div>
-
-      <div className="hud-controls">
-        <button className="hud-button" onClick={backToExhibitions}>
-          {t('exhibitionPreviewBack')}
-        </button>
-        <button
-          className="hud-button"
-          onClick={() => {
-            if (document.fullscreenElement) {
-              document.exitFullscreen();
-            } else {
-              document.documentElement.requestFullscreen();
-            }
-          }}
-        >
-          {isFullscreen ? '⤡ Tam Ekrandan Çık' : '⤢ Tam Ekran'}
-        </button>
-      </div>
-    </div>
+    <ExhibitionPreviewScene
+      exhibition={exhibition}
+      showLoadingScreen={showLoadingScreen}
+      badgeKey="exhibitionPreviewBadge"
+      onBack={() => navigate('/dashboard/organization/exhibitions')}
+    />
   );
 }

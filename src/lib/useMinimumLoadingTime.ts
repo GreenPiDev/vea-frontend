@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
+// Markalı LoadingScreen'in hızlı bağlantılarda tek karelik bir "çakma" gibi
+// görünmesini önler — gerçek bir gecikme eklemiyor, sadece gösterimi en az
+// bu kadar sürdürüyor. Her full-bleed 3D sahne ekranı (App.tsx'in galeri
+// rotası, her iki önizleme sayfası) aynı değeri kullandığı için tek yerden.
+export const GALLERY_SCENE_MIN_LOADING_MS = 1500;
+
 // `isLoading` gerçek veri bekleniyor mu diye düşse bile, LoadingScreen'i en
 // az `minMs` süre ekranda tutar — Login.tsx sonrası gibi yerlerde kısa bir
 // yanıt anında ekranın "çakması" yerine her zaman akıcı/kasıtlı bir geçiş

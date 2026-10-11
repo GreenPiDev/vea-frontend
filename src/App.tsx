@@ -1,26 +1,22 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Scene from "./components/3d/Scene";
 import { EXHIBITIONS } from "./components/3d/exhibitions";
 import { ARTWORKS, type Artwork } from "./components/3d/artworks";
 import type { ArtworkIconPosition } from "./components/3d/ArtworkIconProjector";
 import { adaptApiExhibition, previewAccentColor } from "./components/3d/backendAdapter";
 import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSelect";
 import ArtworkDetailCard from "./components/ArtworkDetailCard";
+import GallerySceneCanvas from "./components/common/GallerySceneCanvas";
+import FullscreenToggleButton from "./components/common/FullscreenToggleButton";
 import LoadingScreen from "./components/common/LoadingScreen";
 import Header from "./components/layout/Header";
 import { useAuth } from "./lib/auth/AuthContext";
 import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitions";
 import { useRealtimeQuerySync } from "./lib/socket/useRealtimeQuerySync";
 import { useExhibitionVisitorCount } from "./lib/socket/useExhibitionVisitorCount";
-import { useMinimumLoadingTime } from "./lib/useMinimumLoadingTime";
+import { useMinimumLoadingTime, GALLERY_SCENE_MIN_LOADING_MS } from "./lib/useMinimumLoadingTime";
 import "./App.css";
-
-// Markalı LoadingScreen'in hızlı bağlantılarda tek karelik bir "çakma" gibi
-// görünmesini önler — gerçek bir gecikme eklemiyor, sadece gösterimi en az
-// bu kadar sürdürüyor (bkz. useMinimumLoadingTime.ts).
-const MIN_LOADING_SCREEN_MS = 1500;
 
 export default function App() {
   const { t } = useTranslation();
@@ -38,7 +34,6 @@ export default function App() {
     () => routeExhibitionId ?? new URLSearchParams(window.location.search).get("exhibition")
   );
   const [locked, setLocked] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [iconPositions, setIconPositions] = useState<ArtworkIconPosition[]>([]);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   // Statik şablon sergiler (EXHIBITIONS) anında bulunduğu için hiçbir ağ
@@ -89,7 +84,7 @@ export default function App() {
 
   const showExhibitionLoadingScreen = useMinimumLoadingTime(
     (enteringExhibition && !exhibition) || (Boolean(backendId) && backendLoading),
-    MIN_LOADING_SCREEN_MS
+    GALLERY_SCENE_MIN_LOADING_MS
   );
 
   // Sergi hazır olur olmaz bayrağı indiriyor — aksi halde "← Sergiler" ile
@@ -161,12 +156,6 @@ export default function App() {
   // always need an extra click, unlike ✕. Keeping the only close path be
   // one that's guaranteed to reacquire the lock avoids that inconsistency.
 
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(document.fullscreenElement != null);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
-
   // Strip the `?exhibition=` param after it's been read into state, so a
   // refresh/back-navigation doesn't keep re-selecting it.
   useEffect(() => {
@@ -227,35 +216,13 @@ export default function App() {
 
   return (
     <div className="app-root">
-      {/* id targeted by Player.tsx's PointerLockControls `selector` — scopes
-          the "click re-engages pointer lock" behavior to clicks that land
-          on the 3D canvas itself, so clicking UI on top (detail card,
-          lightbox, HUD buttons) can't silently re-lock the camera behind it. */}
-      <div id="gallery-canvas-wrapper" className="gallery-canvas-wrapper">
-        <Suspense fallback={<LoadingScreen />}>
-          <Scene
-            key={exhibition.id}
-            exhibition={exhibition}
-            onLockChange={setLocked}
-            onIconPositionsChange={setIconPositions}
-            onCanvasReady={(el) => (canvasElRef.current = el)}
-          />
-        </Suspense>
-
-        {/* Lives inside the wrapper (not as an app-root sibling) so a click
-            here still counts toward PointerLockControls' scoped `selector`
-            re-lock listener — this is the "click to start/resume" prompt. */}
-        <div className={`instructions-overlay ${locked || selectedArtwork ? "hidden" : ""}`}>
-          <div className="instructions-card">
-            <p className="instructions-title">{exhibition.name}</p>
-            <p className="instructions-text">
-              Galeride gezinmek için <strong>WASD</strong> tuşlarını, etrafa
-              bakmak için <strong>mouse</strong>'u kullanın.
-            </p>
-            <p className="instructions-hint">Başlamak için tıklayın · Çıkmak için ESC</p>
-          </div>
-        </div>
-      </div>
+      <GallerySceneCanvas
+        exhibition={exhibition}
+        overlayHidden={locked || Boolean(selectedArtwork)}
+        onLockChange={setLocked}
+        onIconPositionsChange={setIconPositions}
+        onCanvasReady={(el) => (canvasElRef.current = el)}
+      />
 
       {!selectedArtwork &&
         iconPositions
@@ -310,20 +277,9 @@ export default function App() {
             navigate("/home");
           }}
         >
-          ← Sergiler
+          {t("backToExhibitionSelect")}
         </button>
-        <button
-          className="hud-button"
-          onClick={() => {
-            if (document.fullscreenElement) {
-              document.exitFullscreen();
-            } else {
-              document.documentElement.requestFullscreen();
-            }
-          }}
-        >
-          {isFullscreen ? "⤡ Tam Ekrandan Çık" : "⤢ Tam Ekran"}
-        </button>
+        <FullscreenToggleButton />
       </div>
     </div>
   );
