@@ -63,11 +63,29 @@ export default function ExhibitionTemplatePreviewPage() {
 
   return (
     <div className="app-root">
-      <Suspense fallback={<LoadingScreen />}>
-        <Scene key={exhibition.id} exhibition={exhibition} onLockChange={setLocked} onIconPositionsChange={setIconPositions} />
-      </Suspense>
+      {/* id targeted by Player.tsx's PointerLockControls `selector` — scopes
+          the "click re-engages pointer lock" behavior to clicks that land
+          on the 3D canvas itself, matching App.tsx's gallery route. */}
+      <div id="gallery-canvas-wrapper" className="gallery-canvas-wrapper">
+        <Suspense fallback={<LoadingScreen />}>
+          <Scene key={exhibition.id} exhibition={exhibition} onLockChange={setLocked} onIconPositionsChange={setIconPositions} />
+        </Suspense>
 
-      <div className="fixed left-3 top-3 z-40 rounded-md bg-black/55 px-3 py-1.5 text-sm font-medium text-white backdrop-blur">
+        {/* Lives inside the wrapper (not as an app-root sibling) so a click
+            here still counts toward PointerLockControls' scoped `selector`
+            re-lock listener — this is the "click to start/resume" prompt. */}
+        <div className={`instructions-overlay ${locked ? 'hidden' : ''}`}>
+          <div className="instructions-card">
+            <p className="instructions-title">{exhibition.name}</p>
+            <p className="instructions-text">
+              Galeride gezinmek için <strong>WASD</strong> tuşlarını, etrafa bakmak için <strong>mouse</strong>'u kullanın.
+            </p>
+            <p className="instructions-hint">Başlamak için tıklayın · Çıkmak için ESC</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="fixed right-3 top-3 z-40 rounded-md bg-black/55 px-3 py-1.5 text-sm font-medium text-white backdrop-blur">
         {t('exhibitionTemplatePreviewBadge')}
       </div>
 
@@ -87,16 +105,6 @@ export default function ExhibitionTemplatePreviewPage() {
         >
           {isFullscreen ? '⤡ Tam Ekrandan Çık' : '⤢ Tam Ekran'}
         </button>
-      </div>
-
-      <div className={`instructions-overlay ${locked ? 'hidden' : ''}`}>
-        <div className="instructions-card">
-          <p className="instructions-title">{exhibition.name}</p>
-          <p className="instructions-text">
-            Galeride gezinmek için <strong>WASD</strong> tuşlarını, etrafa bakmak için <strong>mouse</strong>'u kullanın.
-          </p>
-          <p className="instructions-hint">Başlamak için tıklayın · Çıkmak için ESC</p>
-        </div>
       </div>
     </div>
   );
