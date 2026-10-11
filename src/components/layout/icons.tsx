@@ -191,6 +191,27 @@ export function UndoIcon({ className }: IconProps) {
   );
 }
 
+// Toast bildirimi (main.tsx) "info" ikonu — CheckIcon (başarı) ve AlertCircleIcon
+// (hata) ile aynı ailede, nötr durum için.
+export function InfoIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4M12 8h.01" />
+    </svg>
+  );
+}
+
+// Toast bildirimi (main.tsx) "hata" ikonu.
+export function AlertCircleIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4M12 16h.01" />
+    </svg>
+  );
+}
+
 export function CalendarIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

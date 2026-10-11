@@ -428,5 +428,6 @@
 
   "toastLoginSuccess": "Giriş başarılı",
   "toastLoginError": "Giriş başarısız, kodu kontrol edin",
-  "toastLogoutSuccess": "Çıkış yapıldı"
+  "toastLogoutSuccess": "Çıkış yapıldı",
+  "toastClose": "Kapat"
 }

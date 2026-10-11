@@ -428,5 +428,6 @@
 
   "toastLoginSuccess": "Logged in successfully",
   "toastLoginError": "Login failed, please check the code",
-  "toastLogoutSuccess": "Logged out"
+  "toastLogoutSuccess": "Logged out",
+  "toastClose": "Close"
 }
