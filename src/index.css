@@ -40,6 +40,19 @@ body {
   font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* Number input'larda tarayıcı varsayılan yukarı/aşağı ok (spinner)
+   butonları projenin hiçbir yerinde istenmiyor — global olarak kaldırılır. */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .fps-stats {
   top: auto !important;
   left: auto !important;
