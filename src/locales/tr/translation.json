@@ -359,5 +359,8 @@
 
   "notifRemovalRequested": "\"{{artworkTitle}}\" için \"{{exhibitionTitle}}\" sergisinden kaldırma talebi geldi",
   "notifRemovalDecisionApproved": "\"{{artworkTitle}}\" için kaldırma talebiniz onaylandı",
-  "notifRemovalDecisionRejected": "\"{{artworkTitle}}\" için kaldırma talebiniz reddedildi"
+  "notifRemovalDecisionRejected": "\"{{artworkTitle}}\" için kaldırma talebiniz reddedildi",
+
+  "toastMutationSuccess": "İşlem başarılı",
+  "toastMutationError": "Bir hata oluştu, lütfen tekrar deneyin"
 }

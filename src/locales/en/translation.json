@@ -359,5 +359,8 @@
 
   "notifRemovalRequested": "Removal request for \"{{artworkTitle}}\" from \"{{exhibitionTitle}}\"",
   "notifRemovalDecisionApproved": "Your removal request for \"{{artworkTitle}}\" was approved",
-  "notifRemovalDecisionRejected": "Your removal request for \"{{artworkTitle}}\" was rejected"
+  "notifRemovalDecisionRejected": "Your removal request for \"{{artworkTitle}}\" was rejected",
+
+  "toastMutationSuccess": "Success",
+  "toastMutationError": "Something went wrong, please try again"
 }

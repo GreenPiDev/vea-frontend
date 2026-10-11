@@ -294,6 +294,7 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
             required
             type="number"
             min={0.01}
+            max={21474836.47}
             step="0.01"
             value={priceAmount}
             onChange={(e) => setPriceAmount(e.target.value)}

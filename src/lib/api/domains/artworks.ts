@@ -100,6 +100,10 @@ export function useUploadArtworkImage() {
       formData.append('file', file);
       return postFormData<{ url: string }>(`${Paths.Artworks}/upload-image`, formData);
     },
+    // Eser oluşturma/güncellemenin bir ön-adımı — kendi başarı/hata toast'ı
+    // kullanıcıya gösterilmez, asıl eser mutasyonununki yeterli (bkz. main.tsx'teki
+    // global MutationCache, meta.silentToast'ı kontrol ediyor).
+    meta: { silentToast: true },
   });
 }
 
