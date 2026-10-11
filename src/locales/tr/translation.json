@@ -15,6 +15,10 @@
   "authUseDifferentEmail": "Farklı e-posta kullan",
   "authLogout": "Çıkış Yap",
 
+  "loadingLogoAlt": "Yükleniyor",
+  "loadingDefaultMessage": "Yükleniyor…",
+  "loadingAfterLoginMessage": "Hesabınıza giriş yapılıyor…",
+
   "panelOpen": "Yönetim Paneli",
   "panelBackToGallery": "Sergiye Dön",
   "backToPreviousPage": "← Önceki Sayfaya Dön",

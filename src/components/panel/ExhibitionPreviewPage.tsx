@@ -5,7 +5,14 @@ import Scene from '../3d/Scene';
 import type { ArtworkIconPosition } from '../3d/ArtworkIconProjector';
 import { adaptApiExhibition } from '../3d/backendAdapter';
 import { useOwnExhibition } from '../../lib/api/domains/exhibitions';
+import LoadingScreen from '../common/LoadingScreen';
+import { useMinimumLoadingTime } from '../../lib/useMinimumLoadingTime';
 import '../../App.css';
+
+// Markalı LoadingScreen'in hızlı bağlantılarda tek karelik bir "çakma" gibi
+// görünmesini önler — gerçek bir gecikme eklemiyor, sadece gösterimi en az
+// bu kadar sürdürüyor (bkz. useMinimumLoadingTime.ts).
+const MIN_LOADING_SCREEN_MS = 1500;
 
 // /dashboard/organization/exhibitions/preview/:exhibitionId — lets a curator
 // walk through their own exhibition in the real 3D scene before publishing
@@ -30,6 +37,7 @@ export default function ExhibitionPreviewPage() {
 
   const { data: backendDetail, isLoading } = useOwnExhibition(exhibitionId ?? '');
   const exhibition = useMemo(() => (backendDetail ? adaptApiExhibition(backendDetail) : null), [backendDetail]);
+  const showLoadingScreen = useMinimumLoadingTime(isLoading, MIN_LOADING_SCREEN_MS);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(document.fullscreenElement != null);
@@ -42,8 +50,8 @@ export default function ExhibitionPreviewPage() {
     navigate('/dashboard/organization/exhibitions');
   }
 
-  if (isLoading) {
-    return <div className="loading-indicator" />;
+  if (showLoadingScreen) {
+    return <LoadingScreen />;
   }
 
   if (!exhibition) {
@@ -61,7 +69,7 @@ export default function ExhibitionPreviewPage() {
 
   return (
     <div className="app-root">
-      <Suspense fallback={<div className="loading-indicator" />}>
+      <Suspense fallback={<LoadingScreen />}>
         <Scene key={exhibition.id} exhibition={exhibition} onLockChange={setLocked} onIconPositionsChange={setIconPositions} />
       </Suspense>
 

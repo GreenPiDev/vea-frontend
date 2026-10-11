@@ -15,6 +15,9 @@
   --color-brand-800: #493323;
   --color-brand-900: #33241a;
   --color-brand-950: #1f1610;
+
+  --animate-loading-bounce: loading-bounce 2.2s ease-in-out infinite;
+  --animate-loading-fade-in: loading-fade-in 0.25s ease-out;
 }
 
 :root {
@@ -96,9 +99,35 @@ input[type="number"]::-webkit-outer-spin-button {
   }
 }
 
+/* LoadingScreen'in (src/components/common/LoadingScreen.tsx) logosu için:
+   küçük genlikli, yavaş yukarı/aşağı zıplama — "minik mini" hissi genliğin
+   (6px) ve sürenin (2.2s) kasıtlı olarak küçük/uzun tutulmasından geliyor. */
+@keyframes loading-bounce {
+  0%,
+  100% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+@keyframes loading-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .toast-slide-in-right,
   .toast-slide-out-right {
+    animation: none !important;
+  }
+
+  .animate-loading-bounce {
     animation: none !important;
   }
 }

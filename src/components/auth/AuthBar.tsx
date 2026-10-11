@@ -5,6 +5,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/auth/AuthContext';
 import Login from './Login';
 import NotificationBell from '../notifications/NotificationBell';
+import LoadingScreen from '../common/LoadingScreen';
+
+// İlk girişte panel verisi (useCurrentUser, sergi/rol bazlı liste
+// sorguları) genelde bu süreden daha hızlı gelir — gerçek bekleme süresine
+// değil, giriş sonrası geçişin her zaman aynı akıcı/kasıtlı hissi vermesine
+// göre sabitlendi (bkz. LoadingScreen.tsx).
+const POST_LOGIN_LOADING_MS = 3000;
 
 interface AuthBarProps {
   /** Mirrors Header's transparent-at-top vs. scrolled "milky coffee" state,
@@ -56,6 +63,7 @@ export default function AuthBar({ atTop }: AuthBarProps) {
   const { t } = useTranslation();
   const { isAuthenticated, logout } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
+  const [postLoginLoading, setPostLoginLoading] = useState(false);
   const navigate = useNavigate();
 
   const items: React.ReactNode[] = isAuthenticated
@@ -101,13 +109,18 @@ export default function AuthBar({ atTop }: AuthBarProps) {
               <Login
                 onSuccess={() => {
                   setShowLogin(false);
+                  setPostLoginLoading(true);
                   navigate('/dashboard');
+                  setTimeout(() => setPostLoginLoading(false), POST_LOGIN_LOADING_MS);
                 }}
               />
             </div>
           </div>,
           document.body
         )}
+
+      {postLoginLoading &&
+        createPortal(<LoadingScreen message={t('loadingAfterLoginMessage')} />, document.body)}
     </>
   );
 }

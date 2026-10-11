@@ -47,7 +47,7 @@ function renderToast(t: Toast) {
       <p className="relative z-10 flex-1 pl-2 font-medium">{resolveValue(t.message, t)}</p>
       <button
         type="button"
-        onClick={() => toast.dismiss(t.id)}
+        onClick={() => toast.remove(t.id)}
         className="absolute right-2 top-2 shrink-0 cursor-pointer text-brand-700/70 transition-transform hover:scale-125 hover:text-brand-900"
         aria-label={i18n.t('toastClose')}
       >

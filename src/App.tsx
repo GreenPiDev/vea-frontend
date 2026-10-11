@@ -8,12 +8,19 @@ import type { ArtworkIconPosition } from "./components/3d/ArtworkIconProjector";
 import { adaptApiExhibition, previewAccentColor } from "./components/3d/backendAdapter";
 import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSelect";
 import ArtworkDetailCard from "./components/ArtworkDetailCard";
+import LoadingScreen from "./components/common/LoadingScreen";
 import Header from "./components/layout/Header";
 import { useAuth } from "./lib/auth/AuthContext";
 import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitions";
 import { useRealtimeQuerySync } from "./lib/socket/useRealtimeQuerySync";
 import { useExhibitionVisitorCount } from "./lib/socket/useExhibitionVisitorCount";
+import { useMinimumLoadingTime } from "./lib/useMinimumLoadingTime";
 import "./App.css";
+
+// Markalı LoadingScreen'in hızlı bağlantılarda tek karelik bir "çakma" gibi
+// görünmesini önler — gerçek bir gecikme eklemiyor, sadece gösterimi en az
+// bu kadar sürdürüyor (bkz. useMinimumLoadingTime.ts).
+const MIN_LOADING_SCREEN_MS = 1500;
 
 export default function App() {
   const { t } = useTranslation();
@@ -34,6 +41,14 @@ export default function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [iconPositions, setIconPositions] = useState<ArtworkIconPosition[]>([]);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
+  // Statik şablon sergiler (EXHIBITIONS) anında bulunduğu için hiçbir ağ
+  // isteği beklemiyor — kart tıklamasıyla hemen `exhibition` dolduğundan,
+  // sadece `backendId && backendLoading`'e bağlı eski kontrol bu sergiler
+  // için hiç tetiklenmiyordu. Seçim anında true olup `exhibition` hazır
+  // olunca otomatik false'a dönen bu bayrak, hem statik hem backend
+  // sergilerinde kart tıklamasından sonra LoadingScreen'in garanti
+  // gösterilmesini sağlıyor (bkz. useMinimumLoadingTime ile birleşimi altta).
+  const [enteringExhibition, setEnteringExhibition] = useState(false);
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
   const exhibitionSelectScrollRef = useRef<HTMLDivElement | null>(null);
   // Whether the pointer was actually locked (player was walking) at the
@@ -71,6 +86,18 @@ export default function App() {
     if (backendDetail) return adaptApiExhibition(backendDetail);
     return null;
   }, [localExhibition, backendDetail]);
+
+  const showExhibitionLoadingScreen = useMinimumLoadingTime(
+    (enteringExhibition && !exhibition) || (Boolean(backendId) && backendLoading),
+    MIN_LOADING_SCREEN_MS
+  );
+
+  // Sergi hazır olur olmaz bayrağı indiriyor — aksi halde "← Sergiler" ile
+  // seçiciye dönüldüğünde (`exhibition` tekrar null'a düşünce) bu bayrak
+  // hâlâ true kalıp loading ekranını yanlışlıkla yeniden tetikleyebilirdi.
+  useEffect(() => {
+    if (exhibition) setEnteringExhibition(false);
+  }, [exhibition]);
 
   // Stays null for the static demo exhibitions (their ids don't exist in
   // the backend, so ExhibitionGateway.handleJoin silently no-ops) — the HUD
@@ -180,15 +207,18 @@ export default function App() {
     // Either nothing picked yet, or a backend exhibition is still loading
     // (backendId set, backendDetail not in yet), or adaptation failed (e.g.
     // an unknown templateId) — all fall back to the selector.
-    if (backendId && backendLoading) {
-      return <div className="loading-indicator" />;
+    if (showExhibitionLoadingScreen) {
+      return <LoadingScreen />;
     }
     return (
       <>
         <Header scrollTargetRef={exhibitionSelectScrollRef} />
         <ExhibitionSelect
           exhibitions={backendCards}
-          onSelect={(id) => navigate(`/exhibition/${id}`)}
+          onSelect={(id) => {
+            setEnteringExhibition(true);
+            navigate(`/exhibition/${id}`);
+          }}
           containerRef={exhibitionSelectScrollRef}
         />
       </>
@@ -202,7 +232,7 @@ export default function App() {
           on the 3D canvas itself, so clicking UI on top (detail card,
           lightbox, HUD buttons) can't silently re-lock the camera behind it. */}
       <div id="gallery-canvas-wrapper" className="gallery-canvas-wrapper">
-        <Suspense fallback={<div className="loading-indicator" />}>
+        <Suspense fallback={<LoadingScreen />}>
           <Scene
             key={exhibition.id}
             exhibition={exhibition}

@@ -5,7 +5,14 @@ import Scene from '../3d/Scene';
 import type { ArtworkIconPosition } from '../3d/ArtworkIconProjector';
 import { adaptExhibitionTemplate } from '../3d/backendAdapter';
 import { useOwnExhibitionTemplate } from '../../lib/api/domains/exhibitionTemplates';
+import LoadingScreen from '../common/LoadingScreen';
+import { useMinimumLoadingTime } from '../../lib/useMinimumLoadingTime';
 import '../../App.css';
+
+// Markalı LoadingScreen'in hızlı bağlantılarda tek karelik bir "çakma" gibi
+// görünmesini önler — gerçek bir gecikme eklemiyor, sadece gösterimi en az
+// bu kadar sürdürüyor (bkz. useMinimumLoadingTime.ts).
+const MIN_LOADING_SCREEN_MS = 1500;
 
 // /dashboard/organization/exhibition-templates/preview/:templateId — same
 // full-bleed 3D walkthrough as ExhibitionPreviewPage.tsx, but for a bare
@@ -24,6 +31,7 @@ export default function ExhibitionTemplatePreviewPage() {
 
   const { data: template, isLoading } = useOwnExhibitionTemplate(templateId ?? '');
   const exhibition = useMemo(() => (template ? adaptExhibitionTemplate(template) : null), [template]);
+  const showLoadingScreen = useMinimumLoadingTime(isLoading, MIN_LOADING_SCREEN_MS);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(document.fullscreenElement != null);
@@ -36,8 +44,8 @@ export default function ExhibitionTemplatePreviewPage() {
     navigate('/dashboard/organization/exhibition-templates');
   }
 
-  if (isLoading) {
-    return <div className="loading-indicator" />;
+  if (showLoadingScreen) {
+    return <LoadingScreen />;
   }
 
   if (!exhibition) {
@@ -55,7 +63,7 @@ export default function ExhibitionTemplatePreviewPage() {
 
   return (
     <div className="app-root">
-      <Suspense fallback={<div className="loading-indicator" />}>
+      <Suspense fallback={<LoadingScreen />}>
         <Scene key={exhibition.id} exhibition={exhibition} onLockChange={setLocked} onIconPositionsChange={setIconPositions} />
       </Suspense>
 

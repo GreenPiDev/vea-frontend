@@ -10,6 +10,7 @@ import {
 } from '../../lib/api/domains/artworks';
 import { useMyArtistProfile } from '../../lib/api/domains/artistProfiles';
 import { ApiError } from '../../lib/api/client';
+import LoadingScreen from '../common/LoadingScreen';
 
 const ALLOWED_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
@@ -157,7 +158,9 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
       : null;
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg bg-brand-50 p-6 shadow-sm">
+    <>
+      {isPending && <LoadingScreen message={t('artworkFormSaving')} />}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg bg-brand-50 p-6 shadow-sm">
       <label className="flex flex-col gap-1 text-sm text-brand-800">
         {t('artworkFormTitle')}
         <input
@@ -376,6 +379,7 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
-    </form>
+      </form>
+    </>
   );
 }

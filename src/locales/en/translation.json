@@ -15,6 +15,10 @@
   "authUseDifferentEmail": "Use a different email",
   "authLogout": "Sign Out",
 
+  "loadingLogoAlt": "Loading",
+  "loadingDefaultMessage": "Loading…",
+  "loadingAfterLoginMessage": "Signing you in…",
+
   "panelOpen": "Admin Dashboard",
   "panelBackToGallery": "Back to Gallery",
   "backToPreviousPage": "← Back to Previous Page",

@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import LoadingScreen from "../components/common/LoadingScreen";
 import SuperAdminPanel from "../components/panel/SuperAdminPanel";
 import CuratorPanel from "../components/panel/CuratorPanel";
 import NewExhibitionPage from "../components/panel/NewExhibitionPage";
@@ -12,6 +13,12 @@ import NewArtworkPage from "../components/panel/NewArtworkPage";
 import EditArtworkPage from "../components/panel/EditArtworkPage";
 import BuyerPanel from "../components/panel/BuyerPanel";
 import { useAuth } from "../lib/auth/AuthContext";
+import { useMinimumLoadingTime } from "../lib/useMinimumLoadingTime";
+
+// Markalı LoadingScreen'in hızlı bağlantılarda tek karelik bir "çakma" gibi
+// görünmesini önler — gerçek bir gecikme eklemiyor, sadece gösterimi en az
+// bu kadar sürdürüyor (bkz. useMinimumLoadingTime.ts).
+const MIN_LOADING_SCREEN_MS = 1500;
 
 // /dashboard/* — every authenticated role lands here (Header's "Panel" link,
 // and Login's post-login redirect), but each role sees a different panel.
@@ -29,9 +36,10 @@ import { useAuth } from "../lib/auth/AuthContext";
 export default function Dashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
+  const showLoadingScreen = useMinimumLoadingTime(isLoading, MIN_LOADING_SCREEN_MS);
 
-  if (isLoading) {
-    return <div className="loading-indicator" />;
+  if (showLoadingScreen) {
+    return <LoadingScreen />;
   }
   if (!isAuthenticated) {
     return <Navigate to="/home" replace />;
