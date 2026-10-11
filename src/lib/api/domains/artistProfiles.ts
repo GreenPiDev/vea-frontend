@@ -37,6 +37,7 @@ export function useCreateArtistProfile() {
     onSuccess: (profile) => {
       queryClient.setQueryData([Paths.ArtistProfileMe], profile);
     },
+    meta: { successKey: 'toastArtistProfileCreateSuccess', errorKey: 'toastArtistProfileCreateError' },
   });
 }
 
@@ -50,5 +51,6 @@ export function useUpdateArtistProfileBio() {
     onSuccess: (profile) => {
       queryClient.setQueryData([Paths.ArtistProfileMe], profile);
     },
+    meta: { successKey: 'toastArtistProfileUpdateSuccess', errorKey: 'toastArtistProfileUpdateError' },
   });
 }

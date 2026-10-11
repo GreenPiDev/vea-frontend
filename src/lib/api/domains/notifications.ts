@@ -38,6 +38,9 @@ export function useMarkNotificationRead() {
       void queryClient.invalidateQueries({ queryKey: [Paths.Notifications] });
       void queryClient.invalidateQueries({ queryKey: [Paths.Notifications, 'unread-count'] });
     },
+    // Minor, frequent background action (opening the bell marks things
+    // read) — a toast here would be noise, not useful feedback.
+    meta: { silentToast: true },
   });
 }
 
@@ -49,5 +52,6 @@ export function useMarkAllNotificationsRead() {
       void queryClient.invalidateQueries({ queryKey: [Paths.Notifications] });
       void queryClient.invalidateQueries({ queryKey: [Paths.Notifications, 'unread-count'] });
     },
+    meta: { silentToast: true },
   });
 }

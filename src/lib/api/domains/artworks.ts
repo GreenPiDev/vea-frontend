@@ -85,7 +85,11 @@ export function useOrganizationArtworks() {
 }
 
 export function useArtworkMutations() {
-  return useApiMutations<ApiArtwork>(Paths.Artworks, [Paths.ArtworksMine]);
+  return useApiMutations<ApiArtwork>(Paths.Artworks, [Paths.ArtworksMine], {
+    create: { successKey: 'toastArtworkCreateSuccess', errorKey: 'toastArtworkCreateError' },
+    update: { successKey: 'toastArtworkUpdateSuccess', errorKey: 'toastArtworkUpdateError' },
+    remove: { successKey: 'toastArtworkDeleteSuccess', errorKey: 'toastArtworkDeleteError' },
+  });
 }
 
 // POST /artworks/upload-image (multipart) — uploads to the caller's own
@@ -113,6 +117,7 @@ export function useSetArtworkStatus() {
     mutationFn: ({ id, status }: { id: string; status: OwnerSettableArtworkStatus }) =>
       patch<ApiArtwork>({ path: `${Paths.Artworks}/${id}/status`, payload: { status } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [Paths.ArtworksMine] }),
+    meta: { successKey: 'toastArtworkStatusUpdateSuccess', errorKey: 'toastArtworkStatusUpdateError' },
   });
 }
 
@@ -126,5 +131,6 @@ export function useUnarchiveArtwork() {
   return useMutation({
     mutationFn: (id: string) => patch<ApiArtwork>({ path: `${Paths.Artworks}/${id}/unarchive` }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [Paths.ArtworksMine] }),
+    meta: { successKey: 'toastArtworkUnarchiveSuccess', errorKey: 'toastArtworkUnarchiveError' },
   });
 }

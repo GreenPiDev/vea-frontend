@@ -32,7 +32,11 @@ export function useOrganizations() {
 }
 
 export function useOrganizationMutations() {
-  return useApiMutations<ApiOrganization>(Paths.Organizations);
+  return useApiMutations<ApiOrganization>(Paths.Organizations, undefined, {
+    create: { successKey: 'toastOrganizationCreateSuccess', errorKey: 'toastOrganizationCreateError' },
+    update: { successKey: 'toastOrganizationUpdateSuccess', errorKey: 'toastOrganizationUpdateError' },
+    remove: { successKey: 'toastOrganizationDeleteSuccess', errorKey: 'toastOrganizationDeleteError' },
+  });
 }
 
 export function useOrgAdmins(organizationId: string) {
@@ -50,6 +54,7 @@ export function useAddOrgAdmin(organizationId: string) {
       post<ApiOrgAdmin>({ path: `${Paths.Organizations}/${organizationId}/admins`, payload: { email } }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [Paths.Organizations, organizationId, 'admins'] }),
+    meta: { successKey: 'toastOrgAdminAddSuccess', errorKey: 'toastOrgAdminAddError' },
   });
 }
 
@@ -60,6 +65,7 @@ export function useRemoveOrgAdmin(organizationId: string) {
       remove<void>({ path: `${Paths.Organizations}/${organizationId}/admins/${userId}` }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: [Paths.Organizations, organizationId, 'admins'] }),
+    meta: { successKey: 'toastOrgAdminRemoveSuccess', errorKey: 'toastOrgAdminRemoveError' },
   });
 }
 
@@ -80,6 +86,7 @@ export function useAddMyOrgArtist() {
     mutationFn: (email: string) =>
       post<ApiOrgArtist>({ path: `${Paths.Organizations}/mine/artists`, payload: { email } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: MINE_ARTISTS_KEY }),
+    meta: { successKey: 'toastOrgArtistAddSuccess', errorKey: 'toastOrgArtistAddError' },
   });
 }
 
@@ -89,5 +96,6 @@ export function useRemoveMyOrgArtist() {
     mutationFn: (userId: string) =>
       remove<void>({ path: `${Paths.Organizations}/mine/artists/${userId}` }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: MINE_ARTISTS_KEY }),
+    meta: { successKey: 'toastOrgArtistRemoveSuccess', errorKey: 'toastOrgArtistRemoveError' },
   });
 }

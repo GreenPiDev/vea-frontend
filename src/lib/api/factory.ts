@@ -36,6 +36,26 @@ interface UpdatePayload<T> {
 }
 
 /**
+ * Attached as a mutation's `meta` — read by main.tsx's global MutationCache
+ * to decide what (if anything) to toast. `successKey`/`errorKey` are
+ * i18next keys, not raw strings — see src/locales/<lang>/translation.json.
+ * `silentToast` skips both (for mutations that are an internal step of a
+ * larger user-facing action, e.g. the image upload before artwork create).
+ */
+export interface ToastMeta {
+  [key: string]: unknown;
+  silentToast?: boolean;
+  successKey?: string;
+  errorKey?: string;
+}
+
+interface ApiMutationMessages {
+  create?: ToastMeta;
+  update?: ToastMeta;
+  remove?: ToastMeta;
+}
+
+/**
  * Create/update/delete mutations for a resource, all invalidating the
  * given list queryKey on settle so the UI refetches automatically. No
  * optimistic-update/rollback machinery (unlike the reference project) —
@@ -43,7 +63,11 @@ interface UpdatePayload<T> {
  * vea's write flows (offer accept, exhibition status) are state-machine
  * transitions where showing stale optimistic state would be misleading.
  */
-export function useApiMutations<T extends { id: string }>(basePath: string, listQueryKey: QueryKey = [basePath]) {
+export function useApiMutations<T extends { id: string }>(
+  basePath: string,
+  listQueryKey: QueryKey = [basePath],
+  messages?: ApiMutationMessages,
+) {
   const queryClient = useQueryClient();
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: listQueryKey });
@@ -51,16 +75,19 @@ export function useApiMutations<T extends { id: string }>(basePath: string, list
   const create = useMutation({
     mutationFn: (payload: Partial<T>) => post<T>({ path: basePath, payload }),
     onSuccess: invalidate,
+    meta: messages?.create,
   });
 
   const update = useMutation({
     mutationFn: ({ id, updates }: UpdatePayload<T>) => patch<T>({ path: `${basePath}/${id}`, payload: updates }),
     onSuccess: invalidate,
+    meta: messages?.update,
   });
 
   const remove_ = useMutation({
     mutationFn: (id: string) => remove<T>({ path: `${basePath}/${id}` }),
     onSuccess: invalidate,
+    meta: messages?.remove,
   });
 
   return { create, update, remove: remove_ };

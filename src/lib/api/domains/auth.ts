@@ -29,6 +29,9 @@ export function useRequestCode() {
   return useMutation({
     mutationFn: (email: string) =>
       post<{ status: string; devCode: string }>({ path: Paths.AuthRequestCode, payload: { email } }),
+    // Intermediate step of the login flow — only the final verify-code
+    // mutation's toast should surface to the user, not this one's too.
+    meta: { silentToast: true },
   });
 }
 
@@ -36,6 +39,7 @@ export function useVerifyCode() {
   return useMutation({
     mutationFn: ({ email, code }: { email: string; code: string }) =>
       post<{ accessToken: string }>({ path: Paths.AuthVerifyCode, payload: { email, code } }),
+    meta: { successKey: 'toastLoginSuccess', errorKey: 'toastLoginError' },
   });
 }
 

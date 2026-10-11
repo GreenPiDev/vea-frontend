@@ -48,6 +48,7 @@ export function useCreateRemovalRequest() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [Paths.ArtworksMine] });
     },
+    meta: { successKey: 'toastRemovalRequestCreateSuccess', errorKey: 'toastRemovalRequestCreateError' },
   });
 }
 
@@ -78,5 +79,6 @@ export function useDecideRemovalRequest() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [Paths.ArtworkRemovalRequests, 'organization'] });
     },
+    meta: { successKey: 'toastRemovalRequestDecisionSuccess', errorKey: 'toastRemovalRequestDecisionError' },
   });
 }

@@ -106,7 +106,11 @@ export function useOwnExhibition(id: string) {
 }
 
 export function useExhibitionMutations() {
-  return useApiMutations<ApiExhibition>(Paths.Exhibitions, [Paths.ExhibitionsMine]);
+  return useApiMutations<ApiExhibition>(Paths.Exhibitions, [Paths.ExhibitionsMine], {
+    create: { successKey: 'toastExhibitionCreateSuccess', errorKey: 'toastExhibitionCreateError' },
+    update: { successKey: 'toastExhibitionUpdateSuccess', errorKey: 'toastExhibitionUpdateError' },
+    remove: { successKey: 'toastExhibitionDeleteSuccess', errorKey: 'toastExhibitionDeleteError' },
+  });
 }
 
 // Dedicated PATCH /exhibitions/:id/status endpoint — DRAFT<->ACTIVE->ENDED
@@ -126,6 +130,7 @@ export function useSetExhibitionStatus() {
       // a publish/unpublish, in the same browser tab that just did it.
       queryClient.invalidateQueries({ queryKey: [Paths.Exhibitions] });
     },
+    meta: { successKey: 'toastExhibitionStatusUpdateSuccess', errorKey: 'toastExhibitionStatusUpdateError' },
   });
 }
 
@@ -142,6 +147,7 @@ export function useRestoreExhibition() {
       queryClient.invalidateQueries({ queryKey: [Paths.ExhibitionsMine] });
       queryClient.invalidateQueries({ queryKey: [Paths.Exhibitions] });
     },
+    meta: { successKey: 'toastExhibitionRestoreSuccess', errorKey: 'toastExhibitionRestoreError' },
   });
 }
 
@@ -163,6 +169,7 @@ export function useAddExhibitionArtwork(exhibitionId: string) {
     mutationFn: (payload: { artworkId: string; positionData: ArtworkPositionData; order: number }) =>
       post<ApiExhibitionArtwork>({ path: `${Paths.Exhibitions}/${exhibitionId}/artworks`, payload }),
     onSuccess: () => invalidateExhibitionQueries(queryClient, exhibitionId),
+    meta: { successKey: 'toastExhibitionArtworkAddSuccess', errorKey: 'toastExhibitionArtworkAddError' },
   });
 }
 
@@ -178,6 +185,7 @@ export function useUpdateExhibitionArtworkLink(exhibitionId: string) {
         payload: { positionData },
       }),
     onSuccess: () => invalidateExhibitionQueries(queryClient, exhibitionId),
+    meta: { successKey: 'toastExhibitionArtworkUpdateSuccess', errorKey: 'toastExhibitionArtworkUpdateError' },
   });
 }
 
@@ -187,12 +195,13 @@ export function useRemoveExhibitionArtwork(exhibitionId: string) {
     mutationFn: (artworkId: string) =>
       remove<void>({ path: `${Paths.Exhibitions}/${exhibitionId}/artworks/${artworkId}` }),
     onSuccess: () => invalidateExhibitionQueries(queryClient, exhibitionId),
+    meta: { successKey: 'toastExhibitionArtworkRemoveSuccess', errorKey: 'toastExhibitionArtworkRemoveError' },
   });
 }
 
 // POST .../views — public, no auth (same as browsing). Fires once per
-// ArtworkDetailCard open (see App.tsx); the response already carries the
-// post-increment count so the card can show it without a second round-trip.
+// ArtworkDetailCard open (see App.tsx) as an automatic side effect of
+// viewing, not a user-initiated action — no toast, success or failure.
 export function useRecordArtworkView() {
   return useMutation({
     mutationFn: ({ exhibitionId, artworkId, sessionId }: { exhibitionId: string; artworkId: string; sessionId: string }) =>
@@ -200,6 +209,7 @@ export function useRecordArtworkView() {
         path: `${Paths.Exhibitions}/${exhibitionId}/artworks/${artworkId}/views`,
         payload: { sessionId },
       }),
+    meta: { silentToast: true },
   });
 }
 

@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRequestCode, useVerifyCode } from '../../lib/api/domains/auth';
 import { useAuth } from '../../lib/auth/AuthContext';
-import { ApiError } from '../../lib/api/client';
 
 type Step = 'email' | 'code';
 
@@ -15,7 +14,6 @@ export default function Login({ onSuccess }: LoginProps) {
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
   // Pre-launch convenience — backend echoes the OTP in the response while
   // MailService is still a logging stub. Remove once real emails go out.
   const [devCode, setDevCode] = useState<string | null>(null);
@@ -24,34 +22,18 @@ export default function Login({ onSuccess }: LoginProps) {
   const verifyCode = useVerifyCode();
   const { login } = useAuth();
 
-  // The backend's raw ApiError.message is normally fine to surface as-is
-  // (it's already a short, specific sentence — see e.g. offer creation
-  // errors in ArtworkDetailCard.tsx), but a 429 from Nest's ThrottlerGuard
-  // comes back as the framework's internal exception name ("ThrottlerException:
-  // Too Many Requests"), which isn't something a visitor should ever see.
-  function getErrorMessage(err: unknown, fallbackKey: string): string {
-    if (err instanceof ApiError) {
-      if (err.status === 429) return t('authErrorTooManyRequests');
-      return err.message;
-    }
-    return t(fallbackKey);
-  }
-
   function handleRequestCode(e: FormEvent) {
     e.preventDefault();
-    setError(null);
     requestCode.mutate(email, {
       onSuccess: ({ devCode }) => {
         setDevCode(devCode);
         setStep('code');
       },
-      onError: (err) => setError(getErrorMessage(err, 'authErrorSendFailed')),
     });
   }
 
   function handleVerifyCode(e: FormEvent) {
     e.preventDefault();
-    setError(null);
     verifyCode.mutate(
       { email, code },
       {
@@ -59,7 +41,6 @@ export default function Login({ onSuccess }: LoginProps) {
           login(accessToken);
           onSuccess?.();
         },
-        onError: (err) => setError(getErrorMessage(err, 'authErrorVerifyFailed')),
       },
     );
   }
@@ -118,7 +99,6 @@ export default function Login({ onSuccess }: LoginProps) {
             onClick={() => {
               setStep('email');
               setCode('');
-              setError(null);
               setDevCode(null);
             }}
             className="cursor-pointer text-xs text-brand-600 underline"
@@ -127,8 +107,6 @@ export default function Login({ onSuccess }: LoginProps) {
           </button>
         </form>
       )}
-
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
     </div>
   );
 }

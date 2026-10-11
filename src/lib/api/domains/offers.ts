@@ -53,6 +53,7 @@ export function useCreateOffer() {
   return useMutation({
     mutationFn: ({ artworkId, amount }: CreateOfferPayload) =>
       post<ApiOffer>({ path: `/artworks/${artworkId}/offers`, payload: { amount } }),
+    meta: { successKey: 'toastOfferCreateSuccess', errorKey: 'toastOfferCreateError' },
   });
 }
 
@@ -81,5 +82,6 @@ export function useSetArtistDecision() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [Paths.OffersMineSelling] });
     },
+    meta: { successKey: 'toastOfferDecisionSuccess', errorKey: 'toastOfferDecisionError' },
   });
 }

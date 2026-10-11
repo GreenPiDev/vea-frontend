@@ -58,5 +58,9 @@ export function useOwnExhibitionTemplate(id: string) {
 }
 
 export function useExhibitionTemplateMutations() {
-  return useApiMutations<ApiExhibitionTemplate>(Paths.ExhibitionTemplates, [Paths.ExhibitionTemplatesMine]);
+  return useApiMutations<ApiExhibitionTemplate>(Paths.ExhibitionTemplates, [Paths.ExhibitionTemplatesMine], {
+    create: { successKey: 'toastTemplateCreateSuccess', errorKey: 'toastTemplateCreateError' },
+    update: { successKey: 'toastTemplateUpdateSuccess', errorKey: 'toastTemplateUpdateError' },
+    remove: { successKey: 'toastTemplateDeleteSuccess', errorKey: 'toastTemplateDeleteError' },
+  });
 }

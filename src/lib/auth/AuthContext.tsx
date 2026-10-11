@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import i18n from '../i18n';
 import { getAccessToken, setAccessToken } from '../api/authToken';
 import { useCurrentUser, type ApiUser } from '../api/domains/auth';
 
@@ -32,6 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
     setHasToken(false);
     queryClient.clear();
+    // Not a mutation (no network call) — the global MutationCache toast
+    // in main.tsx can't cover this, so it's shown directly here.
+    toast.success(i18n.t('toastLogoutSuccess'));
   }
 
   return (
