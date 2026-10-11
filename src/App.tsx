@@ -16,6 +16,7 @@ import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitio
 import { useRealtimeQuerySync } from "./lib/socket/useRealtimeQuerySync";
 import { useExhibitionVisitorCount } from "./lib/socket/useExhibitionVisitorCount";
 import { useMinimumLoadingTime, GALLERY_SCENE_MIN_LOADING_MS } from "./lib/useMinimumLoadingTime";
+import { usePreloadImages } from "./lib/usePreloadImages";
 import "./App.css";
 
 export default function App() {
@@ -82,8 +83,21 @@ export default function App() {
     return null;
   }, [localExhibition, backendDetail]);
 
+  const exhibitionArtworks = useMemo(
+    () => exhibition?.artworks ?? (exhibition ? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id) : []),
+    [exhibition]
+  );
+
+  // Preloaded outside the 3D canvas (see usePreloadImages's doc comment) so the loading
+  // screen below can stay up until every painting's image is actually ready, instead of
+  // the player spawning into a room where some walls are still visibly empty.
+  const artworkImageUrls = useMemo(() => exhibitionArtworks.map((a) => a.image), [exhibitionArtworks]);
+  const artworkImagesReady = usePreloadImages(artworkImageUrls);
+
   const showExhibitionLoadingScreen = useMinimumLoadingTime(
-    (enteringExhibition && !exhibition) || (Boolean(backendId) && backendLoading),
+    (enteringExhibition && !exhibition) ||
+      (Boolean(backendId) && backendLoading) ||
+      (Boolean(exhibition) && !artworkImagesReady),
     GALLERY_SCENE_MIN_LOADING_MS
   );
 
@@ -98,11 +112,6 @@ export default function App() {
   // the backend, so ExhibitionGateway.handleJoin silently no-ops) — the HUD
   // badge below simply doesn't render in that case, no special-casing needed.
   const visitorCount = useExhibitionVisitorCount(exhibition?.id);
-
-  const exhibitionArtworks = useMemo(
-    () => exhibition?.artworks ?? (exhibition ? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id) : []),
-    [exhibition]
-  );
 
   // Only the closest in-range painting responds to the interact key — with
   // several icons on screen at once (e.g. a row of paintings on one wall),
@@ -216,6 +225,13 @@ export default function App() {
 
   return (
     <div className="app-root">
+      {/* Mounted as an overlay rather than gating GallerySceneCanvas's mount — the Canvas
+          below has to actually start rendering for its paintings' textures to begin
+          loading in the first place (see usePreloadImages's doc comment); hiding it until
+          images are ready would create a deadlock where they never start loading. This
+          sits on top (LoadingScreen's own fixed/z-[9999]) until artworkImagesReady flips,
+          so the player never sees the empty-walled room underneath while that happens. */}
+      {showExhibitionLoadingScreen && <LoadingScreen />}
       <GallerySceneCanvas
         exhibition={exhibition}
         overlayHidden={locked || Boolean(selectedArtwork)}

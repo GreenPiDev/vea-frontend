@@ -1,5 +1,6 @@
 import { Suspense, useMemo } from "react";
 import Artwork, { ArtworkLight } from "./Artwork";
+import ArtworkFixtures from "./ArtworkFixtures";
 import { ARTWORKS } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
 import { ArtworkErrorBoundary } from "./ArtworkErrorBoundary";
@@ -14,6 +15,9 @@ export default function GalleryArtworks() {
 
   return (
     <>
+      {/* Every painting's picture-light fixture, batched into a few shared InstancedMesh pools — see
+          ArtworkFixtures.tsx. Rendered once up front rather than per-painting below. */}
+      <ArtworkFixtures artworks={artworks} />
       {artworks.map((data) => (
         <ArtworkErrorBoundary key={data.id} artworkId={data.id}>
           <Suspense fallback={null}>

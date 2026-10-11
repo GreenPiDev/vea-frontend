@@ -58,7 +58,9 @@ export default function GalleryLights() {
           position={[x, layout.wallHeight - 0.05, z]}
           material={getCeilingFixtureMaterial(theme.spotColor)}
         >
-          <cylinderGeometry args={[0.18, 0.18, 0.06, 20]} />
+          {/* radialSegments dropped from 20 to 10 — same reasoning as Artwork.tsx's fixture geometry: this disc
+              is small, cosmetic, and viewed from a few meters away, so the facets aren't visible either way. */}
+          <cylinderGeometry args={[0.18, 0.18, 0.06, 10]} />
         </mesh>
       ))}
     </>
