@@ -182,6 +182,18 @@ export function CheckIcon({ className }: IconProps) {
   );
 }
 
+// Star takes its own `filled` flag (not just currentColor) because the one
+// place it's used (ExhibitionArtworkPlacement.tsx's "Kapak Yap" toggle)
+// needs a visually distinct solid-vs-outline state, unlike every other icon
+// here which is always just an outline.
+export function StarIcon({ className, filled }: IconProps & { filled?: boolean }) {
+  return (
+    <svg {...base} fill={filled ? 'currentColor' : 'none'} className={className} aria-hidden="true">
+      <path d="M12 2.5l2.94 6.46 7.06.78-5.3 4.9 1.47 6.98L12 17.9l-6.17 3.72 1.47-6.98-5.3-4.9 7.06-.78L12 2.5z" />
+    </svg>
+  );
+}
+
 export function UndoIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className} aria-hidden="true">

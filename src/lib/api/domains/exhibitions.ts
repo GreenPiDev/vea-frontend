@@ -75,6 +75,16 @@ export interface ApiExhibition {
   artworkLinks?: ApiExhibitionArtwork[];
   /** Only present on GET /exhibitions/:id and GET /exhibitions/mine/:id — resolved when sceneConfig.kind==='template' and templateId points at a real backend ExhibitionTemplate (not one of the static EXHIBITIONS presets). See backendAdapter.ts's adaptApiExhibition. */
   exhibitionTemplate?: ApiExhibitionTemplate | null;
+  /**
+   * Curator-chosen "kapak eseri" (ExhibitionArtworkPlacement.tsx's "Kapak
+   * Yap" button, via useSetExhibitionCoverArtwork below) — which placed
+   * artwork's imageUrl ExhibitionSelectCard.tsx shows as the homepage
+   * card's background. Null/unset = no explicit choice; the card falls
+   * back to artworkLinks[0] (whatever order the backend returns). Must
+   * reference an artwork currently placed in this exhibition — backend's
+   * responsibility to enforce/clear on removal, not re-validated here.
+   */
+  coverArtworkId?: string | null;
 }
 
 export function usePublicExhibitions() {
@@ -186,6 +196,23 @@ export function useUpdateExhibitionArtworkLink(exhibitionId: string) {
       }),
     onSuccess: () => invalidateExhibitionQueries(queryClient, exhibitionId),
     meta: { successKey: 'toastExhibitionArtworkUpdateSuccess', errorKey: 'toastExhibitionArtworkUpdateError' },
+  });
+}
+
+// PATCH /exhibitions/:id — reuses the generic exhibition-update endpoint
+// (same one useExhibitionMutations().update hits) but with its own
+// invalidation: that generic hook only invalidates the curator's list
+// query, not the owner/public detail queries ExhibitionArtworkPlacement.tsx
+// and ExhibitionSelectCard.tsx actually read coverArtworkId from — without
+// this, "Kapak Yap" would save but the card wouldn't pick it up until the
+// detail query's staleTime passed.
+export function useSetExhibitionCoverArtwork(exhibitionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (coverArtworkId: string | null) =>
+      patch<ApiExhibition>({ path: `${Paths.Exhibitions}/${exhibitionId}`, payload: { coverArtworkId } }),
+    onSuccess: () => invalidateExhibitionQueries(queryClient, exhibitionId),
+    meta: { successKey: 'toastExhibitionCoverUpdateSuccess', errorKey: 'toastExhibitionCoverUpdateError' },
   });
 }
 

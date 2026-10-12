@@ -4,6 +4,7 @@ import {
   useAddExhibitionArtwork,
   useOwnExhibition,
   useRemoveExhibitionArtwork,
+  useSetExhibitionCoverArtwork,
   useUpdateExhibitionArtworkLink,
 } from '../../lib/api/domains/exhibitions';
 import { useOrganizationArtworks, type ApiArtwork } from '../../lib/api/domains/artworks';
@@ -11,7 +12,7 @@ import { groupByWallRun, wallRunsForSceneConfig } from '../3d/backendAdapter';
 import { FLOOR_CLEARANCE } from '../3d/galleryLayout';
 import { ApiError } from '../../lib/api/client';
 import Tooltip from '../layout/Tooltip';
-import { CheckIcon, TrashIcon } from '../layout/icons';
+import { CheckIcon, StarIcon, TrashIcon } from '../layout/icons';
 import ExhibitionBlueprint from './ExhibitionBlueprint';
 
 /** Same formula placeArtworksAlongWall() falls back to when no curator override is set — used here only to pre-fill a sensible starting value in the height input, not as a hard default. */
@@ -42,6 +43,7 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
   const addArtwork = useAddExhibitionArtwork(exhibitionId);
   const updateArtworkLink = useUpdateExhibitionArtworkLink(exhibitionId);
   const removeArtwork = useRemoveExhibitionArtwork(exhibitionId);
+  const setCoverArtwork = useSetExhibitionCoverArtwork(exhibitionId);
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Draft height (meters, as typed text) per artworkId — covers both the
@@ -121,6 +123,17 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
     });
   }
 
+  // Toggle: clicking the cover of the already-set artwork clears it back to
+  // "no explicit choice" (ExhibitionSelectCard.tsx's artworkLinks[0]
+  // fallback), clicking any other placed artwork's star makes it the cover.
+  function handleToggleCover(artworkId: string) {
+    setError(null);
+    const next = exhibition!.coverArtworkId === artworkId ? null : artworkId;
+    setCoverArtwork.mutate(next, {
+      onError: (err) => setError(err instanceof ApiError ? err.message : t('placementError')),
+    });
+  }
+
   function handleUpdateHeight(wallRunId: string, artworkId: string) {
     setError(null);
     const draft = heightDrafts[artworkId];
@@ -193,6 +206,24 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
                         className="w-16 rounded border border-brand-300 px-1.5 py-0.5 text-xs"
                       />
                     </label>
+                    <Tooltip
+                      label={exhibition.coverArtworkId === link.artworkId ? t('placementCoverActive') : t('placementSetCover')}
+                      placement="top"
+                    >
+                      <button
+                        onClick={() => handleToggleCover(link.artworkId)}
+                        disabled={setCoverArtwork.isPending}
+                        aria-label={exhibition.coverArtworkId === link.artworkId ? t('placementCoverActive') : t('placementSetCover')}
+                        aria-pressed={exhibition.coverArtworkId === link.artworkId}
+                        className={`flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:opacity-50 ${
+                          exhibition.coverArtworkId === link.artworkId
+                            ? 'border-amber-400 bg-amber-50 text-amber-500'
+                            : 'border-brand-300 text-brand-700 hover:bg-brand-100 hover:text-brand-900'
+                        }`}
+                      >
+                        <StarIcon className="h-4 w-4" filled={exhibition.coverArtworkId === link.artworkId} />
+                      </button>
+                    </Tooltip>
                     <Tooltip label={t('placementSaveHeight')} placement="top">
                       <button
                         onClick={() => handleUpdateHeight(selectedWallId, link.artworkId)}

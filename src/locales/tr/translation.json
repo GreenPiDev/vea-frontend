@@ -1,5 +1,9 @@
 {
   "headerBrandTitle": "VirtualExhibitionArt",
+  "landingTitle": "Sanatı Sınırların Dışında Keşfedin",
+  "landingSubtitle": "Gerçek sanat eserlerini gezilebilir 3D sergilerde keşfedin, dünyanın her yerinden sanatçıların koleksiyonlarını ziyaret edin.",
+  "landingEnterCta": "Sergilere Göz At",
+  "landingPhotoCredit": "Fotoğraf: Louvre Müzesi, Grande Galerie — Cheng-en Cheng (CC BY-SA 2.0)",
   "exhibitionSelectWelcome": "Hoşgeldiniz",
   "exhibitionSelectSubtitle": "Hangi Sergiye Gireceğinizi Seçiniz",
   "authTitle": "VirtualExhibitionArt",
@@ -209,6 +213,8 @@
   "placementNoAvailableArtworks": "Eklenebilecek eser yok — tüm eserleriniz zaten yerleştirilmiş ya da uygun durumda değil.",
   "placementAdd": "Ekle",
   "placementRemove": "Kaldır",
+  "placementSetCover": "Kapak Yap",
+  "placementCoverActive": "Kapak eser (tekrar tıkla: kaldır)",
   "placementError": "Eser yerleştirilemedi",
   "placementHeightY": "Yükseklik (m):",
   "placementSaveHeight": "Kaydet",
@@ -398,6 +404,8 @@
   "toastExhibitionArtworkAddError": "Eser sergiye eklenemedi",
   "toastExhibitionArtworkUpdateSuccess": "Eser konumu güncellendi",
   "toastExhibitionArtworkUpdateError": "Eser konumu güncellenemedi",
+  "toastExhibitionCoverUpdateSuccess": "Kapak eser güncellendi",
+  "toastExhibitionCoverUpdateError": "Kapak eser güncellenemedi",
   "toastExhibitionArtworkRemoveSuccess": "Eser sergiden kaldırıldı",
   "toastExhibitionArtworkRemoveError": "Eser sergiden kaldırılamadı",
 

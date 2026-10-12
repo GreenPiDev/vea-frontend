@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useExhibitionWatcherCount } from '../lib/socket/useExhibitionVisitorCount';
+import { useExhibition } from '../lib/api/domains/exhibitions';
 import type { ExhibitionCard } from './ExhibitionSelect';
 
 interface ExhibitionSelectCardProps {
@@ -15,6 +16,20 @@ interface ExhibitionSelectCardProps {
 export default function ExhibitionSelectCard({ exhibition, onSelect }: ExhibitionSelectCardProps) {
   const { t } = useTranslation();
   const count = useExhibitionWatcherCount(exhibition.id);
+  // usePublicExhibitions()'un liste yanıtı artworkLinks taşımıyor (bkz.
+  // exhibitions.ts'teki ApiExhibition yorumu), bu yüzden kart görseli için
+  // her kart kendi detay sorgusunu açıyor. Kart sayısı homepage'de küçük
+  // (küratörlerin yayınladığı sergiler) olduğundan N ayrı istek burada kabul
+  // edilebilir bir trade-off — ayrıca bu sorgu aynı query key'i App.tsx'in
+  // sergiye tıklanınca açtığı detay sorgusuyla paylaştığından, karta
+  // tıklandığında sahne genelde zaten önbellekte olur.
+  const { data: detail } = useExhibition(exhibition.id);
+  // Küratörün ExhibitionArtworkPlacement.tsx'teki "Kapak Yap" seçimi
+  // (coverArtworkId) öncelikli — eşleşen eser artık yerleştirilmemiş/
+  // kaldırılmışsa (ör. placement ekranından silinmiş) sessizce
+  // artworkLinks[0] varsayılanına düşülüyor.
+  const coverLink = detail?.artworkLinks?.find((link) => link.artworkId === detail.coverArtworkId);
+  const previewImage = (coverLink ?? detail?.artworkLinks?.[0])?.artwork.imageUrl ?? null;
 
   return (
     <button
@@ -22,6 +37,10 @@ export default function ExhibitionSelectCard({ exhibition, onSelect }: Exhibitio
       style={{ '--accent': exhibition.accent } as React.CSSProperties}
       onClick={() => onSelect(exhibition.id)}
     >
+      {previewImage && (
+        <img src={previewImage} alt="" aria-hidden="true" className="exhibition-select-card-bg" />
+      )}
+      <span className="exhibition-select-card-shade" />
       {count !== null && count > 0 && (
         <span
           className="exhibition-select-live-badge"
@@ -31,8 +50,10 @@ export default function ExhibitionSelectCard({ exhibition, onSelect }: Exhibitio
           {count}
         </span>
       )}
-      <span className="exhibition-select-name">{exhibition.name}</span>
-      <span className="exhibition-select-card-subtitle">{exhibition.subtitle}</span>
+      <span className="exhibition-select-card-content">
+        <span className="exhibition-select-name">{exhibition.name}</span>
+        <span className="exhibition-select-card-subtitle">{exhibition.subtitle}</span>
+      </span>
     </button>
   );
 }

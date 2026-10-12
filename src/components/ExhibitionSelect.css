@@ -14,7 +14,12 @@
   /* Top padding reserves space for the fixed Header (h-16 = 64px) so content
      starts below it in normal flow instead of being covered by it. */
   padding: 88px 24px 24px;
-  background: radial-gradient(circle at 50% 30%, #1c1a17 0%, #0c0b0a 75%);
+  /* Landing.tsx ile aynı hero görseli (landing-hero.jpg, bkz. o dosyadaki
+     lisans notu) — koyu radial gradyan üstte katman olarak kalıyor ki
+     kartların kontrastı/okunabilirliği önceki düz koyu arka planla aynı
+     kalsın, sadece görsel bir "galeri" dokusu eklenmiş olsun. */
+  background: radial-gradient(circle at 50% 30%, rgba(28, 26, 23, 0.88) 0%, rgba(12, 11, 10, 0.94) 75%),
+    url("/landing-hero.jpg") center / cover no-repeat fixed;
   font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #f6f5f1;
 }
@@ -35,20 +40,14 @@
 
 .exhibition-select-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: flex-start;
   gap: 20px;
   width: 100%;
-  max-width: 1000px;
+  max-width: 1100px;
 }
 
-@media (max-width: 900px) {
-  .exhibition-select-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .exhibition-select-grid {
     grid-template-columns: 1fr;
   }
@@ -58,15 +57,18 @@
   --accent: #fff2d0;
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
-  padding: 28px 22px;
+  aspect-ratio: 16 / 9;
+  padding: 20px 22px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-  align-items: center;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.04);
+  justify-content: flex-start;
+  align-items: flex-start;
+  text-align: left;
+  overflow: hidden;
+  /* Saydam değil, düz koyu bir zemin — kartın arkasındaki sayfa hero
+     görseli sızmasın, kartın kendi eser görseli (exhibition-select-card-bg)
+     tek görsel katmanı olsun. */
+  background: #19140f;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 14px;
   color: inherit;
@@ -74,6 +76,66 @@
   transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
   font-family: inherit;
   box-sizing: border-box;
+}
+
+/* Sergideki bir eserin görseli, karta kimlik veren saydam bir doku olarak
+   sağa yaslı gösteriliyor — soldaki başlık/alt yazı her zaman üstte okunur
+   kalsın diye sola doğru bir maskeyle (hem CSS mask hem WebKit varyantı)
+   söndürülüyor, görsel-metin sınırında keskin bir çizgi kalmasın diye.
+   Resim yoksa (ör. henüz eser yerleştirilmemiş sergi) hiç render edilmiyor,
+   kart düz accent zeminde kalıyor. */
+.exhibition-select-card-bg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  /* Görsel artık kartın tamamını değil, sağdaki sabit genişlikli bir
+     şeride (kartın %60'ı) oturuyor — önceki "width:100%" denemesi cover ile
+     birleşince görseli tüm kartı kaplayan bir arkaplana dönüştürüyordu.
+     Kutunun genişliği sabit/bilindiği için aşağıdaki maske de her zaman
+     tam bu kutunun kendi sol kenarında biter — contain'de olduğu gibi
+     "görselin gerçek kenarı nerede" belirsizliği burada yok, bu yüzden
+     geçiş hem yumuşak hem de güvenilir. */
+  width: 60%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  opacity: 0.55;
+  mask-image: linear-gradient(to right, transparent 0%, black 60%, black 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 60%, black 100%);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.exhibition-select-card:hover .exhibition-select-card-bg,
+.exhibition-select-card:focus-visible .exhibition-select-card-bg {
+  opacity: 0.7;
+  transform: scale(1.04);
+}
+
+/* Başlık/açıklama artık sol-üstte oturduğundan karartma da o köşeden
+   başlayıp sağ-alta (görselin en belirgin olduğu tarafa) doğru sönüyor —
+   eski alttan-yukarı gradyan, metin üste taşınınca işe yaramaz olmuştu. */
+.exhibition-select-card-shade {
+  position: absolute;
+  inset: 0;
+  /* Asıl sol->sağ geçişi artık .exhibition-select-card-bg'nin kendi maskesi
+     yapıyor (cover ile tam piksel kaplaması üzerinde güvenilir çalışıyor) —
+     bu katman sadece metnin oturduğu sol-üst köşeye ek bir karartma katıyor. */
+  background: linear-gradient(135deg, rgba(10, 9, 8, 0.6) 0%, rgba(10, 9, 8, 0) 45%);
+  pointer-events: none;
+}
+
+.exhibition-select-card-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Sabit bir piksel tavanı da ekli — yüzde tek başına geniş kartlarda
+     (2 sütunlu grid'de ~500px) açıklamanın sağdaki görsele doğru fazla
+     uzamasına izin veriyordu. */
+  max-width: min(60%, 260px);
+  width: 100%;
 }
 
 .exhibition-select-live-badge {
@@ -102,16 +164,23 @@
 .exhibition-select-card:focus-visible {
   transform: translateY(-4px);
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.08);
+  background: #241d16;
   outline: none;
 }
 
 .exhibition-select-name {
-  font-size: 18px;
+  display: block;
+  font-size: 20px;
   font-weight: 600;
+  text-align: left;
+  overflow-wrap: break-word;
 }
 
 .exhibition-select-card-subtitle {
+  display: block;
   font-size: 13px;
-  color: rgba(246, 245, 241, 0.6);
+  line-height: 1.45;
+  color: rgba(246, 245, 241, 0.65);
+  text-align: left;
+  overflow-wrap: break-word;
 }

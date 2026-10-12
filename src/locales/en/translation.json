@@ -1,5 +1,9 @@
 {
   "headerBrandTitle": "VirtualExhibitionArt",
+  "landingTitle": "Discover Art Beyond Boundaries",
+  "landingSubtitle": "Explore real artworks in walkable 3D exhibitions and visit collections from artists around the world.",
+  "landingEnterCta": "Browse Exhibitions",
+  "landingPhotoCredit": "Photo: Louvre Museum, Grande Galerie — Cheng-en Cheng (CC BY-SA 2.0)",
   "exhibitionSelectWelcome": "Welcome",
   "exhibitionSelectSubtitle": "Choose Which Exhibition to Enter",
   "authTitle": "VirtualExhibitionArt",
@@ -209,6 +213,8 @@
   "placementNoAvailableArtworks": "No artworks available to add — all of yours are already placed or not in an eligible status.",
   "placementAdd": "Add",
   "placementRemove": "Remove",
+  "placementSetCover": "Set as Cover",
+  "placementCoverActive": "Cover artwork (click again to unset)",
   "placementError": "Could not place the artwork",
   "placementHeightY": "Height (m):",
   "placementSaveHeight": "Save",
@@ -398,6 +404,8 @@
   "toastExhibitionArtworkAddError": "Could not add the artwork to the exhibition",
   "toastExhibitionArtworkUpdateSuccess": "Artwork placement updated",
   "toastExhibitionArtworkUpdateError": "Could not update the artwork placement",
+  "toastExhibitionCoverUpdateSuccess": "Cover artwork updated",
+  "toastExhibitionCoverUpdateError": "Could not update the cover artwork",
   "toastExhibitionArtworkRemoveSuccess": "Artwork removed from the exhibition",
   "toastExhibitionArtworkRemoveError": "Could not remove the artwork from the exhibition",
 
