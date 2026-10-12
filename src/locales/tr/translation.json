@@ -220,7 +220,7 @@
   "placementSaveHeight": "Kaydet",
 
   "artworkInfoIconLabel": "{{title}} hakkında bilgi",
-  "artworkInteractHint": "Enter ↵",
+  "artworkInteractHint": "Görüntüle",
   "artworkDetailTechniqueLabel": "Teknik",
   "artworkDetailDimensionsLabel": "Ölçüler",
   "artworkDetailDimensions": "{{height}} × {{width}} cm",

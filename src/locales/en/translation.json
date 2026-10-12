@@ -220,7 +220,7 @@
   "placementSaveHeight": "Save",
 
   "artworkInfoIconLabel": "About {{title}}",
-  "artworkInteractHint": "Enter ↵",
+  "artworkInteractHint": "View",
   "artworkDetailTechniqueLabel": "Technique",
   "artworkDetailDimensionsLabel": "Dimensions",
   "artworkDetailDimensions": "{{height}} × {{width}} cm",

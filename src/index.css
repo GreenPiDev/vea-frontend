@@ -18,6 +18,7 @@
 
   --animate-loading-bounce: loading-bounce 2.2s ease-in-out infinite;
   --animate-loading-fade-in: loading-fade-in 0.25s ease-out;
+  --animate-artwork-icon-breathe: artwork-icon-breathe 2.8s ease-in-out infinite;
 }
 
 :root {
@@ -121,6 +122,19 @@ input[type="number"]::-webkit-outer-spin-button {
   }
 }
 
+/* ArtworkIconProjector'ın "i" rozeti (App.tsx) için: sert bir opacity pulse yerine
+   çok hafif bir nefes alma hissi — kenarlık rengi ve gölgenin genliği kasıtlı olarak
+   küçük tutuldu, dikkat dağıtmadan "canlı" görünmesi için. */
+@keyframes artwork-icon-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(229, 208, 184, 0.18), 0 4px 14px rgba(0, 0, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(229, 208, 184, 0.4), 0 4px 18px rgba(0, 0, 0, 0.35);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .toast-slide-in-right,
   .toast-slide-out-right {
@@ -128,6 +142,10 @@ input[type="number"]::-webkit-outer-spin-button {
   }
 
   .animate-loading-bounce {
+    animation: none !important;
+  }
+
+  .artwork-icon-ring {
     animation: none !important;
   }
 }

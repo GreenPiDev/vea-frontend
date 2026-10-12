@@ -240,34 +240,51 @@ export default function App() {
         onCanvasReady={(el) => (canvasElRef.current = el)}
       />
 
+      {/* Rendered for every artwork (not just the currently-visible ones) so
+          appearing/disappearing is a CSS opacity/scale transition rather than
+          a mount/unmount pop. */}
       {!selectedArtwork &&
-        iconPositions
-          .filter((p) => p.visible)
-          .map((p) => {
-            const artwork = exhibitionArtworks.find((a) => a.id === p.id);
-            if (!artwork) return null;
-            const isNearest = nearestArtwork?.id === artwork.id;
-            return (
-              <button
-                key={p.id}
-                onClick={() => openArtworkDetail(artwork)}
-                aria-label={t("artworkInfoIconLabel", { title: artwork.title })}
-                style={{ left: p.x, top: p.y }}
-                className={`absolute z-40 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 ${
-                  isNearest ? "scale-110" : "opacity-80"
+        iconPositions.map((p) => {
+          const artwork = exhibitionArtworks.find((a) => a.id === p.id);
+          if (!artwork) return null;
+          const isNearest = nearestArtwork?.id === artwork.id;
+          return (
+            <button
+              key={p.id}
+              onClick={() => openArtworkDetail(artwork)}
+              aria-label={t("artworkInfoIconLabel", { title: artwork.title })}
+              tabIndex={p.visible ? 0 : -1}
+              style={{ left: p.x, top: p.y }}
+              className={`absolute z-40 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 transition-[opacity,transform] duration-300 ease-out ${
+                !p.visible
+                  ? "pointer-events-none scale-90 opacity-0"
+                  : isNearest
+                    ? "scale-110 opacity-100"
+                    : "scale-100 opacity-70"
+              }`}
+            >
+              <span
+                className={`flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-sm transition-colors duration-300 ${
+                  isNearest
+                    ? "artwork-icon-ring animate-artwork-icon-breathe border-brand-200/80 bg-brand-950/70"
+                    : "border-brand-200/30 bg-brand-950/50"
                 }`}
               >
-                <span className="flex h-8 w-8 animate-pulse items-center justify-center rounded-full bg-brand-700/90 text-sm font-semibold text-white shadow-md">
+                <span className="font-serif text-[15px] italic leading-none text-brand-50">
                   i
                 </span>
-                {isNearest && (
-                  <span className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                    {t("artworkInteractHint")}
+              </span>
+              {isNearest && (
+                <span className="flex items-center gap-1 rounded-full border border-brand-200/20 bg-brand-950/80 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-brand-100 shadow-md">
+                  <span className="rounded-[4px] border border-brand-100/40 px-1 font-sans text-[9px] not-italic tracking-normal text-brand-50">
+                    ↵
                   </span>
-                )}
-              </button>
-            );
-          })}
+                  {t("artworkInteractHint")}
+                </span>
+              )}
+            </button>
+          );
+        })}
 
       {selectedArtwork && (
         <ArtworkDetailCard
