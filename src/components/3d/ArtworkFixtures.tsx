@@ -29,7 +29,14 @@ export default function ArtworkFixtures({ artworks }: { artworks: ArtworkData[] 
       new THREE.MeshStandardMaterial({
         color: "#0a0a0a",
         emissive: exhibition.theme.spotColor,
-        emissiveIntensity: 1.4,
+        // This strip is always lit regardless of the real spotLight's distance-based fade (Artwork.tsx's
+        // ArtworkLight) — it's the only "is this lamp on" cue once the player is far enough that the real
+        // light has faded out. Bumped from 1.4: at typical gallery viewing distance the strip only covers a
+        // few screen pixels, and Bloom's mip-based downsampling loses weak sub-pixel bright spots, so a
+        // modest intensity read as "off" from across a room even though the material itself never changes.
+        // Free to raise — emissive intensity is a per-fragment material constant on an already-drawn,
+        // already-instanced mesh, it doesn't add draw calls or touch the scene's real light count.
+        emissiveIntensity: 3.5,
         roughness: 0.5,
       }),
     [exhibition.theme.spotColor]

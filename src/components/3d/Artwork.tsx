@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useTexture, Text } from "@react-three/drei";
 import type { Artwork as ArtworkData, FrameStyle } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
@@ -11,6 +12,20 @@ const FRAME_DEPTH = 0.05;
 // Applied on top of each theme's own spotIntensity (exhibitions.ts/backendAdapter.ts) — one shared dial instead of
 // re-tuning every theme's value by hand.
 const SPOT_INTENSITY_SCALE = 0.6;
+
+// Every real spotLight in the scene is evaluated per-fragment by every shaded surface regardless of
+// whether it's in range — a spotLight's own `distance` falloff makes it contribute zero past that
+// range, but doesn't remove it from the shader's light loop, so a big exhibition (one spotLight per
+// artwork) pays a per-fragment cost that scales with the *total* artwork count, not how many are
+// actually nearby. These three distances turn that into a smooth fade-then-unmount: intensity ramps
+// down to 0 between NEAR and FAR (so nothing visibly pops), and the light is only dropped from the
+// scene graph entirely past UNMOUNT_DISTANCE — safely beyond where the fade already reached zero, so
+// the unmount itself is never visible. A first attempt at this used a hard on/off distance threshold
+// and was dropped — distant paintings read as dim, then visibly "switched on" as the player
+// approached; the fade band here exists specifically to avoid that.
+const SPOT_FADE_NEAR_DISTANCE = 9;
+const SPOT_FADE_FAR_DISTANCE = 15;
+const SPOT_UNMOUNT_DISTANCE = 17;
 
 // Keyed by frame style — every painting using, say, "modernBlack" gets the exact same frame look, so
 // there's no reason for each one to own its own MeshStandardMaterial (and its own
@@ -124,6 +139,10 @@ function FrameMesh({ style, size }: { style: FrameStyle; size: [number, number, 
 
 export function ArtworkLight({ data }: { data: ArtworkData }) {
   const { exhibition, layout } = useExhibition();
+  const { camera } = useThree();
+  const spotLightRef = useRef<THREE.SpotLight>(null);
+  const [mounted, setMounted] = useState(true);
+  const baseIntensity = exhibition.theme.spotIntensity * SPOT_INTENSITY_SCALE;
   // Lamp height follows each painting's own top edge (not a fixed rail shared by the whole wall) — a tall-ceiling
   // room would otherwise leave the fixed rail too far above a normally-hung painting for the beam to land on it.
   // placeArtworksAlongWall() guarantees CEILING_HEADROOM (0.73m) of clearance above every painting's top edge, so
@@ -163,19 +182,42 @@ export function ArtworkLight({ data }: { data: ArtworkData }) {
     return obj;
   }, [aimPoint]);
 
+  // Driven imperatively (not React state) so a swinging intensity value never triggers a re-render —
+  // only crossing the mount/unmount boundary does. Distance is measured in the XZ plane against the
+  // *painting's* position, not the light's standoff position — the player walks the floor, not the
+  // light's offset point, so this is what actually tracks "how close is the viewer to this piece."
+  useFrame(() => {
+    const dx = camera.position.x - data.position[0];
+    const dz = camera.position.z - data.position[2];
+    const distance = Math.hypot(dx, dz);
+
+    const shouldBeMounted = distance < SPOT_UNMOUNT_DISTANCE;
+    if (shouldBeMounted !== mounted) setMounted(shouldBeMounted);
+
+    if (spotLightRef.current) {
+      const fade =
+        1 -
+        THREE.MathUtils.smoothstep(distance, SPOT_FADE_NEAR_DISTANCE, SPOT_FADE_FAR_DISTANCE);
+      spotLightRef.current.intensity = baseIntensity * fade;
+    }
+  });
+
   return (
     <>
       <primitive object={target} />
-      <spotLight
-        position={lightPosition}
-        target={target}
-        angle={0.42}
-        penumbra={0.9}
-        intensity={exhibition.theme.spotIntensity * SPOT_INTENSITY_SCALE}
-        distance={7}
-        decay={2}
-        color={exhibition.theme.spotColor}
-      />
+      {mounted && (
+        <spotLight
+          ref={spotLightRef}
+          position={lightPosition}
+          target={target}
+          angle={0.42}
+          penumbra={0.9}
+          intensity={baseIntensity}
+          distance={7}
+          decay={2}
+          color={exhibition.theme.spotColor}
+        />
+      )}
     </>
   );
 }
