@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
 
@@ -37,11 +38,23 @@ function getCeilingFixtureMaterial(spotColor: string) {
  * lighting), so `shadows`/`castShadow`/`receiveShadow` were also stripped
  * from Scene.tsx/GalleryRoom.tsx/Baseboards.tsx/Artwork.tsx — don't
  * re-add shadow flags on a mesh without a shadow-casting light behind them,
- * that only pays the shader cost for nothing.
+ * that only pays the shader cost for nothing. The two directionalLights
+ * added below are deliberately shadow-less too (no `castShadow`) — they
+ * exist only to give walls/floor a light *direction* to shade their normal
+ * maps (surfaceTextures.ts) against, not to look like a literal sun/window.
+ * A single directional light isn't enough: a rectangular room only has 2
+ * independent wall orientations (the X-facing pair and the Z-facing pair),
+ * so one light's angle always leaves exactly one pair of adjacent walls at
+ * near-identical brightness — their shared corner reads as a single flat
+ * surface instead of two distinct walls. The second, dimmer light sits at a
+ * ~90°-different horizontal angle from the first specifically to break that
+ * symmetry, so every corner ends up with *some* brightness contrast.
  */
 export default function GalleryLights() {
   const { layout, exhibition } = useExhibition();
   const { theme } = exhibition;
+  const skylightTarget = useRef<THREE.Object3D>(null);
+  const [centerX, centerZ] = layout.room.center;
 
   return (
     <>
@@ -49,6 +62,23 @@ export default function GalleryLights() {
       <ambientLight color={theme.ambientColor} intensity={theme.ambientIntensity * ROOM_FILL_BOOST} />
       <hemisphereLight
         args={[theme.hemisphereSkyColor, theme.hemisphereGroundColor, 0.4 * ROOM_FILL_BOOST]}
+      />
+
+      {/* Angled "skylight" pair — no shadow casting, just gives normal maps a direction to shade against.
+          Both share one target (room center); the second sits ~90° around from the first horizontally
+          so no corner's two walls end up facing both lights at near-equal angles (see doc comment above). */}
+      <object3D ref={skylightTarget} position={[centerX, layout.wallHeight / 2, centerZ]} />
+      <directionalLight
+        color={theme.hemisphereSkyColor}
+        intensity={0.5}
+        position={[centerX + 4, layout.wallHeight + 3, centerZ - 3]}
+        target={skylightTarget.current ?? undefined}
+      />
+      <directionalLight
+        color={theme.hemisphereSkyColor}
+        intensity={0.3}
+        position={[centerX - 3, layout.wallHeight + 3, centerZ - 4]}
+        target={skylightTarget.current ?? undefined}
       />
 
       {/* Small emissive fixture discs — purely cosmetic, cast no light themselves */}

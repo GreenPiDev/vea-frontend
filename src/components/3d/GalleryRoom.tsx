@@ -54,6 +54,11 @@ export default function GalleryRoom() {
         size={room.size}
         texture={ceilingTexture ?? DEFAULT_CEILING_TEXTURE}
         color={ceilingTexture ? undefined : theme.ceilingColor}
+        // No dedicated ceilingRoughness field on the theme — reuses wallRoughness (same
+        // painted-surface assumption) so a colored ceiling isn't stuck at the default
+        // MeshStandardMaterial roughness of 1, which leaves dark colors (near-black especially)
+        // with almost no diffuse or specular response and reads as a flat void instead of a surface.
+        roughness={ceilingTexture ? undefined : theme.wallRoughness}
       />
 
       <TexturedWalls
