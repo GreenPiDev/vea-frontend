@@ -1,7 +1,10 @@
 // Curated, license-clear (CC0, ambientCG.com) PBR texture presets a custom
 // exhibition can pick for its walls/floor/ceiling instead of a flat color.
-// Only diffuse + roughness maps are used (no normal maps) — keeps the
-// fragment shader cheap so surface realism doesn't cost FPS.
+// Diffuse + roughness + normal maps (OpenGL/"GL" tangent-space convention,
+// matching three.js's default normalMapType) are used — the normal map is
+// downscaled to 512px (vs. 1024px color/roughness) since per-pixel surface
+// detail doesn't need the same resolution as the albedo to read correctly,
+// keeping the added texture weight small.
 
 export interface SurfaceTexture {
   id: string;
@@ -10,6 +13,7 @@ export interface SurfaceTexture {
   thumbnail: string;
   map: string;
   roughnessMap: string;
+  normalMap: string;
   /** World meters per texture tile — controls repeat so the pattern reads at real-world scale. */
   tileSize: number;
 }
@@ -21,6 +25,7 @@ function tex(id: string, label: string, tileSize: number): SurfaceTexture {
     thumbnail: `/textures/${id}/thumb.jpg`,
     map: `/textures/${id}/color.jpg`,
     roughnessMap: `/textures/${id}/roughness.jpg`,
+    normalMap: `/textures/${id}/normal.jpg`,
     tileSize,
   };
 }

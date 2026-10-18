@@ -18,13 +18,14 @@ import { buildTexturedBoxGeometry } from "./textureUv";
 /**
  * Static architecture of the current exhibition room: floor, ceiling and
  * walls. Pure geometry — no lights, no controls. Every surface renders as a
- * real photo-scanned PBR texture — diffuse + roughness map only, no normal
- * map, so the extra realism doesn't add fragment-shader cost. When the
- * exhibition picked an explicit preset (a `*TextureId`), that scan renders
- * as-is; when it only picked a flat RGB color (the custom room builder's
- * color mode), the color tints a neutral base scan (plaster/concrete)
- * instead of painting a perfectly flat material — a flat color with zero
- * surface variation reads as an artificial paint swatch, not a real room.
+ * real photo-scanned PBR texture — diffuse + roughness + normal map, so
+ * light catches per-pixel surface detail instead of bouncing off a
+ * perfectly flat plane. When the exhibition picked an explicit preset (a
+ * `*TextureId`), that scan renders as-is; when it only picked a flat RGB
+ * color (the custom room builder's color mode), the color tints a neutral
+ * base scan (plaster/concrete) instead of painting a perfectly flat
+ * material — a flat color with zero surface variation reads as an
+ * artificial paint swatch, not a real room.
  */
 export default function GalleryRoom() {
   const { layout, exhibition } = useExhibition();
@@ -70,15 +71,19 @@ export default function GalleryRoom() {
 // separate flat-color path anymore).
 
 function useSurfaceMaps(texture: SurfaceTexture) {
-  const [map, roughnessMap] = useTexture([texture.map, texture.roughnessMap]);
+  const [map, roughnessMap, normalMap] = useTexture([
+    texture.map,
+    texture.roughnessMap,
+    texture.normalMap,
+  ]);
   useEffect(() => {
-    for (const t of [map, roughnessMap]) {
+    for (const t of [map, roughnessMap, normalMap]) {
       t.wrapS = THREE.RepeatWrapping;
       t.wrapT = THREE.RepeatWrapping;
       t.needsUpdate = true;
     }
-  }, [map, roughnessMap]);
-  return { map, roughnessMap };
+  }, [map, roughnessMap, normalMap]);
+  return { map, roughnessMap, normalMap };
 }
 
 function TexturedPlane({
@@ -101,7 +106,7 @@ function TexturedPlane({
   roughness?: number;
   metalness?: number;
 }) {
-  const { map, roughnessMap } = useSurfaceMaps(texture);
+  const { map, roughnessMap, normalMap } = useSurfaceMaps(texture);
 
   // Plane UVs are 0..1 by default; scale via texture.repeat (safe here since
   // each plane is the sole user of this map instance's repeat setting).
@@ -110,18 +115,20 @@ function TexturedPlane({
     const repeatY = size[1] / texture.tileSize;
     map.repeat.set(repeatX, repeatY);
     roughnessMap.repeat.set(repeatX, repeatY);
-  }, [map, roughnessMap, size, texture.tileSize]);
+    normalMap.repeat.set(repeatX, repeatY);
+  }, [map, roughnessMap, normalMap, size, texture.tileSize]);
 
   const material = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
         map,
         roughnessMap,
+        normalMap,
         metalness: metalness ?? 0,
         roughness: roughness ?? 1,
         color: color ?? "#ffffff",
       }),
-    [map, roughnessMap, color, roughness, metalness]
+    [map, roughnessMap, normalMap, color, roughness, metalness]
   );
 
   return (
@@ -143,7 +150,7 @@ function TexturedWalls({
   color?: string;
   roughness?: number;
 }) {
-  const { map, roughnessMap } = useSurfaceMaps(texture);
+  const { map, roughnessMap, normalMap } = useSurfaceMaps(texture);
 
   // Shared material with repeat left at the texture's default (1,1) — each
   // wall's own geometry carries pre-scaled UVs instead, so wall runs of
@@ -151,18 +158,20 @@ function TexturedWalls({
   useEffect(() => {
     map.repeat.set(1, 1);
     roughnessMap.repeat.set(1, 1);
-  }, [map, roughnessMap]);
+    normalMap.repeat.set(1, 1);
+  }, [map, roughnessMap, normalMap]);
 
   const material = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
         map,
         roughnessMap,
+        normalMap,
         metalness: 0,
         roughness: roughness ?? 1,
         color: color ?? "#ffffff",
       }),
-    [map, roughnessMap, color, roughness]
+    [map, roughnessMap, normalMap, color, roughness]
   );
 
   const geometries = useMemo(
