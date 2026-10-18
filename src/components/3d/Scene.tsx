@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { PerformanceMonitor, Stats } from "@react-three/drei";
-import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
+import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing";
 import * as THREE from "three";
 import Gallery from "./Gallery";
 import Player from "./Player";
@@ -100,9 +100,13 @@ export default function Scene({
         )}
       </ExhibitionProvider>
       <Stats className="fps-stats" />
+      {/* multisampling stays 0 (real MSAA, same as the renderer's own antialias:false above, is the
+          expensive option) — SMAA is a cheap edge-detection post-process pass instead, added last so
+          it smooths the final composited frame (including Bloom's contribution) in one go. */}
       <EffectComposer multisampling={0}>
         <Bloom intensity={0.35} luminanceThreshold={0.82} luminanceSmoothing={0.3} mipmapBlur />
         <Vignette eskil={false} offset={0.22} darkness={0.55} />
+        <SMAA />
       </EffectComposer>
     </Canvas>
   );

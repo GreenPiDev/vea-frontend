@@ -15,6 +15,13 @@ import {
 import type { WallSegment } from "./galleryLayout";
 import { buildTexturedBoxGeometry } from "./textureUv";
 
+// Exaggerates the ceiling's normal map perturbation strength (MeshStandardMaterial's default
+// normalScale is [1,1], i.e. the map's own baked depth, unmodified). The ceiling's own lighting
+// is close to head-on (see GalleryLights.tsx's doc comment on why a grazing light was tried and
+// reverted there instead of here) so its bump shading reads weaker than the walls' at matching
+// roughness — boosting normalScale compensates without touching any light or other surface.
+const CEILING_NORMAL_SCALE: [number, number] = [2.5, 2.5];
+
 /**
  * Static architecture of the current exhibition room: floor, ceiling and
  * walls. Pure geometry — no lights, no controls. Every surface renders as a
@@ -59,6 +66,7 @@ export default function GalleryRoom() {
         // MeshStandardMaterial roughness of 1, which leaves dark colors (near-black especially)
         // with almost no diffuse or specular response and reads as a flat void instead of a surface.
         roughness={ceilingTexture ? undefined : theme.wallRoughness}
+        normalScale={CEILING_NORMAL_SCALE}
       />
 
       <TexturedWalls
@@ -99,6 +107,7 @@ function TexturedPlane({
   color,
   roughness,
   metalness,
+  normalScale,
 }: {
   position: [number, number, number];
   rotation: [number, number, number];
@@ -110,6 +119,8 @@ function TexturedPlane({
   color?: string;
   roughness?: number;
   metalness?: number;
+  /** Multiplies the normal map's baked perturbation strength; defaults to [1,1] (unmodified) if unset. */
+  normalScale?: [number, number];
 }) {
   const { map, roughnessMap, normalMap } = useSurfaceMaps(texture);
 
@@ -129,11 +140,12 @@ function TexturedPlane({
         map,
         roughnessMap,
         normalMap,
+        normalScale: normalScale ? new THREE.Vector2(...normalScale) : undefined,
         metalness: metalness ?? 0,
         roughness: roughness ?? 1,
         color: color ?? "#ffffff",
       }),
-    [map, roughnessMap, normalMap, color, roughness, metalness]
+    [map, roughnessMap, normalMap, color, roughness, metalness, normalScale]
   );
 
   return (

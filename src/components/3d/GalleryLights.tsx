@@ -49,6 +49,17 @@ function getCeilingFixtureMaterial(spotColor: string) {
  * surface instead of two distinct walls. The second, dimmer light sits at a
  * ~90°-different horizontal angle from the first specifically to break that
  * symmetry, so every corner ends up with *some* brightness contrast.
+ *
+ * A third, grazing-angle light aimed at making the ceiling's normal map
+ * readable was tried and reverted: a directional light affects every surface
+ * at once, and the same shallow angle that would reveal ceiling bumps landed
+ * right in the floor's specular reflection cone — the glossy, low-roughness
+ * floor lit up with a dramatic highlight streak while the ceiling (much
+ * rougher, see GalleryRoom.tsx's `theme.wallRoughness` reuse) barely changed.
+ * Ceiling bump visibility is instead handled via `normalScale` on the
+ * ceiling's own material (GalleryRoom.tsx) — a per-material knob that
+ * exaggerates existing normal-map shading without adding or redirecting any
+ * light, so it can't leak onto an unrelated surface like this did.
  */
 export default function GalleryLights() {
   const { layout, exhibition } = useExhibition();
