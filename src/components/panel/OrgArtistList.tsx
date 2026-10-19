@@ -64,7 +64,7 @@ export default function OrgArtistList() {
             type="button"
             onClick={() => removeArtist.mutate(artist.id)}
             aria-label={t('artistRemove')}
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-red-300 text-red-600 transition-colors hover:bg-red-50 hover:text-red-800"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-red-300 text-red-600 transition-colors hover:bg-red-50 hover:text-red-800"
           >
             <TrashIcon className="h-4 w-4" />
           </button>

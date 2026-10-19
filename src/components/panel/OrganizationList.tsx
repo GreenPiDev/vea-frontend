@@ -98,7 +98,7 @@ export default function OrganizationList({ selectedId, onSelect }: OrganizationL
             type="button"
             onClick={() => openEdit(org)}
             aria-label={t('artworkEdit')}
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-brand-300 text-brand-700 transition-colors hover:bg-brand-100 hover:text-brand-900"
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-brand-300 text-brand-700 transition-colors hover:bg-brand-100 hover:text-brand-900"
           >
             <EditIcon className="h-4 w-4" />
           </button>

@@ -48,7 +48,7 @@ function ActionButton({
         type="button"
         onClick={onClick}
         aria-label={label}
-        className={`flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${
+        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border transition-colors ${
           tone === 'danger'
             ? 'border-red-300 text-red-600 hover:bg-red-50 hover:text-red-800'
             : 'border-brand-300 text-brand-700 hover:bg-brand-100 hover:text-brand-900'

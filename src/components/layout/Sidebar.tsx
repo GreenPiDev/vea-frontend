@@ -52,7 +52,7 @@ export default function Sidebar({
               key={item.id}
               type="button"
               onClick={() => onSelect(item.id)}
-              className={`flex h-12 w-full items-center whitespace-nowrap text-sm font-medium ${
+              className={`flex h-12 w-full cursor-pointer items-center whitespace-nowrap text-sm font-medium ${
                 activeId === item.id
                   ? 'bg-brand-100 text-brand-800'
                   : 'text-brand-600 hover:bg-brand-50 hover:text-brand-900'
@@ -66,7 +66,7 @@ export default function Sidebar({
         <button
           type="button"
           onClick={onLogout}
-          className="mb-3 flex h-12 w-full items-center whitespace-nowrap text-sm font-medium text-red-600 hover:bg-red-50"
+          className="mb-3 flex h-12 w-full cursor-pointer items-center whitespace-nowrap text-sm font-medium text-red-600 hover:bg-red-50"
         >
           <span className="flex w-16 flex-shrink-0 items-center justify-center">
             <LogoutIcon />
@@ -98,7 +98,7 @@ export default function Sidebar({
                   onSelect(item.id);
                   onMobileClose();
                 }}
-                className={`flex h-11 w-full items-center whitespace-nowrap text-sm font-medium ${
+                className={`flex h-11 w-full cursor-pointer items-center whitespace-nowrap text-sm font-medium ${
                   activeId === item.id
                     ? 'bg-brand-100 text-brand-800'
                     : 'text-brand-600 hover:bg-brand-50 hover:text-brand-900'
@@ -112,7 +112,7 @@ export default function Sidebar({
           <button
             type="button"
             onClick={onLogout}
-            className="mb-3 flex h-11 w-full flex-shrink-0 items-center whitespace-nowrap text-sm font-medium text-red-600 hover:bg-red-50"
+            className="mb-3 flex h-11 w-full flex-shrink-0 cursor-pointer items-center whitespace-nowrap text-sm font-medium text-red-600 hover:bg-red-50"
           >
             <span className="flex w-16 flex-shrink-0 items-center justify-center">
               <LogoutIcon />
