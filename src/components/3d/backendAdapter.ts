@@ -191,7 +191,12 @@ export interface BlueprintLayout {
  * below is arbitrary (1) since none of the x/z values this reads depend on it,
  * only the unused ceiling/collider math does.
  */
-function rectangleBlueprint(roomSize: [number, number]): BlueprintLayout {
+// Exported (beyond blueprintForSceneConfig's own use) so CeilingLightEditor.tsx's
+// callers (ExhibitionTemplateForm.tsx/ExhibitionForm.tsx) can render a live
+// floor-plan preview of the *in-progress*, not-yet-saved room shape the curator
+// is currently editing — there's no ApiSceneConfig/ApiExhibitionTemplate to feed
+// blueprintForSceneConfig until that first save round-trips.
+export function rectangleBlueprint(roomSize: [number, number]): BlueprintLayout {
   const [W, D] = roomSize;
   const { playerStart, playerStartYaw } = buildRoomLayout(roomSize, 1);
   return {
@@ -205,7 +210,7 @@ function rectangleBlueprint(roomSize: [number, number]): BlueprintLayout {
   };
 }
 
-function customBlueprint(cells: GridCell[], wallHeight: number, spawn: { x: number; z: number; yaw: number }): BlueprintLayout {
+export function customBlueprint(cells: GridCell[], wallHeight: number, spawn: { x: number; z: number; yaw: number }): BlueprintLayout {
   const { layout, wallRuns } = buildCustomRoomLayout(cells, wallHeight, spawn);
   const [cx, cz] = layout.room.center;
   const [W, D] = layout.room.size;
@@ -275,7 +280,12 @@ export function adaptApiExhibition(exhibition: ApiExhibition): Exhibition | null
     );
   }
 
-  const { layout, wallRuns } = buildCustomRoomLayout(config.cells, config.wallHeight, config.spawn);
+  const { layout, wallRuns } = buildCustomRoomLayout(
+    config.cells,
+    config.wallHeight,
+    config.spawn,
+    config.ceilingLights
+  );
   return {
     id: exhibition.id,
     name: exhibition.title,
@@ -303,12 +313,24 @@ function exhibitionFromBackendTemplate(
     artworks,
   };
   if (backendTemplate.roomShape.kind === "rectangle") {
-    return { ...base, roomSize: [backendTemplate.roomShape.width, backendTemplate.roomShape.depth] };
+    const { width, depth, ceilingLights } = backendTemplate.roomShape;
+    // Rectangle templates normally render via roomSize alone (Scene.tsx computes
+    // the layout at render time via buildRoomLayout) — but that call site has no
+    // way to pass curator-placed ceiling lights through, so when any exist, eagerly
+    // build the full layout here instead and piggyback on the same `customLayout`
+    // field a custom-shaped room already uses (Scene.tsx's `customLayout ??
+    // buildRoomLayout(...)` fallback picks it up with no further changes needed).
+    if (ceilingLights?.length) {
+      const layout = buildRoomLayout([width, depth], backendTemplate.wallHeight, ceilingLights);
+      return { ...base, customLayout: layout };
+    }
+    return { ...base, roomSize: [width, depth] };
   }
   const { layout } = buildCustomRoomLayout(
     backendTemplate.roomShape.cells,
     backendTemplate.wallHeight,
-    backendTemplate.roomShape.spawn
+    backendTemplate.roomShape.spawn,
+    backendTemplate.roomShape.ceilingLights
   );
   return { ...base, custom: true, customLayout: layout };
 }

@@ -202,6 +202,10 @@
 
   "blueprintTitle": "Salon Krokisi",
   "blueprintSpawnHint": "Koyu nokta ve ok, ziyaretçinin başlangıç konumu ve bakış yönünü gösterir.",
+  "ceilingLightEditorTitle": "Tavan Işıkları",
+  "ceilingLightEditorHint": "Boş bir yere tıklayarak ışık ekleyin, bir ışığa tıklayarak kaldırın. Boş bırakılırsa oda otomatik bir ızgarayla aydınlatılır.",
+  "ceilingLightEditorRemoveHint": "Kaldırmak için tıklayın",
+  "ceilingLightEditorMaxReached": "En fazla 24 tavan ışığı ekleyebilirsiniz.",
   "placementTitle": "Eser Yerleştir",
   "placementDone": "Bitti",
   "placementUnavailable": "Bu sergi için oda tanımlanmamış.",

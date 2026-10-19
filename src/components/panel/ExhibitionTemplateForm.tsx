@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CEILING_TEXTURES, FLOOR_TEXTURES, WALL_TEXTURES } from '../3d/surfaceTextures';
+import { rectangleBlueprint, customBlueprint } from '../3d/backendAdapter';
 import {
   useExhibitionTemplateMutations,
   type ApiExhibitionTemplate,
@@ -8,7 +9,9 @@ import {
 import { ApiError } from '../../lib/api/client';
 import TexturePicker from './TexturePicker';
 import RoomGrid from './RoomGrid';
+import CeilingLightEditor from './CeilingLightEditor';
 import { useRoomGridEditor } from './useRoomGridEditor';
+import { useCeilingLightEditor } from './useCeilingLightEditor';
 import { roomSizeLabel } from './roomShapeLabel';
 import './ExhibitionForm.css';
 
@@ -65,6 +68,7 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
       ? { cells: editing.roomShape.cells, spawn: editing.roomShape.spawn }
       : undefined
   );
+  const ceilingLights = useCeilingLightEditor(editing?.roomShape.ceilingLights);
 
   // A template already used by at least one Exhibition has its room shape
   // locked (server-enforced too, see vea-api's ExhibitionTemplatesService.
@@ -83,19 +87,64 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
   const isRectangleValid = isShapeLocked || shapeKind !== 'rectangle' || (rectWidthCheck.isValid && rectDepthCheck.isValid);
   const canSubmit = wallHeightCheck.isValid && isRectangleValid && (isShapeLocked || shapeKind === 'rectangle' || grid.canSubmit);
 
+  // Live floor-plan preview of the in-progress (not-yet-saved) room shape, for
+  // CeilingLightEditor.tsx below — built from this form's own local state via
+  // backendAdapter.ts's exported rectangleBlueprint/customBlueprint, not from a
+  // round-tripped API response. Shape-locked templates use the original stored
+  // shape (same values handleSubmit echoes back unchanged).
+  const lockedShapeForPreview = isShapeLocked ? editing!.roomShape : null;
+  const liveBlueprint = useMemo(() => {
+    if (shapeKind === 'rectangle') {
+      if (lockedShapeForPreview?.kind === 'rectangle') {
+        return rectangleBlueprint([lockedShapeForPreview.width, lockedShapeForPreview.depth]);
+      }
+      if (!rectWidthCheck.isValid || !rectDepthCheck.isValid) return null;
+      return rectangleBlueprint([rectWidthCheck.value, rectDepthCheck.value]);
+    }
+    if (lockedShapeForPreview?.kind === 'custom') {
+      return customBlueprint(lockedShapeForPreview.cells, 1, lockedShapeForPreview.spawn);
+    }
+    if (!grid.canSubmit) return null;
+    return customBlueprint(grid.floorCellList, 1, { x: grid.spawnCell!.x, z: grid.spawnCell!.z, yaw: grid.spawnYaw });
+  }, [
+    shapeKind,
+    lockedShapeForPreview,
+    rectWidthCheck.isValid,
+    rectWidthCheck.value,
+    rectDepthCheck.isValid,
+    rectDepthCheck.value,
+    grid.canSubmit,
+    grid.floorCellList,
+    grid.spawnCell,
+    grid.spawnYaw,
+  ]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
-    const roomShape = isShapeLocked
-      ? undefined
-      : shapeKind === 'rectangle'
-        ? ({ kind: 'rectangle' as const, width: rectWidthCheck.value, depth: rectDepthCheck.value })
-        : ({
+    // Always sent now, even shape-locked — ceilingLights is editable regardless
+    // of the lock (see vea-api's shapeChanged), echoing the original
+    // width/depth or cells/spawn unchanged in that case so the server's
+    // shape-diff check sees no real shape change, only ceilingLights.
+    const lockedShape = isShapeLocked ? editing!.roomShape : null;
+    const roomShape =
+      shapeKind === 'rectangle'
+        ? {
+            kind: 'rectangle' as const,
+            width: lockedShape?.kind === 'rectangle' ? lockedShape.width : rectWidthCheck.value,
+            depth: lockedShape?.kind === 'rectangle' ? lockedShape.depth : rectDepthCheck.value,
+            ceilingLights: ceilingLights.lights,
+          }
+        : {
             kind: 'custom' as const,
-            cells: grid.floorCellList,
-            spawn: { x: grid.spawnCell!.x, z: grid.spawnCell!.z, yaw: grid.spawnYaw },
-          });
+            cells: lockedShape?.kind === 'custom' ? lockedShape.cells : grid.floorCellList,
+            spawn:
+              lockedShape?.kind === 'custom'
+                ? lockedShape.spawn
+                : { x: grid.spawnCell!.x, z: grid.spawnCell!.z, yaw: grid.spawnYaw },
+            ceilingLights: ceilingLights.lights,
+          };
 
     const payload = {
       name,
@@ -249,6 +298,10 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
       <TexturePicker label={t('exhibitionFormCeilingTexture')} options={CEILING_TEXTURES} value={ceilingTextureId} onChange={setCeilingTextureId} />
 
       {!isShapeLocked && shapeKind === 'custom' && <RoomGrid editor={grid} wallColor={wallColor} />}
+
+      {/* Not gated by isShapeLocked — ceiling fixtures are purely cosmetic and never derive a
+          wallRunId, so they stay editable even on a template already used by an exhibition. */}
+      <CeilingLightEditor blueprint={liveBlueprint} editor={ceilingLights} />
 
       <div className="mt-2 flex gap-2">
         <button

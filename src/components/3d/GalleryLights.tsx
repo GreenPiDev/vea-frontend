@@ -5,7 +5,7 @@ import { useExhibition } from "./ExhibitionContext";
 // Ceiling fixtures used to also cast real spotLights for room fill; now the room's own
 // ambient/hemisphere fill carries that job alone, so their loss is compensated here rather
 // than in every theme's data. Ceiling fixtures below are purely cosmetic (emissive discs).
-const ROOM_FILL_BOOST = 1.8;
+const ROOM_FILL_BOOST = 1.55;
 
 // Every ceiling fixture disc in a given room shares the exact same material (same theme,
 // same emissive color) — one per theme color, not one per disc, same reasoning as

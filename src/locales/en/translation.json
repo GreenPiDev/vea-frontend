@@ -202,6 +202,10 @@
 
   "blueprintTitle": "Room Blueprint",
   "blueprintSpawnHint": "The dark dot and arrow show the visitor's starting position and facing direction.",
+  "ceilingLightEditorTitle": "Ceiling Lights",
+  "ceilingLightEditorHint": "Click an empty spot to add a light, click a light to remove it. Leave empty for the room to light itself with an automatic grid.",
+  "ceilingLightEditorRemoveHint": "Click to remove",
+  "ceilingLightEditorMaxReached": "You can add up to 24 ceiling lights.",
   "placementTitle": "Place Artworks",
   "placementDone": "Done",
   "placementUnavailable": "This exhibition has no room defined yet.",

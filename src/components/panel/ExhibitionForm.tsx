@@ -1,14 +1,17 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CEILING_TEXTURES, FLOOR_TEXTURES, WALL_TEXTURES } from '../3d/surfaceTextures';
 import { useExhibitionMutations, type CustomSceneConfig, type TemplateSceneConfig } from '../../lib/api/domains/exhibitions';
 import { useMyExhibitionTemplates } from '../../lib/api/domains/exhibitionTemplates';
 import { useMyOrgArtists } from '../../lib/api/domains/organizations';
+import { customBlueprint } from '../3d/backendAdapter';
 import { ApiError } from '../../lib/api/client';
 import TexturePicker from './TexturePicker';
 import RoomGrid from './RoomGrid';
+import CeilingLightEditor from './CeilingLightEditor';
 import DateField from './DateField';
 import { useRoomGridEditor } from './useRoomGridEditor';
+import { useCeilingLightEditor } from './useCeilingLightEditor';
 import './ExhibitionForm.css';
 
 type RoomType = 'template' | 'custom';
@@ -70,8 +73,17 @@ export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
   const [ceilingTextureId, setCeilingTextureId] = useState<string | undefined>(undefined);
   const grid = useRoomGridEditor();
   const { spawnCell, spawnYaw, floorCellList } = grid;
+  const ceilingLights = useCeilingLightEditor();
 
   const canSubmit = roomType === 'custom' ? grid.canSubmit : Boolean(templateId);
+
+  // Live floor-plan preview for CeilingLightEditor.tsx — same approach as
+  // ExhibitionTemplateForm.tsx's liveBlueprint, built from this form's own
+  // in-progress grid state, not a round-tripped API response.
+  const liveBlueprint = useMemo(() => {
+    if (roomType !== 'custom' || !grid.canSubmit) return null;
+    return customBlueprint(floorCellList, 1, { x: spawnCell!.x, z: spawnCell!.z, yaw: spawnYaw });
+  }, [roomType, grid.canSubmit, floorCellList, spawnCell, spawnYaw]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -89,6 +101,7 @@ export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
             ceilingColor,
             textureIds: { floor: floorTextureId, wall: wallTextureId, ceiling: ceilingTextureId },
             spawn: { x: spawnCell!.x, z: spawnCell!.z, yaw: spawnYaw },
+            ceilingLights: ceilingLights.lights,
           };
 
     const payload = {
@@ -235,6 +248,7 @@ export default function ExhibitionForm({ onDone }: ExhibitionFormProps) {
           <TexturePicker label={t('exhibitionFormCeilingTexture')} options={CEILING_TEXTURES} value={ceilingTextureId} onChange={setCeilingTextureId} />
 
           <RoomGrid editor={grid} wallColor={wallColor} />
+          <CeilingLightEditor blueprint={liveBlueprint} editor={ceilingLights} />
         </div>
       )}
 

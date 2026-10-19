@@ -46,8 +46,18 @@ export interface RoomLayout {
   playerStartYaw: number;
 }
 
+/** A curator-placed ceiling fixture position, room-local meters — same coordinate space as GridCell/SpawnOverride. */
+export interface CeilingLightPoint {
+  x: number;
+  z: number;
+}
+
 /** Builds a fully enclosed single-room layout for a given [width, depth] and ceiling height. */
-export function buildRoomLayout(size: [number, number], wallHeight: number): RoomLayout {
+export function buildRoomLayout(
+  size: [number, number],
+  wallHeight: number,
+  ceilingLights?: CeilingLightPoint[]
+): RoomLayout {
   const [W, D] = size;
   const H = wallHeight;
   const T = WALL_THICKNESS;
@@ -66,17 +76,23 @@ export function buildRoomLayout(size: [number, number], wallHeight: number): Roo
     maxZ: w.position[2] + w.size[2] / 2,
   }));
 
-  // Sparse ceiling grid for ambient fill only — per-painting spotlights (see
-  // ArtworkLightPool.tsx) do the actual highlighting, so this stays
-  // deliberately light on light count for FPS headroom on modest devices.
-  const cols = Math.min(3, Math.max(2, Math.round(W / 8)));
-  const rows = Math.min(3, Math.max(2, Math.round(D / 8)));
+  // Curator-placed fixtures (see ExhibitionTemplateForm.tsx/ExhibitionForm.tsx's
+  // CeilingLightEditor) win when present; otherwise fall back to the sparse
+  // auto-grid below, deliberately light on light count for FPS headroom on
+  // modest devices — per-painting spotlights (see ArtworkLightPool.tsx) do the
+  // actual highlighting either way, these are cosmetic discs only.
   const ceilingSpots: [number, number, number][] = [];
-  for (let i = 0; i < cols; i++) {
-    for (let j = 0; j < rows; j++) {
-      const x = -W / 2 + (W / cols) * (i + 0.5);
-      const z = -D / 2 + (D / rows) * (j + 0.5);
-      ceilingSpots.push([x, H - 0.1, z]);
+  if (ceilingLights?.length) {
+    for (const { x, z } of ceilingLights) ceilingSpots.push([x, H - 0.1, z]);
+  } else {
+    const cols = Math.min(3, Math.max(2, Math.round(W / 8)));
+    const rows = Math.min(3, Math.max(2, Math.round(D / 8)));
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const x = -W / 2 + (W / cols) * (i + 0.5);
+        const z = -D / 2 + (D / rows) * (j + 0.5);
+        ceilingSpots.push([x, H - 0.1, z]);
+      }
     }
   }
 
@@ -167,7 +183,8 @@ export interface SpawnOverride {
 export function buildCustomRoomLayout(
   cells: GridCell[],
   wallHeight: number,
-  spawnOverride?: SpawnOverride
+  spawnOverride?: SpawnOverride,
+  ceilingLights?: CeilingLightPoint[]
 ): { layout: RoomLayout; wallRuns: CustomWallRun[] } {
   const occupied = new Set(cells.map((c) => `${c.x},${c.z}`));
   const edges: RawEdge[] = [];
@@ -223,25 +240,31 @@ export function buildCustomRoomLayout(
     maxZ: w.position[2] + w.size[2] / 2,
   }));
 
-  // Sparse ceiling grid, same density rule as buildRoomLayout, but skipped
-  // over any grid cell that falls outside the drawn footprint.
-  const cols = Math.min(3, Math.max(1, Math.round(W / 8)));
-  const rows = Math.min(3, Math.max(1, Math.round(D / 8)));
+  // Curator-placed fixtures win when present (not footprint-checked — the editor
+  // only ever lets the curator click inside the drawn floor plan, see
+  // CeilingLightEditor.tsx); otherwise the sparse auto-grid below, same density
+  // rule as buildRoomLayout, skipped over any grid cell outside the footprint.
   const ceilingSpots: [number, number, number][] = [];
-  for (let i = 0; i < cols; i++) {
-    for (let j = 0; j < rows; j++) {
-      const x = minX + (W / cols) * (i + 0.5);
-      const z = minZ + (D / rows) * (j + 0.5);
-      const cellX = Math.floor(x);
-      const cellZ = Math.floor(z);
-      if (occupied.has(`${cellX},${cellZ}`)) {
-        ceilingSpots.push([x, wallHeight - 0.1, z]);
+  if (ceilingLights?.length) {
+    for (const { x, z } of ceilingLights) ceilingSpots.push([x, wallHeight - 0.1, z]);
+  } else {
+    const cols = Math.min(3, Math.max(1, Math.round(W / 8)));
+    const rows = Math.min(3, Math.max(1, Math.round(D / 8)));
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const x = minX + (W / cols) * (i + 0.5);
+        const z = minZ + (D / rows) * (j + 0.5);
+        const cellX = Math.floor(x);
+        const cellZ = Math.floor(z);
+        if (occupied.has(`${cellX},${cellZ}`)) {
+          ceilingSpots.push([x, wallHeight - 0.1, z]);
+        }
       }
     }
-  }
-  if (ceilingSpots.length === 0) {
-    const [{ x, z }] = cells;
-    ceilingSpots.push([x + 0.5, wallHeight - 0.1, z + 0.5]);
+    if (ceilingSpots.length === 0) {
+      const [{ x, z }] = cells;
+      ceilingSpots.push([x + 0.5, wallHeight - 0.1, z + 0.5]);
+    }
   }
 
   // Player starts on the occupied cell closest to the footprint's centroid,

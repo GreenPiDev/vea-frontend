@@ -9,7 +9,7 @@ import { Paths } from '../paths';
 import { useApiGet, useApiGetList, useApiMutations } from '../factory';
 import { patch, post, remove } from '../client';
 import type { ApiArtwork } from './artworks';
-import type { ApiExhibitionTemplate } from './exhibitionTemplates';
+import type { ApiExhibitionTemplate, CeilingLightPoint } from './exhibitionTemplates';
 
 // Mirrors vea-api's src/exhibitions/dto/scene-config.dto.ts discriminated
 // union (keep the two in sync by hand, same cross-repo caveat as
@@ -29,6 +29,8 @@ export interface CustomSceneConfig {
   ceilingColor: string;
   textureIds?: { floor?: string; wall?: string; ceiling?: string };
   spawn: { x: number; z: number; yaw: number };
+  /** Curator-placed ceiling fixtures (CeilingLightEditor.tsx). Omitted/empty falls back to galleryLayout.ts's auto-generated grid. */
+  ceilingLights?: CeilingLightPoint[];
 }
 
 export type ApiSceneConfig = TemplateSceneConfig | CustomSceneConfig;

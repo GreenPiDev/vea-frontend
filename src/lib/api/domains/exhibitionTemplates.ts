@@ -11,16 +11,28 @@ import type { ExhibitionTheme } from '../../../components/3d/exhibitions';
 // discriminated-union spirit as ApiSceneConfig (exhibitions.ts), reusing the
 // exact same "custom" grid contract (cells/spawn) as CustomSceneConfig so a
 // template's custom shape is drawn with the same grid UI (useRoomGridEditor).
+// A single curator-placed ceiling fixture position, room-local meters — same
+// coordinate space as cells/spawn. Shared shape with ApiSceneConfig's
+// CustomSceneConfig (exhibitions.ts) for the same field.
+export interface CeilingLightPoint {
+  x: number;
+  z: number;
+}
+
 export interface RectangleRoomShape {
   kind: 'rectangle';
   width: number;
   depth: number;
+  /** Curator-placed ceiling fixtures (CeilingLightEditor.tsx). Omitted/empty falls back to galleryLayout.ts's auto-generated grid. */
+  ceilingLights?: CeilingLightPoint[];
 }
 
 export interface CustomRoomShape {
   kind: 'custom';
   cells: { x: number; z: number }[];
   spawn: { x: number; z: number; yaw: number };
+  /** Curator-placed ceiling fixtures (CeilingLightEditor.tsx). Omitted/empty falls back to galleryLayout.ts's auto-generated grid. */
+  ceilingLights?: CeilingLightPoint[];
 }
 
 export type TemplateRoomShape = RectangleRoomShape | CustomRoomShape;

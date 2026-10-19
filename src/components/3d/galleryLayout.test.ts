@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRoomLayout,
+  buildCustomRoomLayout,
   EYE_HEIGHT,
   WALL_THICKNESS,
   placeArtworksAlongWall,
@@ -64,6 +65,46 @@ describe('buildRoomLayout', () => {
     // cols/rows are each clamped to [2, 3], so max 3x3 = 9 spots ever.
     expect(small.ceilingSpots.length).toBeLessThanOrEqual(9);
     expect(large.ceilingSpots.length).toBeLessThanOrEqual(9);
+  });
+
+  it('uses curator-placed ceiling lights verbatim instead of the auto-grid when provided', () => {
+    const layout = buildRoomLayout([10, 8], 4, [{ x: 1.5, z: -2 }, { x: -3, z: 3 }]);
+
+    expect(layout.ceilingSpots).toEqual([
+      [1.5, 3.9, -2],
+      [-3, 3.9, 3],
+    ]);
+  });
+
+  it('falls back to the auto-grid when ceilingLights is empty', () => {
+    const withEmpty = buildRoomLayout([10, 8], 4, []);
+    const withNone = buildRoomLayout([10, 8], 4);
+
+    expect(withEmpty.ceilingSpots).toEqual(withNone.ceilingSpots);
+  });
+});
+
+describe('buildCustomRoomLayout', () => {
+  // A simple 2x2 footprint, occupying cells (0,0)-(1,1).
+  const cells = [
+    { x: 0, z: 0 },
+    { x: 1, z: 0 },
+    { x: 0, z: 1 },
+    { x: 1, z: 1 },
+  ];
+
+  it('uses curator-placed ceiling lights verbatim instead of the auto-grid when provided', () => {
+    const { layout } = buildCustomRoomLayout(cells, 4, undefined, [{ x: 0.5, z: 0.5 }]);
+
+    expect(layout.ceilingSpots).toEqual([[0.5, 3.9, 0.5]]);
+  });
+
+  it('falls back to the footprint-aware auto-grid when ceilingLights is empty or omitted', () => {
+    const withEmpty = buildCustomRoomLayout(cells, 4, undefined, []);
+    const withNone = buildCustomRoomLayout(cells, 4);
+
+    expect(withEmpty.layout.ceilingSpots).toEqual(withNone.layout.ceilingSpots);
+    expect(withNone.layout.ceilingSpots.length).toBeGreaterThan(0);
   });
 });
 
