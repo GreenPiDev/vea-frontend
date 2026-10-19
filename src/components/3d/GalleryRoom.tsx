@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { useTexture } from "@react-three/drei";
+import { useThree } from "@react-three/fiber";
 import { useExhibition } from "./ExhibitionContext";
 import {
   CEILING_TEXTURES,
@@ -39,8 +40,8 @@ export default function GalleryRoom() {
   const { theme } = exhibition;
   const { room, walls, wallHeight } = layout;
 
-  const floorTexture = findTexture(FLOOR_TEXTURES, theme.floorTextureId);
-  const wallTexture = findTexture(WALL_TEXTURES, theme.wallTextureId);
+  const floorTexture = findTexture(FLOOR_TEXTURES, theme.floorTextureId) ?? DEFAULT_FLOOR_TEXTURE;
+  const wallTexture = findTexture(WALL_TEXTURES, theme.wallTextureId) ?? DEFAULT_WALL_TEXTURE;
   const ceilingTexture = findTexture(CEILING_TEXTURES, theme.ceilingTextureId);
 
   return (
@@ -49,10 +50,11 @@ export default function GalleryRoom() {
         position={[room.center[0], 0, room.center[1]]}
         rotation={[-Math.PI / 2, 0, 0]}
         size={room.size}
-        texture={floorTexture ?? DEFAULT_FLOOR_TEXTURE}
-        color={floorTexture ? undefined : theme.floorColor}
-        roughness={floorTexture ? undefined : theme.floorRoughness}
-        metalness={floorTexture ? undefined : theme.floorMetalness}
+        texture={floorTexture}
+        color={theme.floorTextureId ? undefined : theme.floorColor}
+        roughness={theme.floorTextureId ? undefined : theme.floorRoughness}
+        metalness={theme.floorTextureId ? undefined : theme.floorMetalness}
+        normalScale={floorTexture.normalScale}
       />
 
       <TexturedPlane
@@ -71,9 +73,9 @@ export default function GalleryRoom() {
 
       <TexturedWalls
         walls={walls}
-        texture={wallTexture ?? DEFAULT_WALL_TEXTURE}
-        color={wallTexture ? undefined : theme.wallColor}
-        roughness={wallTexture ? undefined : theme.wallRoughness}
+        texture={wallTexture}
+        color={theme.wallTextureId ? undefined : theme.wallColor}
+        roughness={theme.wallTextureId ? undefined : theme.wallRoughness}
       />
     </group>
   );
@@ -89,13 +91,22 @@ function useSurfaceMaps(texture: SurfaceTexture) {
     texture.roughnessMap,
     texture.normalMap,
   ]);
+  const gl = useThree((state) => state.gl);
   useEffect(() => {
+    // Floor/walls are viewed at a steep grazing angle (a ground plane stretching to the
+    // horizon) — mipmapping alone blurs those pixels far more than the near ones since it
+    // picks one mip level per pixel regardless of direction. Anisotropic filtering samples
+    // more texels along the foreshortened axis instead, fixing the "distance looks out of
+    // focus" look. GPU/driver-side sampling cost only — no extra geometry or textures — so
+    // it's effectively free on any GPU this scene already targets.
+    const maxAnisotropy = gl.capabilities.getMaxAnisotropy();
     for (const t of [map, roughnessMap, normalMap]) {
       t.wrapS = THREE.RepeatWrapping;
       t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = maxAnisotropy;
       t.needsUpdate = true;
     }
-  }, [map, roughnessMap, normalMap]);
+  }, [map, roughnessMap, normalMap, gl]);
   return { map, roughnessMap, normalMap };
 }
 
@@ -140,7 +151,7 @@ function TexturedPlane({
         map,
         roughnessMap,
         normalMap,
-        normalScale: normalScale ? new THREE.Vector2(...normalScale) : undefined,
+        normalScale: new THREE.Vector2(...(normalScale ?? [1, 1])),
         metalness: metalness ?? 0,
         roughness: roughness ?? 1,
         color: color ?? "#ffffff",
@@ -184,11 +195,12 @@ function TexturedWalls({
         map,
         roughnessMap,
         normalMap,
+        normalScale: new THREE.Vector2(...texture.normalScale),
         metalness: 0,
         roughness: roughness ?? 1,
         color: color ?? "#ffffff",
       }),
-    [map, roughnessMap, normalMap, color, roughness]
+    [map, roughnessMap, normalMap, color, roughness, texture.normalScale]
   );
 
   const geometries = useMemo(

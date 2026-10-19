@@ -165,6 +165,7 @@
   "exhibitionFormWallTexture": "Wall Texture",
   "exhibitionFormFloorTexture": "Floor Texture",
   "exhibitionFormCeilingTexture": "Ceiling Texture",
+  "exhibitionFormTextureNone": "No Texture (Flat Color)",
   "exhibitionFormSpawnLabel": "Starting Point",
   "exhibitionFormSpawnPick": "📍 Pick Location",
   "exhibitionFormSpawnChange": "📍 Change Location",

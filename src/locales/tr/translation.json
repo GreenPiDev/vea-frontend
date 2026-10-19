@@ -165,6 +165,7 @@
   "exhibitionFormWallTexture": "Duvar Dokusu",
   "exhibitionFormFloorTexture": "Zemin Dokusu",
   "exhibitionFormCeilingTexture": "Tavan Dokusu",
+  "exhibitionFormTextureNone": "Doku Yok (Düz Renk)",
   "exhibitionFormSpawnLabel": "Başlangıç Noktası",
   "exhibitionFormSpawnPick": "📍 Konumu Seç",
   "exhibitionFormSpawnChange": "📍 Konumu Değiştir",
