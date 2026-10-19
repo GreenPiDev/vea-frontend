@@ -1,6 +1,7 @@
 import { Suspense, useMemo } from "react";
-import Artwork, { ArtworkLight } from "./Artwork";
+import Artwork from "./Artwork";
 import ArtworkFixtures from "./ArtworkFixtures";
+import ArtworkLightPool from "./ArtworkLightPool";
 import { ARTWORKS } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
 import { ArtworkErrorBoundary } from "./ArtworkErrorBoundary";
@@ -18,13 +19,15 @@ export default function GalleryArtworks() {
       {/* Every painting's picture-light fixture, batched into a few shared InstancedMesh pools — see
           ArtworkFixtures.tsx. Rendered once up front rather than per-painting below. */}
       <ArtworkFixtures artworks={artworks} />
+      {/* Fixed-size pool of real spotLights, reassigned every frame to the paintings nearest the camera —
+          see ArtworkLightPool.tsx's doc comment for why this replaced one real light per artwork. Lives
+          outside the per-artwork Suspense/error boundaries below: it doesn't depend on any painting's own
+          texture load succeeding. */}
+      <ArtworkLightPool artworks={artworks} />
       {artworks.map((data) => (
         <ArtworkErrorBoundary key={data.id} artworkId={data.id}>
           <Suspense fallback={null}>
-            <group>
-              <Artwork data={data} />
-              <ArtworkLight data={data} />
-            </group>
+            <Artwork data={data} />
           </Suspense>
         </ArtworkErrorBoundary>
       ))}

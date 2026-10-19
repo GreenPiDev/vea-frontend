@@ -30,7 +30,7 @@ function getCeilingFixtureMaterial(spotColor: string) {
  * fill (themed) is the only real light source, boosted to cover the room
  * evenly on its own. A sparse grid of ceiling fixtures is layered on top for
  * looks only — glowing discs with no attached spotLight — so per-painting
- * spotlights (see Artwork.tsx's ArtworkLight) stay the sole visible "hot"
+ * spotlights (see ArtworkLightPool.tsx) stay the sole visible "hot"
  * light source, like a real gallery's track-lit walls.
  *
  * No light in this rig casts real shadows — a one-time baked directional

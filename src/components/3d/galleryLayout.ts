@@ -67,7 +67,7 @@ export function buildRoomLayout(size: [number, number], wallHeight: number): Roo
   }));
 
   // Sparse ceiling grid for ambient fill only — per-painting spotlights (see
-  // Artwork.tsx's ArtworkLight) do the actual highlighting, so this stays
+  // ArtworkLightPool.tsx) do the actual highlighting, so this stays
   // deliberately light on light count for FPS headroom on modest devices.
   const cols = Math.min(3, Math.max(2, Math.round(W / 8)));
   const rows = Math.min(3, Math.max(2, Math.round(D / 8)));

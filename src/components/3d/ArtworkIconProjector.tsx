@@ -48,7 +48,7 @@ export default function ArtworkIconProjector({
     const positions: ArtworkIconPosition[] = artworks.map((artwork) => {
       const width = artwork.height * artwork.aspect;
       // Painting-local "right" and "up" directions in world space, derived
-      // from rotationY the same way ArtworkLight's normal vector is (see
+      // from rotationY the same way ArtworkLightPool's normal vector is (see
       // Artwork.tsx) — right = (cos, 0, -sin) is 90° from the front normal
       // (sin, 0, cos), consistent with this codebase's rotationY convention
       // (0 = +Z normal, PI/2 = +X normal).

@@ -1,4 +1,4 @@
-// Pure math extracted from Artwork.tsx's ArtworkLight — originally every
+// Pure math extracted from ArtworkLightPool.tsx — originally every
 // painting computed this inline (with its own useMemos) to build its own
 // picture-light fixture meshes. Pulled out here so ArtworkFixtures.tsx can
 // batch every painting's fixture transform into a handful of shared
@@ -42,7 +42,7 @@ export interface FixtureTransform {
   stripLength: number;
 }
 
-/** Computes one painting's picture-light fixture transform (base/arms/bar/LED strip) — same geometry ArtworkLight used to build inline, now a pure function so it can be called for every painting up front and batched into instanced pools. */
+/** Computes one painting's picture-light fixture transform (base/arms/bar/LED strip) — same geometry ArtworkLightPool used to build inline, now a pure function so it can be called for every painting up front and batched into instanced pools. */
 export function computeFixtureTransform(data: ArtworkData, wallHeight: number): FixtureTransform {
   const topEdge = data.position[1] + data.height / 2;
   const lightY = Math.min(topEdge + LAMP_RISE, wallHeight - CEILING_CLEARANCE);
