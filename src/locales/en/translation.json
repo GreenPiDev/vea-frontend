@@ -181,6 +181,8 @@
   "exhibitionTemplateEmpty": "You haven't created a template yet.",
   "exhibitionTemplateNew": "+ New Template",
   "exhibitionTemplateEdit": "Edit",
+  "exhibitionTemplateDuplicate": "Duplicate",
+  "exhibitionTemplateDuplicateConfirm": "Are you sure you want to duplicate the template \"{{name}}\"? You can make changes to the copy afterward.",
   "exhibitionTemplatePreview": "Preview",
   "exhibitionTemplatePreviewBadge": "Template preview — empty room",
   "exhibitionTemplateColName": "Name",
@@ -420,6 +422,8 @@
   "toastTemplateUpdateError": "Could not update the template",
   "toastTemplateDeleteSuccess": "Template deleted successfully",
   "toastTemplateDeleteError": "Could not delete the template",
+  "toastTemplateDuplicateSuccess": "Template duplicated successfully",
+  "toastTemplateDuplicateError": "Could not duplicate the template",
 
   "toastOrganizationCreateSuccess": "Organization created successfully",
   "toastOrganizationCreateError": "Could not create the organization",

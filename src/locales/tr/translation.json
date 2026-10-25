@@ -181,6 +181,8 @@
   "exhibitionTemplateEmpty": "Henüz şablon oluşturmadınız.",
   "exhibitionTemplateNew": "+ Yeni Şablon",
   "exhibitionTemplateEdit": "Düzenle",
+  "exhibitionTemplateDuplicate": "Kopyala",
+  "exhibitionTemplateDuplicateConfirm": "\"{{name}}\" şablonunu kopyalamak istediğinize emin misiniz? Oluşturulan kopya üzerinde değişiklik yapabilirsiniz.",
   "exhibitionTemplatePreview": "Önizle",
   "exhibitionTemplatePreviewBadge": "Şablon önizlemesi — boş oda",
   "exhibitionTemplateColName": "Ad",
@@ -420,6 +422,8 @@
   "toastTemplateUpdateError": "Şablon güncellenemedi",
   "toastTemplateDeleteSuccess": "Şablon başarıyla silindi",
   "toastTemplateDeleteError": "Şablon silinemedi",
+  "toastTemplateDuplicateSuccess": "Şablon başarıyla kopyalandı",
+  "toastTemplateDuplicateError": "Şablon kopyalanamadı",
 
   "toastOrganizationCreateSuccess": "Kurum başarıyla oluşturuldu",
   "toastOrganizationCreateError": "Kurum oluşturulamadı",

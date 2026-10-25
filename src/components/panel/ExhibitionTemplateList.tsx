@@ -1,8 +1,14 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMyExhibitionTemplates, type ApiExhibitionTemplate } from '../../lib/api/domains/exhibitionTemplates';
+import {
+  useMyExhibitionTemplates,
+  useDuplicateExhibitionTemplate,
+  type ApiExhibitionTemplate,
+} from '../../lib/api/domains/exhibitionTemplates';
 import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
+import ConfirmModal from '../common/ConfirmModal';
 import Tooltip from '../layout/Tooltip';
-import { EditIcon, PreviewIcon } from '../layout/icons';
+import { CopyIcon, EditIcon, PreviewIcon } from '../layout/icons';
 import { roomSizeLabel } from './roomShapeLabel';
 
 interface ExhibitionTemplateListProps {
@@ -30,6 +36,10 @@ function ActionButton({ label, onClick, children }: { label: string; onClick: ()
 export default function ExhibitionTemplateList({ onEdit, onPreview }: ExhibitionTemplateListProps) {
   const { t } = useTranslation();
   const { data: templates, isLoading } = useMyExhibitionTemplates();
+  const duplicateTemplate = useDuplicateExhibitionTemplate();
+  // Holds the template pending confirmation, not just its id — so the
+  // ConfirmModal's message can interpolate its name without a second lookup.
+  const [pendingDuplicate, setPendingDuplicate] = useState<ApiExhibitionTemplate | null>(null);
 
   const columns: GenericTableColumn<ApiExhibitionTemplate>[] = [
     {
@@ -63,18 +73,36 @@ export default function ExhibitionTemplateList({ onEdit, onPreview }: Exhibition
           <ActionButton label={t('exhibitionTemplateEdit')} onClick={() => onEdit(template.id)}>
             <EditIcon className="h-4 w-4" />
           </ActionButton>
+          <ActionButton label={t('exhibitionTemplateDuplicate')} onClick={() => setPendingDuplicate(template)}>
+            <CopyIcon className="h-4 w-4" />
+          </ActionButton>
         </div>
       ),
     },
   ];
 
   return (
-    <GenericTable
-      columns={columns}
-      data={templates}
-      getRowKey={(template) => template.id}
-      isLoading={isLoading}
-      emptyMessage={t('exhibitionTemplateEmpty')}
-    />
+    <>
+      <GenericTable
+        columns={columns}
+        data={templates}
+        getRowKey={(template) => template.id}
+        isLoading={isLoading}
+        emptyMessage={t('exhibitionTemplateEmpty')}
+      />
+      {pendingDuplicate && (
+        <ConfirmModal
+          message={t('exhibitionTemplateDuplicateConfirm', { name: pendingDuplicate.name })}
+          confirmLabel={t('exhibitionTemplateDuplicate')}
+          isSubmitting={duplicateTemplate.isPending}
+          onConfirm={() => {
+            duplicateTemplate.mutate(pendingDuplicate.id, {
+              onSuccess: () => setPendingDuplicate(null),
+            });
+          }}
+          onCancel={() => setPendingDuplicate(null)}
+        />
+      )}
+    </>
   );
 }

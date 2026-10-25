@@ -3,7 +3,9 @@
 // can create/update their own named room presets here, picked from
 // ExhibitionForm.tsx's template selector alongside the static ones. See
 // vea-api's src/exhibition-templates/ module.
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Paths } from '../paths';
+import { post } from '../client';
 import { useApiGet, useApiGetList, useApiMutations } from '../factory';
 import type { ExhibitionTheme } from '../../../components/3d/exhibitions';
 
@@ -74,5 +76,21 @@ export function useExhibitionTemplateMutations() {
     create: { successKey: 'toastTemplateCreateSuccess', errorKey: 'toastTemplateCreateError' },
     update: { successKey: 'toastTemplateUpdateSuccess', errorKey: 'toastTemplateUpdateError' },
     remove: { successKey: 'toastTemplateDeleteSuccess', errorKey: 'toastTemplateDeleteError' },
+  });
+}
+
+// Server-side clone (vea-api's ExhibitionTemplatesService.duplicate) rather
+// than re-POSTing the fields read from the list query — avoids re-deriving
+// theme/roomShape client-side and keeps the clone byte-for-byte except for
+// the "(Kopya)" name suffix the backend appends. Doesn't fit
+// useApiMutations' create/update/remove shape (no request body, custom
+// `:id/duplicate` path), so it's a standalone mutation like useCreateOffer.
+export function useDuplicateExhibitionTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      post<ApiExhibitionTemplate>({ path: `${Paths.ExhibitionTemplates}/${id}/duplicate` }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [Paths.ExhibitionTemplatesMine] }),
+    meta: { successKey: 'toastTemplateDuplicateSuccess', errorKey: 'toastTemplateDuplicateError' },
   });
 }
