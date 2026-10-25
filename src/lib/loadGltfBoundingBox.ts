@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 export interface LoadedGltf {
   scene: THREE.Group;
@@ -7,7 +8,18 @@ export interface LoadedGltf {
   box: THREE.Box3;
 }
 
+// Mirrors drei's useGLTF, which configures a DRACOLoader automatically —
+// that's why already-placed furniture renders fine (FurnitureInstances.tsx
+// uses useGLTF) while this raw GLTFLoader (used only to measure a
+// just-picked file before upload) needs its own, otherwise any
+// KHR_draco_mesh_compression model throws instead of parsing. Decoder files
+// copied from node_modules/three/examples/jsm/libs/draco/ into public/draco/
+// so this doesn't depend on a CDN being reachable.
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('/draco/');
+
 const loader = new GLTFLoader();
+loader.setDRACOLoader(dracoLoader);
 
 /**
  * Parses a user-picked .glb File entirely client-side (no upload needed yet

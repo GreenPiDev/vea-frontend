@@ -70,8 +70,31 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
   const [uploadError, setUploadError] = useState<string | null>(null);
   const uploadModel = useUploadFurnitureModel();
   const uploadThumbnail = useUploadFurnitureThumbnail();
-  const { create } = useFurnitureAssetMutations();
+  const { create, update } = useFurnitureAssetMutations();
   const isUploading = uploadModel.isPending || uploadThumbnail.isPending || create.isPending;
+
+  const selectedAsset = assets.find((a) => a.id === editor.selectedCatalogId) ?? null;
+  const [scaleInput, setScaleInput] = useState('1');
+  const [scaleError, setScaleError] = useState<string | null>(null);
+  // Resets the input to the selected asset's saved scale whenever the
+  // selection changes (switching catalog items, or a save round-trip
+  // refetching the list) — not a plain useState default, since
+  // selectedAsset only exists once `assets` has loaded.
+  useEffect(() => {
+    setScaleInput(String(selectedAsset?.scale ?? 1));
+    setScaleError(null);
+  }, [selectedAsset?.id, selectedAsset?.scale]);
+
+  function handleSaveScale() {
+    if (!selectedAsset) return;
+    const scale = Number(scaleInput);
+    if (!Number.isFinite(scale) || scale < 0.1 || scale > 5) {
+      setScaleError(t('furnitureEditorScaleError'));
+      return;
+    }
+    setScaleError(null);
+    update.mutate({ id: selectedAsset.id, updates: { scale } });
+  }
 
   async function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -89,7 +112,8 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
         nativeDepth: Math.max(size.z, 0.05),
         name: file.name.replace(/\.(glb|gltf)$/i, ''),
       });
-    } catch {
+    } catch (err) {
+      console.error('Furniture model parse failed:', err);
       setUploadError(t('furnitureEditorUploadError'));
     }
   }
@@ -192,6 +216,30 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
           {t('furnitureEditorUploadButton')}
         </button>
       </div>
+
+      {selectedAsset && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-brand-300 bg-white p-2">
+          <span className="text-sm text-brand-700">{t('furnitureEditorScaleLabel', { name: selectedAsset.name })}</span>
+          <input
+            type="number"
+            step={0.1}
+            min={0.1}
+            max={5}
+            value={scaleInput}
+            onChange={(e) => setScaleInput(e.target.value)}
+            className="w-20 rounded-md border border-brand-300 px-2 py-1 text-sm text-brand-900 outline-none focus:border-brand-500"
+          />
+          <button
+            type="button"
+            disabled={update.isPending}
+            onClick={handleSaveScale}
+            className="rounded-md bg-brand-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {t('furnitureEditorScaleSave')}
+          </button>
+          {scaleError && <span className="text-sm text-red-600">{scaleError}</span>}
+        </div>
+      )}
 
       {pending && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-brand-300 bg-white p-2">
