@@ -52,11 +52,35 @@ export interface CeilingLightPoint {
   z: number;
 }
 
+/** A curator-placed furniture piece, resolved from a FurniturePlacement + its catalog footprint (see components/3d/furniture.ts) — room-local meters/radians, same coordinate space as GridCell/SpawnOverride. Only the half-extents are needed here; the model url/scale are render-only concerns backendAdapter.ts handles separately. */
+export interface PlacedFurnitureInput {
+  x: number;
+  z: number;
+  rotationY: number;
+  halfWidth: number;
+  halfDepth: number;
+}
+
+/** Conservative axis-aligned bounding box for a footprint rotated by yaw around its center — same ColliderBox shape walls use, so Player.tsx's collides() needs no changes to also block on furniture. */
+function furnitureCollider(piece: PlacedFurnitureInput): ColliderBox {
+  const cos = Math.abs(Math.cos(piece.rotationY));
+  const sin = Math.abs(Math.sin(piece.rotationY));
+  const exHalfX = cos * piece.halfWidth + sin * piece.halfDepth;
+  const exHalfZ = sin * piece.halfWidth + cos * piece.halfDepth;
+  return {
+    minX: piece.x - exHalfX,
+    maxX: piece.x + exHalfX,
+    minZ: piece.z - exHalfZ,
+    maxZ: piece.z + exHalfZ,
+  };
+}
+
 /** Builds a fully enclosed single-room layout for a given [width, depth] and ceiling height. */
 export function buildRoomLayout(
   size: [number, number],
   wallHeight: number,
-  ceilingLights?: CeilingLightPoint[]
+  ceilingLights?: CeilingLightPoint[],
+  furniture?: PlacedFurnitureInput[]
 ): RoomLayout {
   const [W, D] = size;
   const H = wallHeight;
@@ -75,6 +99,7 @@ export function buildRoomLayout(
     minZ: w.position[2] - w.size[2] / 2,
     maxZ: w.position[2] + w.size[2] / 2,
   }));
+  if (furniture?.length) colliders.push(...furniture.map(furnitureCollider));
 
   // Curator-placed fixtures (see ExhibitionTemplateForm.tsx/ExhibitionForm.tsx's
   // CeilingLightEditor) win when present; otherwise fall back to the sparse
@@ -184,7 +209,8 @@ export function buildCustomRoomLayout(
   cells: GridCell[],
   wallHeight: number,
   spawnOverride?: SpawnOverride,
-  ceilingLights?: CeilingLightPoint[]
+  ceilingLights?: CeilingLightPoint[],
+  furniture?: PlacedFurnitureInput[]
 ): { layout: RoomLayout; wallRuns: CustomWallRun[] } {
   const occupied = new Set(cells.map((c) => `${c.x},${c.z}`));
   const edges: RawEdge[] = [];
@@ -239,6 +265,7 @@ export function buildCustomRoomLayout(
     minZ: w.position[2] - w.size[2] / 2,
     maxZ: w.position[2] + w.size[2] / 2,
   }));
+  if (furniture?.length) colliders.push(...furniture.map(furnitureCollider));
 
   // Curator-placed fixtures win when present (not footprint-checked — the editor
   // only ever lets the curator click inside the drawn floor plan, see

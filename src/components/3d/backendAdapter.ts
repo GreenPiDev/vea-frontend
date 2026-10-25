@@ -14,16 +14,58 @@ import type {
   ApiSceneConfig,
   CustomSceneConfig,
 } from "../../lib/api/domains/exhibitions";
-import type { ApiExhibitionTemplate } from "../../lib/api/domains/exhibitionTemplates";
+import type { ApiExhibitionTemplate, FurniturePlacement } from "../../lib/api/domains/exhibitionTemplates";
 import type { Artwork } from "./artworks";
 import { EXHIBITIONS, type Exhibition, type ExhibitionTheme } from "./exhibitions";
+import type { FurnitureDef } from "./furniture";
 import {
   buildCustomRoomLayout,
   buildRoomLayout,
   placeArtworksAlongWall,
   type GridCell,
+  type PlacedFurnitureInput,
   type WallRunGeometry,
 } from "./galleryLayout";
+
+/**
+ * Resolves a template's stored furniture placements against a fetched
+ * furniture catalog (see lib/api/domains/furnitureAssets.ts's
+ * useMyFurnitureAssets/useFurnitureAssetsByOrganization + furniture.ts's
+ * toFurnitureDef — callers fetch this, it's no longer a static import),
+ * producing both the collider inputs galleryLayout.ts needs and the
+ * render-ready list Exhibition.furniture/GalleryFurniture.tsx consume. An
+ * unknown furnitureId (deleted asset, or a catalog that hasn't loaded yet)
+ * is silently dropped — same "don't let stale stored data break the scene"
+ * approach as a wallRunId that no longer resolves to a real wall.
+ */
+function resolveFurniture(
+  placements: FurniturePlacement[] | undefined,
+  catalog: FurnitureDef[]
+): {
+  colliderInputs: PlacedFurnitureInput[];
+  renderList: Exhibition["furniture"];
+} {
+  const colliderInputs: PlacedFurnitureInput[] = [];
+  const renderList: Exhibition["furniture"] = [];
+  for (const placement of placements ?? []) {
+    const def = catalog.find((f) => f.id === placement.furnitureId);
+    if (!def) continue;
+    colliderInputs.push({
+      x: placement.x,
+      z: placement.z,
+      rotationY: placement.rotationY,
+      halfWidth: def.footprint.width / 2,
+      halfDepth: def.footprint.depth / 2,
+    });
+    renderList.push({
+      modelUrl: def.modelUrl,
+      position: [placement.x, 0, placement.z],
+      rotationY: placement.rotationY,
+      scale: def.scale,
+    });
+  }
+  return { colliderInputs, renderList };
+}
 
 /** The 4 fixed walls of a rectangular template room, in the same {start,end,orientation,fixed,outward} shape buildCustomRoomLayout's CustomWallRun uses — lets template and custom rooms share one placement function. Geometry/ids match buildRoomLayout exactly (see galleryLayout.ts). */
 export function templateWallRuns(roomSize: [number, number]): (WallRunGeometry & { id: string })[] {
@@ -248,7 +290,7 @@ export function blueprintForSceneConfig(
  * renderable Exhibition, or null if it can't be rendered yet (no
  * sceneConfig, or a "template" pointing at an unknown/removed preset id).
  */
-export function adaptApiExhibition(exhibition: ApiExhibition): Exhibition | null {
+export function adaptApiExhibition(exhibition: ApiExhibition, furnitureCatalog: FurnitureDef[] = []): Exhibition | null {
   const config = exhibition.sceneConfig;
   if (!config) return null;
 
@@ -276,7 +318,8 @@ export function adaptApiExhibition(exhibition: ApiExhibition): Exhibition | null
     return exhibitionFromBackendTemplate(
       backendTemplate,
       { id: exhibition.id, name: exhibition.title },
-      placeAll(runs, backendTemplate.wallHeight, byWall, exhibition.id)
+      placeAll(runs, backendTemplate.wallHeight, byWall, exhibition.id),
+      furnitureCatalog
     );
   }
 
@@ -302,8 +345,10 @@ export function adaptApiExhibition(exhibition: ApiExhibition): Exhibition | null
 function exhibitionFromBackendTemplate(
   backendTemplate: ApiExhibitionTemplate,
   identity: { id: string; name: string },
-  artworks: Artwork[]
+  artworks: Artwork[],
+  furnitureCatalog: FurnitureDef[] = []
 ): Exhibition {
+  const { colliderInputs, renderList } = resolveFurniture(backendTemplate.roomShape.furniture, furnitureCatalog);
   const base = {
     id: identity.id,
     name: identity.name,
@@ -311,17 +356,19 @@ function exhibitionFromBackendTemplate(
     wallHeight: backendTemplate.wallHeight,
     theme: backendTemplate.theme,
     artworks,
+    furniture: renderList,
   };
   if (backendTemplate.roomShape.kind === "rectangle") {
     const { width, depth, ceilingLights } = backendTemplate.roomShape;
     // Rectangle templates normally render via roomSize alone (Scene.tsx computes
     // the layout at render time via buildRoomLayout) — but that call site has no
-    // way to pass curator-placed ceiling lights through, so when any exist, eagerly
-    // build the full layout here instead and piggyback on the same `customLayout`
-    // field a custom-shaped room already uses (Scene.tsx's `customLayout ??
-    // buildRoomLayout(...)` fallback picks it up with no further changes needed).
-    if (ceilingLights?.length) {
-      const layout = buildRoomLayout([width, depth], backendTemplate.wallHeight, ceilingLights);
+    // way to pass curator-placed ceiling lights/furniture through, so when either
+    // exists, eagerly build the full layout here instead and piggyback on the same
+    // `customLayout` field a custom-shaped room already uses (Scene.tsx's
+    // `customLayout ?? buildRoomLayout(...)` fallback picks it up with no further
+    // changes needed).
+    if (ceilingLights?.length || colliderInputs.length) {
+      const layout = buildRoomLayout([width, depth], backendTemplate.wallHeight, ceilingLights, colliderInputs);
       return { ...base, customLayout: layout };
     }
     return { ...base, roomSize: [width, depth] };
@@ -330,7 +377,8 @@ function exhibitionFromBackendTemplate(
     backendTemplate.roomShape.cells,
     backendTemplate.wallHeight,
     backendTemplate.roomShape.spawn,
-    backendTemplate.roomShape.ceilingLights
+    backendTemplate.roomShape.ceilingLights,
+    colliderInputs
   );
   return { ...base, custom: true, customLayout: layout };
 }
@@ -342,6 +390,6 @@ function exhibitionFromBackendTemplate(
  * what a template's empty room looks like before picking it for a real
  * exhibition, the same 3D Scene component exhibition previews use.
  */
-export function adaptExhibitionTemplate(template: ApiExhibitionTemplate): Exhibition {
-  return exhibitionFromBackendTemplate(template, { id: template.id, name: template.name }, []);
+export function adaptExhibitionTemplate(template: ApiExhibitionTemplate, furnitureCatalog: FurnitureDef[] = []): Exhibition {
+  return exhibitionFromBackendTemplate(template, { id: template.id, name: template.name }, [], furnitureCatalog);
 }

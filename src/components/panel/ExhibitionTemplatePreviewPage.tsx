@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { adaptExhibitionTemplate } from '../3d/backendAdapter';
+import { toFurnitureDef } from '../3d/furniture';
 import { useOwnExhibitionTemplate } from '../../lib/api/domains/exhibitionTemplates';
+import { useFurnitureAssetsByOrganization } from '../../lib/api/domains/furnitureAssets';
 import { useMinimumLoadingTime, GALLERY_SCENE_MIN_LOADING_MS } from '../../lib/useMinimumLoadingTime';
 import ExhibitionPreviewScene from './ExhibitionPreviewScene';
 import '../../App.css';
@@ -18,7 +20,11 @@ export default function ExhibitionTemplatePreviewPage() {
   const { templateId } = useParams<{ templateId: string }>();
 
   const { data: template, isLoading } = useOwnExhibitionTemplate(templateId ?? '');
-  const exhibition = useMemo(() => (template ? adaptExhibitionTemplate(template) : null), [template]);
+  const { data: furnitureAssets } = useFurnitureAssetsByOrganization(template?.organizationId ?? null);
+  const exhibition = useMemo(
+    () => (template ? adaptExhibitionTemplate(template, (furnitureAssets ?? []).map(toFurnitureDef)) : null),
+    [template, furnitureAssets]
+  );
   const showLoadingScreen = useMinimumLoadingTime(isLoading, GALLERY_SCENE_MIN_LOADING_MS);
 
   return (

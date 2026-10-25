@@ -5,6 +5,7 @@ import { EXHIBITIONS } from "./components/3d/exhibitions";
 import { ARTWORKS, type Artwork } from "./components/3d/artworks";
 import type { ArtworkIconPosition } from "./components/3d/ArtworkIconProjector";
 import { adaptApiExhibition, previewAccentColor } from "./components/3d/backendAdapter";
+import { toFurnitureDef } from "./components/3d/furniture";
 import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSelect";
 import ArtworkDetailCard from "./components/ArtworkDetailCard";
 import GallerySceneCanvas from "./components/common/GallerySceneCanvas";
@@ -13,6 +14,7 @@ import LoadingScreen from "./components/common/LoadingScreen";
 import Header from "./components/layout/Header";
 import { useAuth } from "./lib/auth/AuthContext";
 import { usePublicExhibitions, useExhibition } from "./lib/api/domains/exhibitions";
+import { useFurnitureAssetsByOrganization } from "./lib/api/domains/furnitureAssets";
 import { useRealtimeQuerySync } from "./lib/socket/useRealtimeQuerySync";
 import { useExhibitionVisitorCount } from "./lib/socket/useExhibitionVisitorCount";
 import { useMinimumLoadingTime, GALLERY_SCENE_MIN_LOADING_MS } from "./lib/useMinimumLoadingTime";
@@ -76,12 +78,15 @@ export default function App() {
   // fetch, then forget the query" effect would freeze on whatever data
   // happened to be cached at the moment of the first click.
   const { data: backendDetail, isLoading: backendLoading } = useExhibition(backendId);
+  const { data: furnitureAssets } = useFurnitureAssetsByOrganization(
+    backendDetail?.exhibitionTemplate?.organizationId ?? null
+  );
 
   const exhibition = useMemo(() => {
     if (localExhibition) return localExhibition;
-    if (backendDetail) return adaptApiExhibition(backendDetail);
+    if (backendDetail) return adaptApiExhibition(backendDetail, (furnitureAssets ?? []).map(toFurnitureDef));
     return null;
-  }, [localExhibition, backendDetail]);
+  }, [localExhibition, backendDetail, furnitureAssets]);
 
   const exhibitionArtworks = useMemo(
     () => exhibition?.artworks ?? (exhibition ? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id) : []),

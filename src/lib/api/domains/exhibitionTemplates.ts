@@ -21,12 +21,26 @@ export interface CeilingLightPoint {
   z: number;
 }
 
+// Mirrors vea-api's exhibitions/dto/scene-config.dto.ts's FurniturePlacementDto.
+// `furnitureId` picks a model from 3d/furniture.ts's FURNITURE_CATALOG — not
+// validated against that list on the backend, same frontend-owned-data
+// approach as a "template" sceneConfig's templateId.
+export interface FurniturePlacement {
+  furnitureId: string;
+  x: number;
+  z: number;
+  /** Yaw in radians, same convention as spawn.yaw: 0 = north (-Z), PI = south (+Z), PI/2 = west (-X), -PI/2 = east (+X). */
+  rotationY: number;
+}
+
 export interface RectangleRoomShape {
   kind: 'rectangle';
   width: number;
   depth: number;
   /** Curator-placed ceiling fixtures (CeilingLightEditor.tsx). Omitted/empty falls back to galleryLayout.ts's auto-generated grid. */
   ceilingLights?: CeilingLightPoint[];
+  /** Curator-placed furniture (FurnitureEditor.tsx). Omitted/empty means no furniture in the room. */
+  furniture?: FurniturePlacement[];
 }
 
 export interface CustomRoomShape {
@@ -35,6 +49,8 @@ export interface CustomRoomShape {
   spawn: { x: number; z: number; yaw: number };
   /** Curator-placed ceiling fixtures (CeilingLightEditor.tsx). Omitted/empty falls back to galleryLayout.ts's auto-generated grid. */
   ceilingLights?: CeilingLightPoint[];
+  /** Curator-placed furniture (FurnitureEditor.tsx). Omitted/empty means no furniture in the room. */
+  furniture?: FurniturePlacement[];
 }
 
 export type TemplateRoomShape = RectangleRoomShape | CustomRoomShape;

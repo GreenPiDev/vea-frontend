@@ -58,6 +58,8 @@ export interface Exhibition {
   customLayout?: RoomLayout;
   /** Explicit hung collection for a custom exhibition; overrides the ARTWORKS-by-id lookup. */
   artworks?: Artwork[];
+  /** Curator-placed furniture (template-only for now, see backendAdapter.ts's exhibitionFromBackendTemplate) — rendered by GalleryFurniture.tsx, already resolved against 3d/furniture.ts's FURNITURE_CATALOG. */
+  furniture?: { modelUrl: string; position: [number, number, number]; rotationY: number; scale?: number }[];
   /** Original builder inputs, kept so the exhibition can be reopened and edited. */
   builderSource?: CustomExhibitionSource;
 }

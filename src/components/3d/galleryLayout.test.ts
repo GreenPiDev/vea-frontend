@@ -8,6 +8,7 @@ import {
   minCeilingFor,
   MIN_CEILING_MARGIN,
   type WallRunGeometry,
+  type PlacedFurnitureInput,
 } from './galleryLayout';
 
 describe('buildRoomLayout', () => {
@@ -180,5 +181,52 @@ describe('placeArtworksAlongWall', () => {
 
   it('minCeilingFor matches MIN_CEILING_MARGIN', () => {
     expect(minCeilingFor(1.8)).toBeCloseTo(1.8 + MIN_CEILING_MARGIN);
+  });
+});
+
+describe('furniture colliders', () => {
+  const piece = (rotationY: number): PlacedFurnitureInput => ({
+    x: 0,
+    z: 0,
+    rotationY,
+    halfWidth: 0.9,
+    halfDepth: 0.4,
+  });
+
+  it('adds an axis-aligned collider matching the footprint at rotationY 0', () => {
+    const layout = buildRoomLayout([10, 8], 4, undefined, [piece(0)]);
+    const collider = layout.colliders[layout.colliders.length - 1];
+
+    expect(collider.minX).toBeCloseTo(-0.9);
+    expect(collider.maxX).toBeCloseTo(0.9);
+    expect(collider.minZ).toBeCloseTo(-0.4);
+    expect(collider.maxZ).toBeCloseTo(0.4);
+  });
+
+  it('swaps width/depth extents when rotated 90 degrees', () => {
+    const layout = buildRoomLayout([10, 8], 4, undefined, [piece(Math.PI / 2)]);
+    const collider = layout.colliders[layout.colliders.length - 1];
+
+    expect(collider.minX).toBeCloseTo(-0.4);
+    expect(collider.maxX).toBeCloseTo(0.4);
+    expect(collider.minZ).toBeCloseTo(-0.9);
+    expect(collider.maxZ).toBeCloseTo(0.9);
+  });
+
+  it('produces a wider conservative AABB at a 45 degree rotation', () => {
+    const layout = buildRoomLayout([10, 8], 4, undefined, [piece(Math.PI / 4)]);
+    const collider = layout.colliders[layout.colliders.length - 1];
+    const half = Math.SQRT1_2 * (0.9 + 0.4);
+
+    expect(collider.maxX).toBeCloseTo(half);
+    expect(collider.maxZ).toBeCloseTo(half);
+  });
+
+  it('also adds furniture colliders to a custom room layout', () => {
+    const { layout } = buildCustomRoomLayout([{ x: 0, z: 0 }], 4, undefined, undefined, [piece(0)]);
+    const collider = layout.colliders[layout.colliders.length - 1];
+
+    expect(collider.minX).toBeCloseTo(-0.9);
+    expect(collider.maxX).toBeCloseTo(0.9);
   });
 });

@@ -6,12 +6,15 @@ import {
   useExhibitionTemplateMutations,
   type ApiExhibitionTemplate,
 } from '../../lib/api/domains/exhibitionTemplates';
+import { useMyFurnitureAssets } from '../../lib/api/domains/furnitureAssets';
 import { ApiError } from '../../lib/api/client';
 import TexturePicker from './TexturePicker';
 import RoomGrid from './RoomGrid';
 import CeilingLightEditor from './CeilingLightEditor';
+import FurnitureEditor from './FurnitureEditor';
 import { useRoomGridEditor } from './useRoomGridEditor';
 import { useCeilingLightEditor } from './useCeilingLightEditor';
+import { useFurnitureEditor } from './useFurnitureEditor';
 import { roomSizeLabel } from './roomShapeLabel';
 import './ExhibitionForm.css';
 
@@ -69,6 +72,8 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
       : undefined
   );
   const ceilingLights = useCeilingLightEditor(editing?.roomShape.ceilingLights);
+  const furniture = useFurnitureEditor(editing?.roomShape.furniture);
+  const { data: furnitureAssets } = useMyFurnitureAssets();
 
   // A template already used by at least one Exhibition has its room shape
   // locked (server-enforced too, see vea-api's ExhibitionTemplatesService.
@@ -135,6 +140,7 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
             width: lockedShape?.kind === 'rectangle' ? lockedShape.width : rectWidthCheck.value,
             depth: lockedShape?.kind === 'rectangle' ? lockedShape.depth : rectDepthCheck.value,
             ceilingLights: ceilingLights.lights,
+            furniture: furniture.items,
           }
         : {
             kind: 'custom' as const,
@@ -144,6 +150,7 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
                 ? lockedShape.spawn
                 : { x: grid.spawnCell!.x, z: grid.spawnCell!.z, yaw: grid.spawnYaw },
             ceilingLights: ceilingLights.lights,
+            furniture: furniture.items,
           };
 
     const payload = {
@@ -299,9 +306,10 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
 
       {!isShapeLocked && shapeKind === 'custom' && <RoomGrid editor={grid} wallColor={wallColor} />}
 
-      {/* Not gated by isShapeLocked — ceiling fixtures are purely cosmetic and never derive a
-          wallRunId, so they stay editable even on a template already used by an exhibition. */}
+      {/* Not gated by isShapeLocked — ceiling fixtures/furniture are purely cosmetic and never
+          derive a wallRunId, so they stay editable even on a template already used by an exhibition. */}
       <CeilingLightEditor blueprint={liveBlueprint} editor={ceilingLights} />
+      <FurnitureEditor blueprint={liveBlueprint} editor={furniture} assets={furnitureAssets ?? []} />
 
       <div className="mt-2 flex gap-2">
         <button

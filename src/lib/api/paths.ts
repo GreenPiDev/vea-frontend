@@ -18,6 +18,10 @@ export const Paths = {
   ExhibitionTemplates: '/exhibition-templates',
   ExhibitionTemplatesMine: '/exhibition-templates/mine',
 
+  FurnitureAssets: '/furniture-assets',
+  FurnitureAssetsMine: '/furniture-assets/mine',
+  FurnitureAssetsByOrganization: '/furniture-assets/by-organization',
+
   Organizations: '/organizations',
 
   Notifications: '/notifications',
