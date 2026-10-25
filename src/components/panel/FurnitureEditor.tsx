@@ -104,12 +104,31 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
     try {
       const { scene, box } = await loadGltfFromFile(file);
       const size = box.getSize(new THREE.Vector3());
+      // Backend's CreateFurnitureAssetDto clamps nativeWidth/nativeDepth to
+      // [0.05, 10] — checked client-side too so a bad measurement (NaN from
+      // a model whose geometry didn't resolve, or a model genuinely bigger
+      // than a 10m room) surfaces as a clear message instead of a raw 400
+      // from the create call three steps later.
+      const nativeWidth = size.x;
+      const nativeDepth = size.z;
+      if (
+        !Number.isFinite(nativeWidth) ||
+        !Number.isFinite(nativeDepth) ||
+        nativeWidth < 0.05 ||
+        nativeWidth > 10 ||
+        nativeDepth < 0.05 ||
+        nativeDepth > 10
+      ) {
+        console.error('Furniture model has an invalid measured size:', size);
+        setUploadError(t('furnitureEditorSizeError'));
+        return;
+      }
       setPending({
         file,
         scene,
         box,
-        nativeWidth: Math.max(size.x, 0.05),
-        nativeDepth: Math.max(size.z, 0.05),
+        nativeWidth,
+        nativeDepth,
         name: file.name.replace(/\.(glb|gltf)$/i, ''),
       });
     } catch (err) {

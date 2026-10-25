@@ -221,6 +221,7 @@
   "furnitureEditorScaleLabel": "{{name}} size (multiplier):",
   "furnitureEditorScaleSave": "Save",
   "furnitureEditorScaleError": "Size must be between 0.1 and 5.",
+  "furnitureEditorSizeError": "The model's measured size is invalid (must be between 0.05m and 10m). Check the file.",
   "placementTitle": "Place Artworks",
   "placementDone": "Done",
   "placementUnavailable": "This exhibition has no room defined yet.",
