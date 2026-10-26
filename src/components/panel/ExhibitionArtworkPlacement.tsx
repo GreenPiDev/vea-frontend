@@ -8,7 +8,9 @@ import {
   useUpdateExhibitionArtworkLink,
 } from '../../lib/api/domains/exhibitions';
 import { useOrganizationArtworks, type ApiArtwork } from '../../lib/api/domains/artworks';
+import { useMyFurnitureAssets } from '../../lib/api/domains/furnitureAssets';
 import { groupByWallRun, wallRunsForSceneConfig } from '../3d/backendAdapter';
+import { toFurnitureDef } from '../3d/furniture';
 import { FLOOR_CLEARANCE } from '../3d/galleryLayout';
 import { ApiError } from '../../lib/api/client';
 import Tooltip from '../layout/Tooltip';
@@ -41,6 +43,8 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
   const { t } = useTranslation();
   const { data: exhibition, isLoading } = useOwnExhibition(exhibitionId);
   const { data: orgArtworks } = useOrganizationArtworks();
+  const { data: furnitureAssets } = useMyFurnitureAssets();
+  const furnitureCatalog = useMemo(() => (furnitureAssets ?? []).map(toFurnitureDef), [furnitureAssets]);
   const addArtwork = useAddExhibitionArtwork(exhibitionId);
   const updateArtworkLink = useUpdateExhibitionArtworkLink(exhibitionId);
   const removeArtwork = useRemoveExhibitionArtwork(exhibitionId);
@@ -372,6 +376,7 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
         byWall={byWall}
         selectedWallId={selectedWallId}
         onSelectWall={setSelectedWallId}
+        furnitureCatalog={furnitureCatalog}
       />
     </div>
   );

@@ -217,6 +217,14 @@ export function wallRunsForSceneConfig(
   return buildCustomRoomLayout(config.cells, config.wallHeight, config.spawn).wallRuns;
 }
 
+/** A curator-placed furniture piece, resolved against the catalog (footprint in meters) — just enough to draw its top-down icon, same shape FurnitureEditor.tsx's live pieces use for rendering. */
+export interface BlueprintFurniturePiece {
+  x: number;
+  z: number;
+  rotationY: number;
+  footprint: { width: number; depth: number };
+}
+
 export interface BlueprintLayout {
   /** Occupied unit cells for a "custom" room's exact footprint (draw each as a 1x1 square) — null for "template", whose floor is just the bounding rectangle in `bounds`. */
   cells: GridCell[] | null;
@@ -224,6 +232,22 @@ export interface BlueprintLayout {
   wallRuns: (WallRunGeometry & { id: string })[];
   /** Spawn position (x/z, meters) + facing already converted to SVG rotate() degrees (clockwise), for a top-down floor-plan marker. */
   spawn: { x: number; z: number; rotationDeg: number };
+  /** Curator-placed furniture (template-only, same "furniture?" field as roomShape — see TemplateRoomShape), already resolved against a furniture catalog. Empty when the room has none or the catalog hasn't loaded yet. */
+  furniture: BlueprintFurniturePiece[];
+}
+
+/** Resolves a template's stored furniture placements against a fetched catalog into just enough to draw a top-down icon — the floor-plan-sketch counterpart to resolveFurniture's collider/render-ready output above. An unknown furnitureId is silently dropped, same as resolveFurniture. */
+function resolveBlueprintFurniture(
+  placements: FurniturePlacement[] | undefined,
+  catalog: FurnitureDef[]
+): BlueprintFurniturePiece[] {
+  const pieces: BlueprintFurniturePiece[] = [];
+  for (const placement of placements ?? []) {
+    const def = catalog.find((f) => f.id === placement.furnitureId);
+    if (!def) continue;
+    pieces.push({ x: placement.x, z: placement.z, rotationY: placement.rotationY, footprint: def.footprint });
+  }
+  return pieces;
 }
 
 /**
@@ -238,7 +262,7 @@ export interface BlueprintLayout {
 // floor-plan preview of the *in-progress*, not-yet-saved room shape the curator
 // is currently editing — there's no ApiSceneConfig/ApiExhibitionTemplate to feed
 // blueprintForSceneConfig until that first save round-trips.
-export function rectangleBlueprint(roomSize: [number, number]): BlueprintLayout {
+export function rectangleBlueprint(roomSize: [number, number], furniture: BlueprintFurniturePiece[] = []): BlueprintLayout {
   const [W, D] = roomSize;
   const { playerStart, playerStartYaw } = buildRoomLayout(roomSize, 1);
   return {
@@ -249,10 +273,16 @@ export function rectangleBlueprint(roomSize: [number, number]): BlueprintLayout 
     // top-down mapping, increasing toward +X/"east") is the opposite
     // sense, hence the negation — see SpawnOverride's yaw doc comment.
     spawn: { x: playerStart[0], z: playerStart[2], rotationDeg: -(playerStartYaw * 180) / Math.PI },
+    furniture,
   };
 }
 
-export function customBlueprint(cells: GridCell[], wallHeight: number, spawn: { x: number; z: number; yaw: number }): BlueprintLayout {
+export function customBlueprint(
+  cells: GridCell[],
+  wallHeight: number,
+  spawn: { x: number; z: number; yaw: number },
+  furniture: BlueprintFurniturePiece[] = []
+): BlueprintLayout {
   const { layout, wallRuns } = buildCustomRoomLayout(cells, wallHeight, spawn);
   const [cx, cz] = layout.room.center;
   const [W, D] = layout.room.size;
@@ -265,21 +295,24 @@ export function customBlueprint(cells: GridCell[], wallHeight: number, spawn: { 
       z: layout.playerStart[2],
       rotationDeg: -(layout.playerStartYaw * 180) / Math.PI,
     },
+    furniture,
   };
 }
 
 export function blueprintForSceneConfig(
   config: ApiSceneConfig | null,
-  resolvedTemplate?: ApiExhibitionTemplate | null
+  resolvedTemplate?: ApiExhibitionTemplate | null,
+  furnitureCatalog: FurnitureDef[] = []
 ): BlueprintLayout | null {
   if (!config) return null;
   if (config.kind === "template") {
     const staticTemplate = EXHIBITIONS.find((e) => e.id === config.templateId);
     if (staticTemplate?.roomSize) return rectangleBlueprint(staticTemplate.roomSize);
     if (!resolvedTemplate) return null;
+    const furniture = resolveBlueprintFurniture(resolvedTemplate.roomShape.furniture, furnitureCatalog);
     return resolvedTemplate.roomShape.kind === "rectangle"
-      ? rectangleBlueprint([resolvedTemplate.roomShape.width, resolvedTemplate.roomShape.depth])
-      : customBlueprint(resolvedTemplate.roomShape.cells, resolvedTemplate.wallHeight, resolvedTemplate.roomShape.spawn);
+      ? rectangleBlueprint([resolvedTemplate.roomShape.width, resolvedTemplate.roomShape.depth], furniture)
+      : customBlueprint(resolvedTemplate.roomShape.cells, resolvedTemplate.wallHeight, resolvedTemplate.roomShape.spawn, furniture);
   }
   return customBlueprint(config.cells, config.wallHeight, config.spawn);
 }

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { ApiExhibitionArtwork, ApiSceneConfig } from '../../lib/api/domains/exhibitions';
 import type { ApiExhibitionTemplate } from '../../lib/api/domains/exhibitionTemplates';
 import { blueprintForSceneConfig } from '../3d/backendAdapter';
+import type { FurnitureDef } from '../3d/furniture';
 import { placeArtworksAlongWall } from '../3d/galleryLayout';
 
 interface ExhibitionBlueprintProps {
@@ -14,6 +15,8 @@ interface ExhibitionBlueprintProps {
   selectedWallId?: string | null;
   /** Lets the floor plan double as a wall picker — clicking a wall (or its number) calls this with the same run.id the wall-button row above uses, so the two stay in sync either way. Optional so the blueprint still works as a read-only sketch wherever a picker doesn't make sense. */
   onSelectWall?: (wallId: string) => void;
+  /** Catalog to resolve resolvedTemplate's roomShape.furniture against (see useMyFurnitureAssets/useFurnitureAssetsByOrganization + toFurnitureDef) — defaults to none, so callers that don't care about furniture don't need to fetch it. */
+  furnitureCatalog?: FurnitureDef[];
 }
 
 const MARGIN = 1;
@@ -31,9 +34,19 @@ const WALL_NUMBER_FONT_SIZE = 0.5;
  * placeArtworksAlongWall), just projected onto the x/z plane instead of
  * rendered in Three.js. Pure SVG, no dependency on the 3D scene stack.
  */
-export default function ExhibitionBlueprint({ sceneConfig, resolvedTemplate, byWall, selectedWallId, onSelectWall }: ExhibitionBlueprintProps) {
+export default function ExhibitionBlueprint({
+  sceneConfig,
+  resolvedTemplate,
+  byWall,
+  selectedWallId,
+  onSelectWall,
+  furnitureCatalog = [],
+}: ExhibitionBlueprintProps) {
   const { t } = useTranslation();
-  const blueprint = useMemo(() => blueprintForSceneConfig(sceneConfig, resolvedTemplate), [sceneConfig, resolvedTemplate]);
+  const blueprint = useMemo(
+    () => blueprintForSceneConfig(sceneConfig, resolvedTemplate, furnitureCatalog),
+    [sceneConfig, resolvedTemplate, furnitureCatalog]
+  );
 
   const thumbnails = useMemo(() => {
     if (!blueprint) return [];
@@ -60,7 +73,7 @@ export default function ExhibitionBlueprint({ sceneConfig, resolvedTemplate, byW
 
   if (!blueprint) return null;
 
-  const { bounds, wallRuns, spawn, cells } = blueprint;
+  const { bounds, wallRuns, spawn, cells, furniture } = blueprint;
   const minX = bounds.minX - MARGIN;
   const minZ = bounds.minZ - MARGIN;
   const width = bounds.maxX - bounds.minX + MARGIN * 2;
@@ -149,6 +162,24 @@ export default function ExhibitionBlueprint({ sceneConfig, resolvedTemplate, byW
                 {number}
               </text>
             </g>
+          );
+        })}
+
+        {furniture.map((piece, i) => {
+          const { width: fw, depth: fd } = piece.footprint;
+          const deg = -(piece.rotationY * 180) / Math.PI;
+          return (
+            <rect
+              key={i}
+              x={piece.x - fw / 2}
+              y={piece.z - fd / 2}
+              width={fw}
+              height={fd}
+              rx={0.05}
+              transform={`rotate(${deg} ${piece.x} ${piece.z})`}
+              className="fill-amber-700/70 stroke-amber-900"
+              strokeWidth={0.05}
+            />
           );
         })}
 
