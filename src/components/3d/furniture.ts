@@ -16,6 +16,8 @@ export interface FurnitureDef {
   footprint: { width: number; depth: number };
   /** Uniform scale applied to the loaded GLTF scene. */
   scale?: number;
+  /** The catalog item's captured preview image (captureModelThumbnail.ts), if any — a 3/4-angle render, not a true top-down shot, so a floor-plan consumer (ExhibitionBlueprint.tsx) that draws it still needs its own direction marker rather than relying on the image's own rotation to convey facing. */
+  thumbnailUrl?: string | null;
 }
 
 export function toFurnitureDef(asset: ApiFurnitureAsset): FurnitureDef {
@@ -25,5 +27,6 @@ export function toFurnitureDef(asset: ApiFurnitureAsset): FurnitureDef {
     modelUrl: asset.modelUrl,
     footprint: { width: asset.nativeWidth * asset.scale, depth: asset.nativeDepth * asset.scale },
     scale: asset.scale,
+    thumbnailUrl: asset.thumbnailUrl,
   };
 }

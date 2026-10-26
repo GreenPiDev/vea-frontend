@@ -11,13 +11,16 @@ interface PlacedFurniture extends FurniturePlacement {
 }
 
 /**
- * Free-placement + rotate state behind FurnitureEditor.tsx — pick a catalog
- * item, click an empty point on the floor plan to place it (default facing
- * north, rotationY 0), drag its rotate handle to set which way it faces,
- * click its body to remove it. Shared shape with useCeilingLightEditor.ts
- * (same placed/remove/max-reached pattern), plus a `selectedCatalogId` for
- * which furniture type the next floor click places, and a `draggingId` for
- * the in-progress rotate-handle drag.
+ * Free-placement + rotate + move state behind FurnitureEditor.tsx — pick a
+ * catalog item, click an empty point on the floor plan to place it (default
+ * facing north, rotationY 0), drag its rotate handle to set which way it
+ * faces, drag its body to move it, or click its body without dragging to
+ * remove it. Shared shape with useCeilingLightEditor.ts (same placed/remove/
+ * max-reached pattern), plus a `selectedCatalogId` for which furniture type
+ * the next floor click places (toggled off by FurnitureEditor.tsx when the
+ * same catalog button is clicked again, so the floor can be clicked to drag
+ * existing pieces instead of placing new ones), and a `draggingId` for the
+ * in-progress rotate-handle drag.
  */
 export function useFurnitureEditor(initial?: FurniturePlacement[]) {
   const [placed, setPlaced] = useState<PlacedFurniture[]>(
@@ -46,6 +49,10 @@ export function useFurnitureEditor(initial?: FurniturePlacement[]) {
     setPlaced((prev) => prev.map((p) => (p.id === id ? { ...p, rotationY } : p)));
   }
 
+  function setPosition(id: number, x: number, z: number) {
+    setPlaced((prev) => prev.map((p) => (p.id === id ? { ...p, x, z } : p)));
+  }
+
   return {
     placed,
     items: placed.map(({ id: _id, ...rest }): FurniturePlacement => rest),
@@ -57,6 +64,7 @@ export function useFurnitureEditor(initial?: FurniturePlacement[]) {
     addFurniture,
     removeFurniture,
     setRotation,
+    setPosition,
   };
 }
 

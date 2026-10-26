@@ -223,6 +223,7 @@ export interface BlueprintFurniturePiece {
   z: number;
   rotationY: number;
   footprint: { width: number; depth: number };
+  thumbnailUrl?: string | null;
 }
 
 export interface BlueprintLayout {
@@ -245,7 +246,13 @@ function resolveBlueprintFurniture(
   for (const placement of placements ?? []) {
     const def = catalog.find((f) => f.id === placement.furnitureId);
     if (!def) continue;
-    pieces.push({ x: placement.x, z: placement.z, rotationY: placement.rotationY, footprint: def.footprint });
+    pieces.push({
+      x: placement.x,
+      z: placement.z,
+      rotationY: placement.rotationY,
+      footprint: def.footprint,
+      thumbnailUrl: def.thumbnailUrl,
+    });
   }
   return pieces;
 }

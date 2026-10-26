@@ -168,18 +168,57 @@ export default function ExhibitionBlueprint({
         {furniture.map((piece, i) => {
           const { width: fw, depth: fd } = piece.footprint;
           const deg = -(piece.rotationY * 180) / Math.PI;
+          // A small triangle on the box's local north edge, before rotation —
+          // the enclosing <g>'s rotate() carries it to the piece's real
+          // facing direction. Needed because the catalog thumbnail itself is
+          // a fixed 3/4-angle shot (captureModelThumbnail.ts), not a true
+          // top-down image, so rotating the photo alone wouldn't read as
+          // "which way does it face".
+          const arrowWidth = Math.min(fw, fd) * 0.5;
+          const arrowDepth = arrowWidth * 0.7;
           return (
-            <rect
-              key={i}
-              x={piece.x - fw / 2}
-              y={piece.z - fd / 2}
-              width={fw}
-              height={fd}
-              rx={0.05}
-              transform={`rotate(${deg} ${piece.x} ${piece.z})`}
-              className="fill-amber-700/70 stroke-amber-900"
-              strokeWidth={0.05}
-            />
+            <g key={i} transform={`rotate(${deg} ${piece.x} ${piece.z})`}>
+              {piece.thumbnailUrl ? (
+                <>
+                  <clipPath id={`furniture-clip-${i}`}>
+                    <rect x={piece.x - fw / 2} y={piece.z - fd / 2} width={fw} height={fd} rx={0.05} />
+                  </clipPath>
+                  <image
+                    href={piece.thumbnailUrl}
+                    x={piece.x - fw / 2}
+                    y={piece.z - fd / 2}
+                    width={fw}
+                    height={fd}
+                    preserveAspectRatio="xMidYMid slice"
+                    clipPath={`url(#furniture-clip-${i})`}
+                  />
+                  <rect
+                    x={piece.x - fw / 2}
+                    y={piece.z - fd / 2}
+                    width={fw}
+                    height={fd}
+                    rx={0.05}
+                    fill="none"
+                    className="stroke-amber-900"
+                    strokeWidth={0.05}
+                  />
+                </>
+              ) : (
+                <rect
+                  x={piece.x - fw / 2}
+                  y={piece.z - fd / 2}
+                  width={fw}
+                  height={fd}
+                  rx={0.05}
+                  className="fill-amber-700/70 stroke-amber-900"
+                  strokeWidth={0.05}
+                />
+              )}
+              <polygon
+                points={`${piece.x},${piece.z - fd / 2 - 0.02} ${piece.x - arrowWidth / 2},${piece.z - fd / 2 + arrowDepth} ${piece.x + arrowWidth / 2},${piece.z - fd / 2 + arrowDepth}`}
+                className="fill-amber-900"
+              />
+            </g>
           );
         })}
 
