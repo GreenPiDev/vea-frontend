@@ -173,6 +173,11 @@ export function useRestoreExhibition() {
 function invalidateExhibitionQueries(queryClient: ReturnType<typeof useQueryClient>, exhibitionId: string) {
   queryClient.invalidateQueries({ queryKey: [Paths.ExhibitionsMine, exhibitionId] });
   queryClient.invalidateQueries({ queryKey: [Paths.Exhibitions, exhibitionId] });
+  // Adding/removing a placement changes each artwork's own exhibitionLinks
+  // (ApiArtwork.exhibitionLinks, read by useOrganizationArtworks) — without
+  // this, ExhibitionArtworkPlacement.tsx's "Eser Ekle" picker keeps treating
+  // a just-removed artwork as still placed until a full page refresh.
+  queryClient.invalidateQueries({ queryKey: [Paths.Artworks, 'organization'] });
 }
 
 export function useAddExhibitionArtwork(exhibitionId: string) {

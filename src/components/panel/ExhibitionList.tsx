@@ -9,7 +9,7 @@ import {
 } from '../../lib/api/domains/exhibitions';
 import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
 import Tooltip from '../layout/Tooltip';
-import { ArtworkIcon, EyeIcon, EyeOffIcon, PreviewIcon, TrashIcon, UndoIcon } from '../layout/icons';
+import { ArtworkIcon, EditIcon, EyeIcon, EyeOffIcon, PreviewIcon, TrashIcon, UndoIcon } from '../layout/icons';
 
 const STATUS_KEYS: Record<ApiExhibition['status'], string> = {
   DRAFT: 'exhibitionStatusDraft',
@@ -20,6 +20,7 @@ const STATUS_KEYS: Record<ApiExhibition['status'], string> = {
 interface ExhibitionListProps {
   onPlace: (exhibitionId: string) => void;
   onPreview: (exhibitionId: string) => void;
+  onEdit: (exhibitionId: string) => void;
 }
 
 // Icon-only action button, always wrapped in a Tooltip (see icons.tsx) —
@@ -55,7 +56,7 @@ function ActionButton({
   );
 }
 
-export default function ExhibitionList({ onPlace, onPreview }: ExhibitionListProps) {
+export default function ExhibitionList({ onPlace, onPreview, onEdit }: ExhibitionListProps) {
   const { t } = useTranslation();
   const [showRemoved, setShowRemoved] = useState(false);
   const { data: exhibitions, isLoading } = useMyExhibitions(showRemoved);
@@ -100,6 +101,9 @@ export default function ExhibitionList({ onPlace, onPreview }: ExhibitionListPro
           <div className="flex items-center gap-2">
             <ActionButton label={t('placementTitle')} onClick={() => onPlace(exhibition.id)}>
               <ArtworkIcon className="h-4 w-4" />
+            </ActionButton>
+            <ActionButton label={t('exhibitionEdit')} onClick={() => onEdit(exhibition.id)}>
+              <EditIcon className="h-4 w-4" />
             </ActionButton>
             <ActionButton label={t('exhibitionPreview')} onClick={() => onPreview(exhibition.id)}>
               <PreviewIcon className="h-4 w-4" />

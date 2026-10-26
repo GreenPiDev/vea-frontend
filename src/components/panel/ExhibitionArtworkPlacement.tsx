@@ -12,7 +12,8 @@ import { groupByWallRun, wallRunsForSceneConfig } from '../3d/backendAdapter';
 import { FLOOR_CLEARANCE } from '../3d/galleryLayout';
 import { ApiError } from '../../lib/api/client';
 import Tooltip from '../layout/Tooltip';
-import { CheckIcon, StarIcon, TrashIcon } from '../layout/icons';
+import { StarIcon, TrashIcon } from '../layout/icons';
+import ConfirmModal from '../common/ConfirmModal';
 import ExhibitionBlueprint from './ExhibitionBlueprint';
 
 /** Same formula placeArtworksAlongWall() falls back to when no curator override is set — used here only to pre-fill a sensible starting value in the height input, not as a hard default. */
@@ -50,6 +51,10 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
   // "not yet placed" add-flow rows and the "already placed" edit rows, keyed
   // the same way since an artwork is never in both lists at once.
   const [heightDrafts, setHeightDrafts] = useState<Record<string, string>>({});
+  // Holds the artwork pending removal confirmation, not just its id — so the
+  // ConfirmModal's message can interpolate its title without a second lookup.
+  const [confirmRemove, setConfirmRemove] = useState<{ artworkId: string; title: string } | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   const runs = useMemo(
     () => (exhibition ? wallRunsForSceneConfig(exhibition.sceneConfig, exhibition.exhibitionTemplate) : null),
@@ -119,6 +124,7 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
   function handleRemove(artworkId: string) {
     setError(null);
     removeArtwork.mutate(artworkId, {
+      onSuccess: () => setConfirmRemove(null),
       onError: (err) => setError(err instanceof ApiError ? err.message : t('placementError')),
     });
   }
@@ -134,21 +140,50 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
     });
   }
 
-  function handleUpdateHeight(wallRunId: string, artworkId: string) {
+  // Flushes every typed-but-unsaved height draft for already-placed artworks
+  // (favoriting/cover already saves immediately on click, see
+  // handleToggleCover — only the height input is deferred), then leaves the
+  // screen. No per-row save button needed anymore; "Bitti" is the one save
+  // action for all pending height edits.
+  async function handleDone() {
     setError(null);
-    const draft = heightDrafts[artworkId];
-    const heightY = draft ? Number(draft) : undefined;
-    updateArtworkLink.mutate(
-      { artworkId, positionData: { wallRunId, heightY } },
-      { onError: (err) => setError(err instanceof ApiError ? err.message : t('placementError')) }
+    const pendingLinks = (exhibition!.artworkLinks ?? []).filter(
+      (link) => heightDrafts[link.artworkId] !== undefined && link.positionData?.wallRunId
     );
+    if (pendingLinks.length === 0) {
+      onDone();
+      return;
+    }
+    setIsFinishing(true);
+    try {
+      await Promise.all(
+        pendingLinks.map((link) =>
+          updateArtworkLink.mutateAsync({
+            artworkId: link.artworkId,
+            positionData: {
+              wallRunId: link.positionData!.wallRunId,
+              heightY: Number(heightDrafts[link.artworkId]),
+            },
+          })
+        )
+      );
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t('placementError'));
+    } finally {
+      setIsFinishing(false);
+    }
   }
 
   return (
     <div className="flex flex-col gap-4 rounded-lg bg-brand-50 p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-brand-900">{exhibition.title}</h3>
-        <button onClick={onDone} className="rounded-md border border-brand-300 px-3 py-1.5 text-sm text-brand-700 hover:bg-brand-100">
+        <button
+          onClick={handleDone}
+          disabled={isFinishing}
+          className="rounded-md border border-brand-300 px-3 py-1.5 text-sm text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+        >
           {t('placementDone')}
         </button>
       </div>
@@ -224,19 +259,9 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
                         <StarIcon className="h-4 w-4" filled={exhibition.coverArtworkId === link.artworkId} />
                       </button>
                     </Tooltip>
-                    <Tooltip label={t('placementSaveHeight')} placement="top">
-                      <button
-                        onClick={() => handleUpdateHeight(selectedWallId, link.artworkId)}
-                        disabled={updateArtworkLink.isPending}
-                        aria-label={t('placementSaveHeight')}
-                        className="flex h-8 w-8 items-center justify-center rounded-md border border-brand-300 text-brand-700 transition-colors hover:bg-brand-100 hover:text-brand-900 disabled:opacity-50"
-                      >
-                        <CheckIcon className="h-4 w-4" />
-                      </button>
-                    </Tooltip>
                     <Tooltip label={t('placementRemove')} placement="top">
                       <button
-                        onClick={() => handleRemove(link.artworkId)}
+                        onClick={() => setConfirmRemove({ artworkId: link.artworkId, title: link.artwork.title })}
                         disabled={removeArtwork.isPending}
                         aria-label={t('placementRemove')}
                         className="flex h-8 w-8 items-center justify-center rounded-md border border-brand-300 text-red-600 transition-colors hover:bg-red-50 hover:text-red-800 disabled:opacity-50"
@@ -256,27 +281,12 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
             {!isFull && availableArtworks.length === 0 && placedElsewhereArtworks.length === 0 && (
               <p className="text-xs text-brand-600">{t('placementNoAvailableArtworks')}</p>
             )}
+            {/* Not-placed-anywhere artworks first (the ones a curator can
+                actually add right now), placed-elsewhere ones last (grayed
+                out, informational only) — swapped from insertion order so
+                the actionable rows aren't buried below a long "already
+                placed elsewhere" tail. */}
             <ul className="flex flex-col gap-1">
-              {placedElsewhereArtworks.map((artwork) => (
-                <li
-                  key={artwork.id}
-                  className="flex items-center justify-between gap-2 rounded-md bg-white px-3 py-1.5 text-sm text-brand-400 opacity-50"
-                >
-                  <span className="flex items-center gap-2">
-                    <img
-                      src={artwork.imageUrl}
-                      alt=""
-                      className="h-8 w-8 flex-shrink-0 rounded object-cover"
-                    />
-                    {artwork.title}
-                    <span className="text-xs">
-                      {t('placementPlacedElsewhere', {
-                        title: artwork.exhibitionLinks?.[0]?.exhibition.title ?? '',
-                      })}
-                    </span>
-                  </span>
-                </li>
-              ))}
               {availableArtworks.map((artwork) => (
                 <li key={artwork.id} className="flex items-center justify-between gap-2 rounded-md bg-white px-3 py-1.5 text-sm text-brand-900">
                   <span className="flex items-center gap-2">
@@ -318,12 +328,43 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
                   </div>
                 </li>
               ))}
+              {placedElsewhereArtworks.map((artwork) => (
+                <li
+                  key={artwork.id}
+                  className="flex items-center justify-between gap-2 rounded-md bg-white px-3 py-1.5 text-sm text-brand-400 opacity-50"
+                >
+                  <span className="flex items-center gap-2">
+                    <img
+                      src={artwork.imageUrl}
+                      alt=""
+                      className="h-8 w-8 flex-shrink-0 rounded object-cover"
+                    />
+                    {artwork.title}
+                    <span className="text-xs">
+                      {t('placementPlacedElsewhere', {
+                        title: artwork.exhibitionLinks?.[0]?.exhibition.title ?? '',
+                      })}
+                    </span>
+                  </span>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
       )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {confirmRemove && (
+        <ConfirmModal
+          message={t('placementRemoveConfirm', { title: confirmRemove.title })}
+          confirmLabel={t('placementRemove')}
+          tone="danger"
+          isSubmitting={removeArtwork.isPending}
+          onConfirm={() => handleRemove(confirmRemove.artworkId)}
+          onCancel={() => setConfirmRemove(null)}
+        />
+      )}
 
       <ExhibitionBlueprint
         sceneConfig={exhibition.sceneConfig}

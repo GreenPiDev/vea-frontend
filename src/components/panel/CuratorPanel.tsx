@@ -69,6 +69,9 @@ export default function CuratorPanel({ onBack }: CuratorPanelProps) {
             onPlace={(exhibitionId) =>
               navigate(`/dashboard/organization/exhibitions/add-artwork/${exhibitionId}`)
             }
+            onEdit={(exhibitionId) =>
+              navigate(`/dashboard/organization/exhibitions/edit/${exhibitionId}`)
+            }
             onPreview={(exhibitionId) =>
               navigate(`/dashboard/organization/exhibitions/preview/${exhibitionId}`)
             }

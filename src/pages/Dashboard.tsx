@@ -3,6 +3,7 @@ import LoadingScreen from "../components/common/LoadingScreen";
 import SuperAdminPanel from "../components/panel/SuperAdminPanel";
 import CuratorPanel from "../components/panel/CuratorPanel";
 import NewExhibitionPage from "../components/panel/NewExhibitionPage";
+import EditExhibitionPage from "../components/panel/EditExhibitionPage";
 import NewExhibitionTemplatePage from "../components/panel/NewExhibitionTemplatePage";
 import EditExhibitionTemplatePage from "../components/panel/EditExhibitionTemplatePage";
 import ExhibitionTemplatePreviewPage from "../components/panel/ExhibitionTemplatePreviewPage";
@@ -61,6 +62,10 @@ export default function Dashboard() {
           <Route
             path="organization/exhibitions/new-exhibition"
             element={<NewExhibitionPage onBack={onBack} />}
+          />
+          <Route
+            path="organization/exhibitions/edit/:exhibitionId"
+            element={<EditExhibitionPage onBack={onBack} />}
           />
           <Route
             path="organization/exhibitions/add-artwork/:exhibitionId"
