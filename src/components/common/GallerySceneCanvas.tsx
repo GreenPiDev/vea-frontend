@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Scene from "../3d/Scene";
 import type { ArtworkIconPosition } from "../3d/ArtworkIconProjector";
 import type { Exhibition } from "../3d/exhibitions";
+import type { SeatSpot } from "../3d/seating";
 import GalleryInstructionsOverlay from "./GalleryInstructionsOverlay";
 import LoadingScreen from "./LoadingScreen";
 
@@ -11,6 +12,8 @@ interface GallerySceneCanvasProps {
   onLockChange: (locked: boolean) => void;
   onIconPositionsChange: (positions: ArtworkIconPosition[]) => void;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
+  seatedSpot?: SeatSpot | null;
+  onNearestSeatChange?: (seat: SeatSpot | null) => void;
 }
 
 // The `#gallery-canvas-wrapper` + Suspense + <Scene> + instructions-card
@@ -24,6 +27,8 @@ export default function GallerySceneCanvas({
   onLockChange,
   onIconPositionsChange,
   onCanvasReady,
+  seatedSpot,
+  onNearestSeatChange,
 }: GallerySceneCanvasProps) {
   return (
     // id targeted by Player.tsx's PointerLockControls `selector` — scopes
@@ -38,6 +43,8 @@ export default function GallerySceneCanvas({
           onLockChange={onLockChange}
           onIconPositionsChange={onIconPositionsChange}
           onCanvasReady={onCanvasReady}
+          seatedSpot={seatedSpot}
+          onNearestSeatChange={onNearestSeatChange}
         />
       </Suspense>
 

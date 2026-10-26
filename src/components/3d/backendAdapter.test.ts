@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { adaptApiExhibition, groupByWallRun, wallRunsForSceneConfig } from "./backendAdapter";
+import { adaptApiExhibition, adaptExhibitionTemplate, groupByWallRun, wallRunsForSceneConfig } from "./backendAdapter";
 import { EXHIBITIONS } from "./exhibitions";
 import type { ApiExhibition, ApiExhibitionArtwork } from "../../lib/api/domains/exhibitions";
 import type { ApiArtwork } from "../../lib/api/domains/artworks";
+import type { ApiExhibitionTemplate } from "../../lib/api/domains/exhibitionTemplates";
+import type { FurnitureDef } from "./furniture";
 
 function makeArtwork(overrides: Partial<ApiArtwork> = {}): ApiArtwork {
   return {
@@ -206,6 +208,67 @@ describe("adaptApiExhibition", () => {
     );
 
     expect(result!.artworks).toEqual([]);
+  });
+});
+
+describe("adaptExhibitionTemplate's seating resolution", () => {
+  function makeTemplate(overrides: Partial<ApiExhibitionTemplate> = {}): ApiExhibitionTemplate {
+    return {
+      id: "template-1",
+      organizationId: "org-1",
+      name: "Test Template",
+      roomShape: { kind: "rectangle", width: 10, depth: 10 },
+      wallHeight: 4,
+      wallColor: "#112233",
+      floorColor: "#445566",
+      ceilingColor: "#778899",
+      theme: EXHIBITIONS[0].theme,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      ...overrides,
+    };
+  }
+
+  function makeFurnitureDef(overrides: Partial<FurnitureDef> = {}): FurnitureDef {
+    return {
+      id: "furniture-1",
+      label: "Koltuk",
+      modelUrl: "https://example.com/armchair.glb",
+      footprint: { width: 0.8, depth: 0.8 },
+      isSeating: false,
+      ...overrides,
+    };
+  }
+
+  it("includes a seat for an isSeating furniture placement", () => {
+    const template = makeTemplate({
+      roomShape: {
+        kind: "rectangle",
+        width: 10,
+        depth: 10,
+        furniture: [{ furnitureId: "furniture-1", x: 1.5, z: -2.5, rotationY: Math.PI / 2 }],
+      },
+    });
+    const catalog = [makeFurnitureDef({ isSeating: true })];
+
+    const result = adaptExhibitionTemplate(template, catalog);
+
+    expect(result.seats).toEqual([{ id: "0", x: 1.5, z: -2.5, rotationY: Math.PI / 2 }]);
+  });
+
+  it("excludes a placement whose furniture is not isSeating", () => {
+    const template = makeTemplate({
+      roomShape: {
+        kind: "rectangle",
+        width: 10,
+        depth: 10,
+        furniture: [{ furnitureId: "furniture-1", x: 1.5, z: -2.5, rotationY: 0 }],
+      },
+    });
+    const catalog = [makeFurnitureDef({ isSeating: false })];
+
+    const result = adaptExhibitionTemplate(template, catalog);
+
+    expect(result.seats).toEqual([]);
   });
 });
 

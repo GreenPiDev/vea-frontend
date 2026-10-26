@@ -18,6 +18,7 @@ export interface ApiFurnitureAsset {
   nativeWidth: number;
   nativeDepth: number;
   scale: number;
+  isSeating: boolean;
   createdAt: string;
 }
 

@@ -5,6 +5,7 @@
 
 import type { Artwork } from "./artworks";
 import type { RoomLayout } from "./galleryLayout";
+import type { SeatSpot } from "./seating";
 
 export interface ExhibitionTheme {
   wallColor: string;
@@ -60,6 +61,8 @@ export interface Exhibition {
   artworks?: Artwork[];
   /** Curator-placed furniture (template-only for now, see backendAdapter.ts's exhibitionFromBackendTemplate) — rendered by GalleryFurniture.tsx, already resolved against 3d/furniture.ts's FURNITURE_CATALOG. */
   furniture?: { modelUrl: string; position: [number, number, number]; rotationY: number; scale?: number }[];
+  /** Sittable furniture spots (isSeating furniture pieces), see seating.ts. */
+  seats?: SeatSpot[];
   /** Original builder inputs, kept so the exhibition can be reopened and edited. */
   builderSource?: CustomExhibitionSource;
 }

@@ -45,6 +45,7 @@ interface PendingUpload {
   nativeWidth: number;
   nativeDepth: number;
   name: string;
+  isSeating: boolean;
 }
 
 /**
@@ -108,8 +109,17 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
   const [uploadError, setUploadError] = useState<string | null>(null);
   const uploadModel = useUploadFurnitureModel();
   const uploadThumbnail = useUploadFurnitureThumbnail();
-  const { create, update } = useFurnitureAssetMutations();
+  const { create, update, remove } = useFurnitureAssetMutations();
   const isUploading = uploadModel.isPending || uploadThumbnail.isPending || create.isPending;
+  // Which catalog item is showing its inline "delete this?" prompt — only
+  // one at a time, same pattern as ArtistOfferTable.tsx's decision confirm.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  function handleConfirmDelete(id: string) {
+    remove.mutate(id);
+    if (editor.selectedCatalogId === id) editor.setSelectedCatalogId('');
+    setConfirmDeleteId(null);
+  }
 
   const selectedAsset = assets.find((a) => a.id === editor.selectedCatalogId) ?? null;
   const [scaleInput, setScaleInput] = useState('1');
@@ -132,6 +142,11 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
     }
     setScaleError(null);
     update.mutate({ id: selectedAsset.id, updates: { scale } });
+  }
+
+  function handleToggleSeating(isSeating: boolean) {
+    if (!selectedAsset) return;
+    update.mutate({ id: selectedAsset.id, updates: { isSeating } });
   }
 
   async function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -168,6 +183,7 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
         nativeWidth,
         nativeDepth,
         name: file.name.replace(/\.(glb|gltf)$/i, ''),
+        isSeating: false,
       });
     } catch (err) {
       console.error('Furniture model parse failed:', err);
@@ -190,6 +206,7 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
         thumbnailUrl,
         nativeWidth: pending.nativeWidth,
         nativeDepth: pending.nativeDepth,
+        isSeating: pending.isSeating,
       });
       editor.setSelectedCatalogId(newAsset.id);
       setPending(null);
@@ -330,26 +347,70 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
       <p className="text-sm font-medium text-brand-800">{t('furnitureEditorTitle')}</p>
 
       <div className="flex flex-wrap items-center gap-2">
-        {assets.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() =>
-              editor.setSelectedCatalogId(editor.selectedCatalogId === item.id ? '' : item.id)
-            }
-            title={item.name}
-            className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm transition-colors ${
-              editor.selectedCatalogId === item.id
-                ? 'border-brand-700 bg-brand-700 text-white'
-                : 'border-brand-300 text-brand-700 hover:bg-brand-100'
-            }`}
-          >
-            {item.thumbnailUrl ? (
-              <img src={item.thumbnailUrl} alt="" className="h-8 w-8 rounded object-cover" />
-            ) : null}
-            {item.name}
-          </button>
-        ))}
+        {assets.map((item) => {
+          const isSelected = editor.selectedCatalogId === item.id;
+          // Only this organization's own uploads are deletable — a platform
+          // default (organizationId null) has no delete affordance, mirrors
+          // the backend's assertOwnership rejecting it outright.
+          const isOwn = item.organizationId !== null;
+          const isConfirming = confirmDeleteId === item.id;
+          return (
+            <div
+              key={item.id}
+              className={`flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-sm transition-colors ${
+                isSelected ? 'border-brand-700 bg-brand-700 text-white' : 'border-brand-300 text-brand-700 hover:bg-brand-100'
+              }`}
+            >
+              {isConfirming ? (
+                <>
+                  <span className="text-xs">{t('furnitureEditorDeleteConfirmPrompt')}</span>
+                  <button
+                    type="button"
+                    disabled={remove.isPending}
+                    onClick={() => handleConfirmDelete(item.id)}
+                    className="rounded px-1 text-xs font-medium underline disabled:opacity-50"
+                  >
+                    {t('furnitureEditorDeleteConfirmYes')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="rounded px-1 text-xs underline"
+                  >
+                    {t('commonCancel')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => editor.setSelectedCatalogId(isSelected ? '' : item.id)}
+                    title={item.name}
+                    className="flex items-center gap-2"
+                  >
+                    {item.thumbnailUrl ? (
+                      <img src={item.thumbnailUrl} alt="" className="h-8 w-8 rounded object-cover" />
+                    ) : null}
+                    {item.name}
+                  </button>
+                  {isOwn && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(item.id)}
+                      title={t('furnitureEditorDeleteButton')}
+                      aria-label={t('furnitureEditorDeleteButton')}
+                      className={`rounded px-1 text-sm leading-none ${
+                        isSelected ? 'text-white/70 hover:text-white' : 'text-brand-400 hover:text-red-600'
+                      }`}
+                    >
+                      ×
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
 
         <input ref={fileInputRef} type="file" accept=".glb" className="hidden" onChange={handleFilePicked} />
         <button
@@ -382,6 +443,16 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
             {t('furnitureEditorScaleSave')}
           </button>
           {scaleError && <span className="text-sm text-red-600">{scaleError}</span>}
+          <label className="flex items-center gap-1.5 text-sm text-brand-700">
+            <input
+              type="checkbox"
+              checked={selectedAsset.isSeating}
+              disabled={update.isPending}
+              onChange={(e) => handleToggleSeating(e.target.checked)}
+              className="h-4 w-4 accent-brand-700"
+            />
+            {t('furnitureEditorIsSeatingLabel')}
+          </label>
         </div>
       )}
 
@@ -393,6 +464,15 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
             placeholder={t('furnitureEditorUploadNamePlaceholder')}
             className="min-w-0 flex-1 rounded-md border border-brand-300 px-2 py-1 text-sm text-brand-900 outline-none focus:border-brand-500"
           />
+          <label className="flex items-center gap-1.5 text-sm text-brand-700">
+            <input
+              type="checkbox"
+              checked={pending.isSeating}
+              onChange={(e) => setPending({ ...pending, isSeating: e.target.checked })}
+              className="h-4 w-4 accent-brand-700"
+            />
+            {t('furnitureEditorIsSeatingLabel')}
+          </label>
           <button
             type="button"
             disabled={isUploading || !pending.name.trim()}

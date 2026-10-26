@@ -6,6 +6,7 @@ import { ARTWORKS, type Artwork } from "./components/3d/artworks";
 import type { ArtworkIconPosition } from "./components/3d/ArtworkIconProjector";
 import { adaptApiExhibition, previewAccentColor } from "./components/3d/backendAdapter";
 import { toFurnitureDef } from "./components/3d/furniture";
+import type { SeatSpot } from "./components/3d/seating";
 import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSelect";
 import ArtworkDetailCard from "./components/ArtworkDetailCard";
 import GallerySceneCanvas from "./components/common/GallerySceneCanvas";
@@ -39,6 +40,8 @@ export default function App() {
   const [locked, setLocked] = useState(false);
   const [iconPositions, setIconPositions] = useState<ArtworkIconPosition[]>([]);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
+  const [nearestSeat, setNearestSeat] = useState<SeatSpot | null>(null);
+  const [seatedSpot, setSeatedSpot] = useState<SeatSpot | null>(null);
   // Statik şablon sergiler (EXHIBITIONS) anında bulunduğu için hiçbir ağ
   // isteği beklemiyor — kart tıklamasıyla hemen `exhibition` dolduğundan,
   // sadece `backendId && backendLoading`'e bağlı eski kontrol bu sergiler
@@ -150,7 +153,7 @@ export default function App() {
   // click the on-screen icon with). Clicking the icon itself still works
   // whenever the cursor happens to be visible (see the icon button below).
   useEffect(() => {
-    if (selectedArtwork || !nearestArtwork) return;
+    if (selectedArtwork || !nearestArtwork || seatedSpot) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code !== "Enter" && e.code !== "Space" && e.code !== "NumpadEnter") return;
       e.preventDefault();
@@ -160,7 +163,33 @@ export default function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedArtwork, nearestArtwork, locked]);
+  }, [selectedArtwork, nearestArtwork, locked, seatedSpot]);
+
+  // Separate, loosely-coupled Enter/Space state machine for sitting down —
+  // deliberately not merged into the artwork listener above so the two
+  // interaction mechanics can evolve independently. Pointer lock is left
+  // untouched the whole time sitting: unlike the artwork detail card, there's
+  // no real DOM UI to show a cursor for, and mouse-look needs to stay active
+  // ("etrafı izleme serbest kalır"). If both a painting and a seat are in
+  // range at once, the artwork modal wins (the pre-existing, higher-value
+  // interaction) — enforced by the `nearestArtwork` check below.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (seatedSpot) {
+        if (e.code === "Enter" || e.code === "Space" || e.code === "NumpadEnter" || e.code === "Escape") {
+          e.preventDefault();
+          setSeatedSpot(null);
+        }
+        return;
+      }
+      if (selectedArtwork || nearestArtwork || !nearestSeat) return;
+      if (e.code !== "Enter" && e.code !== "Space" && e.code !== "NumpadEnter") return;
+      e.preventDefault();
+      setSeatedSpot(nearestSeat);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedArtwork, nearestArtwork, nearestSeat, seatedSpot]);
 
   // Escape deliberately does NOT close the open detail card — only its own
   // ✕ button does. Browsers disqualify an Escape keypress from ever being
@@ -243,6 +272,8 @@ export default function App() {
         onLockChange={setLocked}
         onIconPositionsChange={setIconPositions}
         onCanvasReady={(el) => (canvasElRef.current = el)}
+        seatedSpot={seatedSpot}
+        onNearestSeatChange={setNearestSeat}
       />
 
       {/* Rendered for every artwork (not just the currently-visible ones) so
@@ -290,6 +321,24 @@ export default function App() {
             </button>
           );
         })}
+
+      {!selectedArtwork && !seatedSpot && nearestSeat && (
+        <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-brand-200/20 bg-brand-950/80 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-brand-100 shadow-md">
+          <span className="rounded-[4px] border border-brand-100/40 px-1 font-sans text-[9px] not-italic tracking-normal text-brand-50">
+            ↵
+          </span>
+          {t("seatInteractHint")}
+        </div>
+      )}
+
+      {seatedSpot && (
+        <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-brand-200/20 bg-brand-950/80 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-brand-100 shadow-md">
+          <span className="rounded-[4px] border border-brand-100/40 px-1 font-sans text-[9px] not-italic tracking-normal text-brand-50">
+            ↵ / Esc
+          </span>
+          {t("seatStandHint")}
+        </div>
+      )}
 
       {selectedArtwork && (
         <ArtworkDetailCard

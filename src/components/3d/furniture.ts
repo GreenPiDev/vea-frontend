@@ -18,6 +18,8 @@ export interface FurnitureDef {
   scale?: number;
   /** The catalog item's captured preview image (captureModelThumbnail.ts), if any — a 3/4-angle render, not a true top-down shot, so a floor-plan consumer (ExhibitionBlueprint.tsx) that draws it still needs its own direction marker rather than relying on the image's own rotation to convey facing. */
   thumbnailUrl?: string | null;
+  /** Whether a visitor can sit in this model (armchair/bench/etc.) — see seating.ts. */
+  isSeating: boolean;
 }
 
 export function toFurnitureDef(asset: ApiFurnitureAsset): FurnitureDef {
@@ -28,5 +30,6 @@ export function toFurnitureDef(asset: ApiFurnitureAsset): FurnitureDef {
     footprint: { width: asset.nativeWidth * asset.scale, depth: asset.nativeDepth * asset.scale },
     scale: asset.scale,
     thumbnailUrl: asset.thumbnailUrl,
+    isSeating: asset.isSeating,
   };
 }

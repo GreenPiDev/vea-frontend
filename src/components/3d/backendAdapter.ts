@@ -18,6 +18,7 @@ import type { ApiExhibitionTemplate, FurniturePlacement } from "../../lib/api/do
 import type { Artwork } from "./artworks";
 import { EXHIBITIONS, type Exhibition, type ExhibitionTheme } from "./exhibitions";
 import type { FurnitureDef } from "./furniture";
+import type { SeatSpot } from "./seating";
 import {
   buildCustomRoomLayout,
   buildRoomLayout,
@@ -44,9 +45,11 @@ function resolveFurniture(
 ): {
   colliderInputs: PlacedFurnitureInput[];
   renderList: Exhibition["furniture"];
+  seats: SeatSpot[];
 } {
   const colliderInputs: PlacedFurnitureInput[] = [];
   const renderList: Exhibition["furniture"] = [];
+  const seats: SeatSpot[] = [];
   for (const placement of placements ?? []) {
     const def = catalog.find((f) => f.id === placement.furnitureId);
     if (!def) continue;
@@ -63,8 +66,16 @@ function resolveFurniture(
       rotationY: placement.rotationY,
       scale: def.scale,
     });
+    if (def.isSeating) {
+      seats.push({
+        id: String(colliderInputs.length - 1),
+        x: placement.x,
+        z: placement.z,
+        rotationY: placement.rotationY,
+      });
+    }
   }
-  return { colliderInputs, renderList };
+  return { colliderInputs, renderList, seats };
 }
 
 /** The 4 fixed walls of a rectangular template room, in the same {start,end,orientation,fixed,outward} shape buildCustomRoomLayout's CustomWallRun uses — lets template and custom rooms share one placement function. Geometry/ids match buildRoomLayout exactly (see galleryLayout.ts). */
@@ -388,7 +399,7 @@ function exhibitionFromBackendTemplate(
   artworks: Artwork[],
   furnitureCatalog: FurnitureDef[] = []
 ): Exhibition {
-  const { colliderInputs, renderList } = resolveFurniture(backendTemplate.roomShape.furniture, furnitureCatalog);
+  const { colliderInputs, renderList, seats } = resolveFurniture(backendTemplate.roomShape.furniture, furnitureCatalog);
   const base = {
     id: identity.id,
     name: identity.name,
@@ -397,6 +408,7 @@ function exhibitionFromBackendTemplate(
     theme: backendTemplate.theme,
     artworks,
     furniture: renderList,
+    seats,
   };
   if (backendTemplate.roomShape.kind === "rectangle") {
     const { width, depth, ceilingLights } = backendTemplate.roomShape;

@@ -6,9 +6,11 @@ import * as THREE from "three";
 import Gallery from "./Gallery";
 import Player from "./Player";
 import ArtworkIconProjector, { type ArtworkIconPosition } from "./ArtworkIconProjector";
+import SeatProximityTracker from "./SeatProximityTracker";
 import { buildRoomLayout } from "./galleryLayout";
 import { ExhibitionProvider } from "./ExhibitionContext";
 import type { Exhibition } from "./exhibitions";
+import type { SeatSpot } from "./seating";
 
 // Render cost scales with the actual number of pixels the GPU has to fill every frame —
 // a browser window maximized on a 4K TV or a wide external monitor has several times the
@@ -50,6 +52,8 @@ interface SceneProps {
   onLockChange?: (locked: boolean) => void;
   onIconPositionsChange?: (positions: ArtworkIconPosition[]) => void;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
+  seatedSpot?: SeatSpot | null;
+  onNearestSeatChange?: (seat: SeatSpot | null) => void;
 }
 
 export default function Scene({
@@ -57,6 +61,8 @@ export default function Scene({
   onLockChange,
   onIconPositionsChange,
   onCanvasReady,
+  seatedSpot,
+  onNearestSeatChange,
 }: SceneProps) {
   // FPS-driven quality signal: start conservative and only spend extra pixels once the
   // device has proven it can hold frame rate, so mid/low-end GPUs don't pay retina-level
@@ -94,9 +100,16 @@ export default function Scene({
         <Suspense fallback={null}>
           <Gallery />
         </Suspense>
-        <Player onLockChange={onLockChange} />
+        <Player onLockChange={onLockChange} seatedSpot={seatedSpot} />
         {onIconPositionsChange && (
           <ArtworkIconProjector onPositionsChange={onIconPositionsChange} />
+        )}
+        {onNearestSeatChange && (
+          <SeatProximityTracker
+            seats={exhibition.seats ?? []}
+            disabled={Boolean(seatedSpot)}
+            onNearestSeatChange={onNearestSeatChange}
+          />
         )}
       </ExhibitionProvider>
       <Stats className="fps-stats" />
