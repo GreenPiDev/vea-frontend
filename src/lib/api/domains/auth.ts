@@ -38,7 +38,10 @@ export function useRequestCode() {
 export function useVerifyCode() {
   return useMutation({
     mutationFn: ({ email, code }: { email: string; code: string }) =>
-      post<{ accessToken: string }>({ path: Paths.AuthVerifyCode, payload: { email, code } }),
+      post<{ accessToken: string; user: ApiUser }>({
+        path: Paths.AuthVerifyCode,
+        payload: { email, code },
+      }),
     meta: { successKey: 'toastLoginSuccess', errorKey: 'toastLoginError' },
   });
 }

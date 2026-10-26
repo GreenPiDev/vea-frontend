@@ -2,8 +2,8 @@ import { useTranslation } from 'react-i18next';
 
 interface LoadingScreenProps {
   /** Varsayılan ("loadingDefaultMessage") yerine gösterilecek özel metin —
-   * örn. girişten sonra ("loadingAfterLoginMessage") veya bir eser
-   * kaydedilirken ("artworkFormSaving") farklı bir mesaj geçmek için. */
+   * örn. bir eser kaydedilirken ("artworkFormSaving") farklı bir mesaj
+   * geçmek için. */
   message?: string;
 }
 

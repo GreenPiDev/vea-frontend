@@ -37,8 +37,8 @@ export default function Login({ onSuccess }: LoginProps) {
     verifyCode.mutate(
       { email, code },
       {
-        onSuccess: ({ accessToken }) => {
-          login(accessToken);
+        onSuccess: ({ accessToken, user }) => {
+          login(accessToken, user);
           onSuccess?.();
         },
       },
