@@ -17,6 +17,16 @@ const CEILING_CLEARANCE = 0.15;
 // target's height, instead of converging where aimed. Pulling the real emission point out gives the beam a
 // steep enough angle to land squarely on each painting at its own height.
 const BEAM_STANDOFF = 1.6;
+// Cone half-angle was previously a single fixed value (0.42 rad) for every painting regardless of width —
+// at BEAM_STANDOFF that lights a ~1.4m-diameter circle on the wall, which fully covers a small canvas but
+// only grazes the center of a large one. Now derived per-painting from its physical width so the cone
+// actually spans the canvas either way; MIN keeps the previous tight look for small paintings, MAX stops
+// very wide paintings from flattening into an unrealistically broad floodlight.
+const SPOT_ANGLE_MIN = 0.42;
+const SPOT_ANGLE_MAX = 0.95;
+// Cone covers slightly past the canvas edge (not flush) so the penumbra's soft falloff lands outside the
+// painting instead of visibly dimming its edge.
+const SPOT_WIDTH_MARGIN = 1.15;
 
 // Fixed real-spotLight budget, independent of total artwork count. Every frame, these N lights are
 // imperatively repositioned onto the N artworks currently nearest the camera (sorted by XZ distance) —
@@ -44,6 +54,7 @@ interface PreparedLight {
   artwork: ArtworkData;
   position: THREE.Vector3;
   aimPoint: THREE.Vector3;
+  angle: number;
 }
 
 // Lamp height follows each painting's own top edge (not a fixed rail shared by the whole wall) — a tall-ceiling
@@ -63,7 +74,13 @@ function prepareLight(data: ArtworkData, wallHeight: number): PreparedLight {
   // Aim at the upper third of the canvas (not its center) — a real picture light grazes down from just under
   // the frame top, it doesn't point square at the middle of the painting.
   const aimPoint = new THREE.Vector3(data.position[0], topEdge - data.height * 0.15, data.position[2]);
-  return { artwork: data, position, aimPoint };
+  const width = data.height * data.aspect;
+  const angle = THREE.MathUtils.clamp(
+    Math.atan((width / 2) * SPOT_WIDTH_MARGIN / BEAM_STANDOFF),
+    SPOT_ANGLE_MIN,
+    SPOT_ANGLE_MAX
+  );
+  return { artwork: data, position, aimPoint, angle };
 }
 
 /** All artwork picture-lights for the current room, as a fixed-size pool reassigned to the nearest paintings every frame — see module doc comment. */
@@ -109,6 +126,7 @@ export default function ArtworkLightPool({ artworks }: { artworks: ArtworkData[]
       const { light, distance } = entry;
       spotLight.position.copy(light.position);
       spotLight.color.set(exhibition.theme.spotColor);
+      spotLight.angle = light.angle;
       spotLight.target = target;
       target.position.copy(light.aimPoint);
       const fade =
