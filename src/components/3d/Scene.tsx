@@ -1,7 +1,8 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { PerformanceMonitor, Stats } from "@react-three/drei";
-import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing";
+import { EffectComposer, Bloom, Vignette, SMAA, ToneMapping } from "@react-three/postprocessing";
+import { ToneMappingMode } from "postprocessing";
 import * as THREE from "three";
 import Gallery from "./Gallery";
 import Player from "./Player";
@@ -78,7 +79,10 @@ export default function Scene({
 
   return (
     <Canvas
-      gl={{ antialias: false, toneMapping: THREE.ACESFilmicToneMapping }}
+      // No renderer-level toneMapping here: <EffectComposer> forces gl.toneMapping to NoToneMapping while
+      // mounted (@react-three/postprocessing does this unconditionally), so a value set here was silently
+      // ignored and the HDR frame was hard-clipped. Tone mapping lives in the composer instead, see below.
+      gl={{ antialias: false }}
       camera={{ fov: 65, near: 0.1, far: 100, position: layout.playerStart }}
       onCreated={({ gl }) => {
         gl.outputColorSpace = THREE.SRGBColorSpace;
@@ -117,7 +121,15 @@ export default function Scene({
           expensive option) — SMAA is a cheap edge-detection post-process pass instead, added last so
           it smooths the final composited frame (including Bloom's contribution) in one go. */}
       <EffectComposer multisampling={0}>
-        <Bloom intensity={0.35} luminanceThreshold={0.82} luminanceSmoothing={0.3} mipmapBlur />
+        {/* Bloom runs on the linear HDR frame (before tone mapping). Threshold 1.0 = only true light sources
+            (emissive fixtures, values above display white) glow; the previous 0.82 also caught brightly
+            spot-lit wall/canvas areas, giving paintings a hazy halo instead of a crisp lit surface. */}
+        <Bloom intensity={0.4} luminanceThreshold={1.0} luminanceSmoothing={0.25} mipmapBlur />
+        {/* Khronos PBR Neutral rather than ACES Filmic: ACES shifts hues and saturation (warm yellows/oranges
+            especially), which misrepresents the artworks' real colors — the one thing a gallery must not do.
+            Neutral leaves everything below ~0.8 essentially linear (so the room's existing brightness tuning
+            still holds) and only rolls off the highlights that used to hard-clip into flat white patches. */}
+        <ToneMapping mode={ToneMappingMode.NEUTRAL} />
         <Vignette eskil={false} offset={0.22} darkness={0.55} />
         <SMAA />
       </EffectComposer>

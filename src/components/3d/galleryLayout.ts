@@ -44,6 +44,8 @@ export interface RoomLayout {
   playerStart: [number, number, number];
   /** Initial camera yaw in radians (0 = facing -Z, matching Three.js's default camera forward). */
   playerStartYaw: number;
+  /** Exact (rotated) furniture footprints — `colliders` only has their conservative AABBs. Used for floor contact shadows (roomAo.ts). */
+  furniture?: PlacedFurnitureInput[];
 }
 
 /** A curator-placed ceiling fixture position, room-local meters — same coordinate space as GridCell/SpawnOverride. */
@@ -129,6 +131,7 @@ export function buildRoomLayout(
     ceilingSpots,
     playerStart: [0, EYE_HEIGHT, D / 2 - 2],
     playerStartYaw: 0,
+    furniture,
   };
 }
 
@@ -319,6 +322,7 @@ export function buildCustomRoomLayout(
     ceilingSpots,
     playerStart: [start.x + 0.5, EYE_HEIGHT, start.z + 0.5],
     playerStartYaw: spawnOverride?.yaw ?? 0,
+    furniture,
   };
 
   return { layout, wallRuns };

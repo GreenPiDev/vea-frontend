@@ -15,6 +15,13 @@ import {
 } from "./surfaceTextures";
 import type { WallSegment } from "./galleryLayout";
 import { buildTexturedBoxGeometry } from "./textureUv";
+import { DEFAULT_AO_FIELD_OPTIONS, buildRoomAoField } from "./roomAo";
+import {
+  applyRoomAo,
+  createRoomAoUniforms,
+  type RoomAoSurface,
+  type RoomAoUniforms,
+} from "./roomAoMaterial";
 
 // Exaggerates the ceiling's normal map perturbation strength (MeshStandardMaterial's default
 // normalScale is [1,1], i.e. the map's own baked depth, unmodified). The ceiling's own lighting
@@ -38,11 +45,23 @@ const CEILING_NORMAL_SCALE: [number, number] = [2.5, 2.5];
 export default function GalleryRoom() {
   const { layout, exhibition } = useExhibition();
   const { theme } = exhibition;
-  const { room, walls, wallHeight } = layout;
+  const { room, walls, wallHeight, furniture } = layout;
 
   const floorTexture = findTexture(FLOOR_TEXTURES, theme.floorTextureId) ?? DEFAULT_FLOOR_TEXTURE;
   const wallTexture = findTexture(WALL_TEXTURES, theme.wallTextureId) ?? DEFAULT_WALL_TEXTURE;
   const ceilingTexture = findTexture(CEILING_TEXTURES, theme.ceilingTextureId);
+
+  // Computed once per layout (a few ms even for a large custom room), see roomAo.ts.
+  const aoUniforms = useMemo(
+    () =>
+      createRoomAoUniforms(
+        buildRoomAoField(room, walls, furniture),
+        wallHeight,
+        DEFAULT_AO_FIELD_OPTIONS.wall.radius
+      ),
+    [room, walls, wallHeight, furniture]
+  );
+  useEffect(() => () => aoUniforms.uRoomAoMap.value?.dispose(), [aoUniforms]);
 
   return (
     <group>
@@ -55,6 +74,8 @@ export default function GalleryRoom() {
         roughness={theme.floorTextureId ? undefined : theme.floorRoughness}
         metalness={theme.floorTextureId ? undefined : theme.floorMetalness}
         normalScale={floorTexture.normalScale}
+        aoSurface="floor"
+        aoUniforms={aoUniforms}
       />
 
       <TexturedPlane
@@ -69,6 +90,8 @@ export default function GalleryRoom() {
         // with almost no diffuse or specular response and reads as a flat void instead of a surface.
         roughness={ceilingTexture ? undefined : theme.wallRoughness}
         normalScale={CEILING_NORMAL_SCALE}
+        aoSurface="ceiling"
+        aoUniforms={aoUniforms}
       />
 
       <TexturedWalls
@@ -76,6 +99,7 @@ export default function GalleryRoom() {
         texture={wallTexture}
         color={theme.wallTextureId ? undefined : theme.wallColor}
         roughness={theme.wallTextureId ? undefined : theme.wallRoughness}
+        aoUniforms={aoUniforms}
       />
     </group>
   );
@@ -119,6 +143,8 @@ function TexturedPlane({
   roughness,
   metalness,
   normalScale,
+  aoSurface,
+  aoUniforms,
 }: {
   position: [number, number, number];
   rotation: [number, number, number];
@@ -132,6 +158,8 @@ function TexturedPlane({
   metalness?: number;
   /** Multiplies the normal map's baked perturbation strength; defaults to [1,1] (unmodified) if unset. */
   normalScale?: [number, number];
+  aoSurface: RoomAoSurface;
+  aoUniforms: RoomAoUniforms;
 }) {
   const { map, roughnessMap, normalMap } = useSurfaceMaps(texture);
 
@@ -145,19 +173,19 @@ function TexturedPlane({
     normalMap.repeat.set(repeatX, repeatY);
   }, [map, roughnessMap, normalMap, size, texture.tileSize]);
 
-  const material = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        map,
-        roughnessMap,
-        normalMap,
-        normalScale: new THREE.Vector2(...(normalScale ?? [1, 1])),
-        metalness: metalness ?? 0,
-        roughness: roughness ?? 1,
-        color: color ?? "#ffffff",
-      }),
-    [map, roughnessMap, normalMap, color, roughness, metalness, normalScale]
-  );
+  const material = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({
+      map,
+      roughnessMap,
+      normalMap,
+      normalScale: new THREE.Vector2(...(normalScale ?? [1, 1])),
+      metalness: metalness ?? 0,
+      roughness: roughness ?? 1,
+      color: color ?? "#ffffff",
+    });
+    applyRoomAo(m, aoSurface, aoUniforms);
+    return m;
+  }, [map, roughnessMap, normalMap, color, roughness, metalness, normalScale, aoSurface, aoUniforms]);
 
   return (
     <mesh position={position} rotation={rotation} material={material}>
@@ -171,12 +199,14 @@ function TexturedWalls({
   texture,
   color,
   roughness,
+  aoUniforms,
 }: {
   walls: WallSegment[];
   texture: SurfaceTexture;
   /** See TexturedPlane's `color` doc — same tint-over-neutral-scan fallback for custom room colors. */
   color?: string;
   roughness?: number;
+  aoUniforms: RoomAoUniforms;
 }) {
   const { map, roughnessMap, normalMap } = useSurfaceMaps(texture);
 
@@ -189,19 +219,19 @@ function TexturedWalls({
     normalMap.repeat.set(1, 1);
   }, [map, roughnessMap, normalMap]);
 
-  const material = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        map,
-        roughnessMap,
-        normalMap,
-        normalScale: new THREE.Vector2(...texture.normalScale),
-        metalness: 0,
-        roughness: roughness ?? 1,
-        color: color ?? "#ffffff",
-      }),
-    [map, roughnessMap, normalMap, color, roughness, texture.normalScale]
-  );
+  const material = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({
+      map,
+      roughnessMap,
+      normalMap,
+      normalScale: new THREE.Vector2(...texture.normalScale),
+      metalness: 0,
+      roughness: roughness ?? 1,
+      color: color ?? "#ffffff",
+    });
+    applyRoomAo(m, "wall", aoUniforms);
+    return m;
+  }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, aoUniforms]);
 
   const geometries = useMemo(
     () => walls.map((w) => buildTexturedBoxGeometry(w.size, texture.tileSize)),

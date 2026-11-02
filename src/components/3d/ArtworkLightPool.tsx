@@ -22,11 +22,16 @@ const BEAM_STANDOFF = 1.6;
 // only grazes the center of a large one. Now derived per-painting from its physical width so the cone
 // actually spans the canvas either way; MIN keeps the previous tight look for small paintings, MAX stops
 // very wide paintings from flattening into an unrealistically broad floodlight.
-const SPOT_ANGLE_MIN = 0.42;
-const SPOT_ANGLE_MAX = 0.95;
-// Cone covers slightly past the canvas edge (not flush) so the penumbra's soft falloff lands outside the
-// painting instead of visibly dimming its edge.
-const SPOT_WIDTH_MARGIN = 1.15;
+const SPOT_ANGLE_MIN = 0.5;
+const SPOT_ANGLE_MAX = 1.1;
+// Cone extends well past the canvas edge. three's penumbra fades from the inner cone (angle·(1−penumbra))
+// to the outer edge, so with the old 1.15 margin + 0.9 penumbra the canvas edge sat deep in the falloff
+// (~15% brightness — a visibly vignetted painting) and the light then stopped in a hard ring right after.
+// A real picture light does the opposite: the canvas is lit fairly evenly and the beam spills softly onto
+// the surrounding wall ("wall wash"). 1.6 margin + full penumbra puts the canvas edge at ~65% and spreads
+// the remainder as a gradual glow around it. Same light count, so no performance cost.
+const SPOT_WIDTH_MARGIN = 1.6;
+const SPOT_PENUMBRA = 1;
 
 // Fixed real-spotLight budget, independent of total artwork count. Every frame, these N lights are
 // imperatively repositioned onto the N artworks currently nearest the camera (sorted by XZ distance) —
@@ -142,8 +147,8 @@ export default function ArtworkLightPool({ artworks }: { artworks: ArtworkData[]
           <object3D ref={(o) => { targetRefs.current[i] = o; }} />
           <spotLight
             ref={(l) => { lightRefs.current[i] = l; }}
-            angle={0.42}
-            penumbra={0.9}
+            angle={SPOT_ANGLE_MIN}
+            penumbra={SPOT_PENUMBRA}
             intensity={0}
             distance={7}
             decay={2}
