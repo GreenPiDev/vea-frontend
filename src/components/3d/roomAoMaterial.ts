@@ -10,6 +10,7 @@
 
 import * as THREE from "three";
 import type { AoField } from "./roomAo";
+import { EYE_HEIGHT, WALL_THICKNESS } from "./galleryLayout";
 
 export type RoomAoSurface = "floor" | "ceiling" | "wall";
 
@@ -50,6 +51,28 @@ uniform float uRoomAoReach;
 // .r = wall occlusion, .g = furniture occlusion (see roomAo.ts).
 vec2 roomAoField(vec2 xz) {
   return texture2D(uRoomAoMap, (xz - uRoomAoBounds.xy) / uRoomAoBounds.zw).rg;
+}
+
+// Box-projected ("parallax-corrected") environment lookup. RoomEnvironment.tsx renders the env cubemap
+// from the room center at eye height, and a plain cubemap lookup treats it as infinitely far away — so
+// a ceiling fixture's reflection in a glossy floor stays glued to the viewer and slides along as they
+// walk. Intersecting the reflection ray with the room's actual inner box and looking up the direction
+// from the probe to that hit point pins reflections to where the fixtures really are. Same box as
+// RoomEnvironment.tsx's (inner wall faces, floor to ceiling); for a non-rectangular custom room it's the
+// bounding box, still far closer than "infinitely far". A few ALU ops per fragment, no texture fetches.
+vec3 roomBoxProject(vec3 dir, vec3 worldPos) {
+  vec3 boxMin = vec3(uRoomAoBounds.x + ${(WALL_THICKNESS / 2).toFixed(3)}, 0.0, uRoomAoBounds.y + ${(WALL_THICKNESS / 2).toFixed(3)});
+  vec3 boxMax = vec3(
+    uRoomAoBounds.x + uRoomAoBounds.z - ${(WALL_THICKNESS / 2).toFixed(3)},
+    uRoomWallHeight,
+    uRoomAoBounds.y + uRoomAoBounds.w - ${(WALL_THICKNESS / 2).toFixed(3)}
+  );
+  vec3 probe = vec3((boxMin.x + boxMax.x) * 0.5, ${EYE_HEIGHT.toFixed(3)}, (boxMin.z + boxMax.z) * 0.5);
+  // Axis-parallel rays would divide by zero; a tiny stand-in just pushes that axis's hit to "very far".
+  vec3 safeDir = mix(dir, vec3(1e-4), vec3(lessThan(abs(dir), vec3(1e-4))));
+  vec3 tFar = max((boxMax - worldPos) / safeDir, (boxMin - worldPos) / safeDir);
+  float t = max(min(min(tFar.x, tFar.y), tFar.z), 0.0);
+  return normalize(worldPos + dir * t - probe);
 }
 
 // Same curve as roomAo.ts's occlusionAtDistance() (GLSL smoothstep == t*t*(3-2t)).
@@ -98,6 +121,13 @@ const FRAGMENT_APPLY = /* glsl */ `
 }
 `;
 
+// three's own IBL radiance function with the box projection spliced in right after the reflection vector
+// is brought into world space (getIBLAnisotropyRadiance calls getIBLRadiance, so it's covered too).
+export const ENVMAP_PHYSICAL_PARS = THREE.ShaderChunk.envmap_physical_pars_fragment.replace(
+  "reflectVec = transformDirectionByInverseViewMatrix( reflectVec, viewMatrix );",
+  "reflectVec = transformDirectionByInverseViewMatrix( reflectVec, viewMatrix );\n\t\t\treflectVec = roomBoxProject( reflectVec, vRoomAoWorldPos );"
+);
+
 function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramParametersWithUniforms) {
   Object.assign(shader.uniforms, (this.userData as { roomAoUniforms: RoomAoUniforms }).roomAoUniforms);
   shader.vertexShader = shader.vertexShader
@@ -105,6 +135,7 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
     .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}`);
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <common>", `#include <common>\n${FRAGMENT_DECL}`)
+    .replace("#include <envmap_physical_pars_fragment>", ENVMAP_PHYSICAL_PARS)
     .replace("#include <aomap_fragment>", `#include <aomap_fragment>\n${FRAGMENT_APPLY}`);
 }
 

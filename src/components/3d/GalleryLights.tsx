@@ -37,7 +37,7 @@ function getCeilingFixtureMaterial(spotColor: string) {
  * No light in this rig casts real shadows — a one-time baked directional
  * "skylight" shadow was tried and dropped (didn't read as correct gallery
  * lighting), so `shadows`/`castShadow`/`receiveShadow` were also stripped
- * from Scene.tsx/GalleryRoom.tsx/Baseboards.tsx/Artwork.tsx — don't
+ * from Scene.tsx/GalleryRoom.tsx/Artwork.tsx — don't
  * re-add shadow flags on a mesh without a shadow-casting light behind them,
  * that only pays the shader cost for nothing.
  *

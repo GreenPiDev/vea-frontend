@@ -4,9 +4,17 @@ import { useTexture, Text } from "@react-three/drei";
 import type { Artwork as ArtworkData, FrameStyle } from "./artworks";
 import { FRAME_TEXTURES } from "./frameTextures";
 import { buildTexturedBoxGeometry } from "./textureUv";
+import { FRAME_BORDER, FRAME_DEPTH } from "./artworkShadow";
+import { WEAVE_TILE_METERS, getCanvasWeaveNormalMap } from "./canvasWeave";
 
-const FRAME_BORDER = 0.07;
-const FRAME_DEPTH = 0.05;
+// Paint surface: a painting isn't a matte print. A thin varnish layer gives it a soft sheen the picture
+// light can catch (0.65 read like paper), and the shared linen weave normal map breaks that sheen up the
+// way real canvas does when seen close. Kept modest on purpose — glare must never hide the artwork,
+// and the picture light comes from steeply above, so its mirror highlight lands toward the floor, not
+// the visitor's eye. (No per-material envMapIntensity: three overrides it with scene.environmentIntensity
+// whenever the env map comes from scene.environment, as RoomEnvironment.tsx's does.)
+const CANVAS_ROUGHNESS = 0.5;
+const CANVAS_NORMAL_SCALE = new THREE.Vector2(0.35, 0.35);
 
 // Keyed by frame style — every painting using, say, "modernBlack" gets the exact same frame look, so
 // there's no reason for each one to own its own MeshStandardMaterial (and its own
@@ -23,6 +31,19 @@ export default function Artwork({ data }: { data: ArtworkData }) {
   }, [texture]);
 
   const width = data.height * data.aspect;
+
+  // Second UV set in meters/tile for the weave (see canvasWeave.ts) — the color map keeps the 0..1 `uv`.
+  const canvasGeometry = useMemo(() => {
+    const geometry = new THREE.PlaneGeometry(width, data.height);
+    const uv1 = geometry.attributes.uv.clone();
+    for (let i = 0; i < uv1.count; i++) {
+      uv1.setXY(i, (uv1.getX(i) * width) / WEAVE_TILE_METERS, (uv1.getY(i) * data.height) / WEAVE_TILE_METERS);
+    }
+    geometry.setAttribute("uv1", uv1);
+    return geometry;
+  }, [width, data.height]);
+  useEffect(() => () => canvasGeometry.dispose(), [canvasGeometry]);
+
   const frameSize: [number, number, number] = [
     width + FRAME_BORDER * 2,
     data.height + FRAME_BORDER * 2,
@@ -34,11 +55,15 @@ export default function Artwork({ data }: { data: ArtworkData }) {
       {/* Frame — skipped when the artist marked their uploaded image as already framed (see artworks.ts's `frame` doc comment). "modernBlack" is the default for unframed backend artworks, all styles now render as real photo-scanned material. */}
       {data.frame ? <FrameMesh style={data.frame} size={frameSize} /> : null}
 
-
       {/* Canvas */}
-      <mesh position={[0, 0, 0.004]}>
-        <planeGeometry args={[width, data.height]} />
-        <meshStandardMaterial map={texture} roughness={0.65} metalness={0} />
+      <mesh position={[0, 0, 0.004]} geometry={canvasGeometry}>
+        <meshStandardMaterial
+          map={texture}
+          roughness={CANVAS_ROUGHNESS}
+          metalness={0}
+          normalMap={getCanvasWeaveNormalMap()}
+          normalScale={CANVAS_NORMAL_SCALE}
+        />
       </mesh>
 
       {/* Wall label */}

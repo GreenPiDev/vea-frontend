@@ -143,7 +143,7 @@ export function buildRoomLayout(
 // same facing) are merged into a single straight wall run. This lets the
 // footprint be any orthogonal shape (L-shapes, notches, etc.), not just a
 // rectangle, while reusing the exact same RoomLayout consumed by
-// GalleryRoom/Baseboards/GalleryLights/Player.
+// GalleryRoom/GalleryLights/Player.
 
 export interface GridCell {
   x: number;

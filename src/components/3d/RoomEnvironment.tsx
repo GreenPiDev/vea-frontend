@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { Environment, Lightformer } from "@react-three/drei";
 import { useExhibition } from "./ExhibitionContext";
-import { EYE_HEIGHT } from "./galleryLayout";
+import { EYE_HEIGHT, WALL_THICKNESS } from "./galleryLayout";
 
 // How strongly the environment map lights/reflects on every MeshStandardMaterial in the scene. It adds on
 // top of GalleryLights.tsx's ambient/hemisphere fill. Raised from 0.6 when GalleryLights' two directional
@@ -30,15 +30,19 @@ function scaled(color: string, factor: number) {
  * ceiling colors, plus a bright emissive disc at each real ceiling fixture position, so the floor
  * picks up soft reflections of the actual light layout.
  *
- * Known approximation: a cubemap is "infinitely far away", so reflections are exact from the room
- * center and drift slightly as the visitor walks — invisible on rough surfaces, subtle on glossy ones.
+ * A cubemap is "infinitely far away" on its own, so reflections would be exact only from the room
+ * center and slide along as the visitor walks. roomAoMaterial.ts box-projects the lookup on the room's
+ * floor/walls/ceiling against the same inner box built here (wall inner faces, floor to ceiling), which
+ * pins the fixtures' reflections in place — keep the two boxes in sync.
  */
 export default function RoomEnvironment() {
   const { layout, exhibition } = useExhibition();
   const { theme } = exhibition;
   const { room, wallHeight, ceilingSpots } = layout;
   const [cx, cz] = room.center;
-  const [w, d] = room.size;
+  // Inner wall faces — walls are centered on the footprint edge (see galleryLayout.ts).
+  const w = room.size[0] - WALL_THICKNESS;
+  const d = room.size[1] - WALL_THICKNESS;
 
   const colors = useMemo(
     () => ({

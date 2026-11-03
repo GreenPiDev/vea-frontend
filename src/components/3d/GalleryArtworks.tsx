@@ -2,6 +2,7 @@ import { Suspense, useMemo } from "react";
 import Artwork from "./Artwork";
 import ArtworkFixtures from "./ArtworkFixtures";
 import ArtworkLightPool from "./ArtworkLightPool";
+import ArtworkWallShadows from "./ArtworkWallShadows";
 import { ARTWORKS } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
 import { ArtworkErrorBoundary } from "./ArtworkErrorBoundary";
@@ -24,6 +25,10 @@ export default function GalleryArtworks() {
           outside the per-artwork Suspense/error boundaries below: it doesn't depend on any painting's own
           texture load succeeding. */}
       <ArtworkLightPool artworks={artworks} />
+      {/* Every painting's soft shadow on its wall, one instanced draw call — see artworkShadow.ts. Placed from
+          data alone, like the fixtures above: if a painting's image fails to load (ArtworkErrorBoundary drops
+          it), its shadow stays behind together with its fixture. */}
+      <ArtworkWallShadows artworks={artworks} />
       {artworks.map((data) => (
         <ArtworkErrorBoundary key={data.id} artworkId={data.id}>
           <Suspense fallback={null}>
