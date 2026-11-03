@@ -20,6 +20,9 @@ import { useRealtimeQuerySync } from "./lib/socket/useRealtimeQuerySync";
 import { useExhibitionVisitorCount } from "./lib/socket/useExhibitionVisitorCount";
 import { useMinimumLoadingTime, GALLERY_SCENE_MIN_LOADING_MS } from "./lib/useMinimumLoadingTime";
 import { usePreloadImages } from "./lib/usePreloadImages";
+import { enterMobileImmersive } from "./lib/mobileImmersive";
+import { useForcedLandscape } from "./lib/useForcedLandscape";
+import { isTouchPrimaryDevice } from "./lib/navigationMode";
 import "./App.css";
 
 export default function App() {
@@ -58,6 +61,9 @@ export default function App() {
   // force a lock the visitor never asked for.
   const pointerWasLockedRef = useRef(false);
 
+  const forcedLandscape = useForcedLandscape();
+  // Phones/tablets have no Enter key: sitting down/standing up gets an on-screen button instead.
+  const [touchDevice] = useState(isTouchPrimaryDevice);
   const { isAuthenticated } = useAuth();
   const { data: backendExhibitions } = usePublicExhibitions();
   useRealtimeQuerySync(isAuthenticated);
@@ -121,9 +127,9 @@ export default function App() {
   // badge below simply doesn't render in that case, no special-casing needed.
   const visitorCount = useExhibitionVisitorCount(exhibition?.id);
 
-  // Only the closest in-range painting responds to the interact key — with
-  // several icons on screen at once (e.g. a row of paintings on one wall),
-  // "which one does Enter open" needs to be unambiguous.
+  // The closest in-range painting's "i" icon is drawn emphasized. (Paintings
+  // open by clicking/tapping the painting or its "i" — there's deliberately
+  // no keyboard shortcut for it; Enter/Space is the sit/stand key.)
   const nearestArtwork = useMemo(() => {
     let nearest: { artwork: Artwork; distanceSq: number } | null = null;
     for (const pos of iconPositions) {
@@ -148,31 +154,10 @@ export default function App() {
     }
   }
 
-  // Interact key (Enter/Space) opens the nearest in-range painting's detail
-  // card — the primary way in while pointer-locked (no visible cursor to
-  // click the on-screen icon with). Clicking the icon itself still works
-  // whenever the cursor happens to be visible (see the icon button below).
-  useEffect(() => {
-    if (selectedArtwork || !nearestArtwork || seatedSpot) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "Enter" && e.code !== "Space" && e.code !== "NumpadEnter") return;
-      e.preventDefault();
-      pointerWasLockedRef.current = locked;
-      document.exitPointerLock();
-      setSelectedArtwork(nearestArtwork);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedArtwork, nearestArtwork, locked, seatedSpot]);
-
-  // Separate, loosely-coupled Enter/Space state machine for sitting down —
-  // deliberately not merged into the artwork listener above so the two
-  // interaction mechanics can evolve independently. Pointer lock is left
-  // untouched the whole time sitting: unlike the artwork detail card, there's
-  // no real DOM UI to show a cursor for, and mouse-look needs to stay active
-  // ("etrafı izleme serbest kalır"). If both a painting and a seat are in
-  // range at once, the artwork modal wins (the pre-existing, higher-value
-  // interaction) — enforced by the `nearestArtwork` check below.
+  // Enter/Space state machine for sitting down / standing up. Pointer lock is
+  // left untouched the whole time sitting: there's no real DOM UI to show a
+  // cursor for, and mouse-look needs to stay active ("etrafı izleme serbest
+  // kalır").
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (seatedSpot) {
@@ -182,14 +167,14 @@ export default function App() {
         }
         return;
       }
-      if (selectedArtwork || nearestArtwork || !nearestSeat) return;
+      if (selectedArtwork || !nearestSeat) return;
       if (e.code !== "Enter" && e.code !== "Space" && e.code !== "NumpadEnter") return;
       e.preventDefault();
       setSeatedSpot(nearestSeat);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedArtwork, nearestArtwork, nearestSeat, seatedSpot]);
+  }, [selectedArtwork, nearestSeat, seatedSpot]);
 
   // Escape deliberately does NOT close the open detail card — only its own
   // ✕ button does. Browsers disqualify an Escape keypress from ever being
@@ -248,6 +233,9 @@ export default function App() {
         <ExhibitionSelect
           exhibitions={backendCards}
           onSelect={(id) => {
+            // Mobile: fullscreen + landscape must start inside this tap (browsers require a user gesture);
+            // GallerySceneCanvas releases both when the visitor leaves the exhibition.
+            void enterMobileImmersive();
             setEnteringExhibition(true);
             navigate(`/exhibition/${id}`);
           }}
@@ -258,7 +246,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-root">
+    <div className={`app-root${forcedLandscape ? " force-landscape" : ""}`}>
       {/* Mounted as an overlay rather than gating GallerySceneCanvas's mount — the Canvas
           below has to actually start rendering for its paintings' textures to begin
           loading in the first place (see usePreloadImages's doc comment); hiding it until
@@ -274,6 +262,10 @@ export default function App() {
         onCanvasReady={(el) => (canvasElRef.current = el)}
         seatedSpot={seatedSpot}
         onNearestSeatChange={setNearestSeat}
+        onArtworkClick={(id) => {
+          const artwork = exhibitionArtworks.find((a) => a.id === id);
+          if (artwork) openArtworkDetail(artwork);
+        }}
       />
 
       {/* Rendered for every artwork (not just the currently-visible ones) so
@@ -291,16 +283,17 @@ export default function App() {
               aria-label={t("artworkInfoIconLabel", { title: artwork.title })}
               tabIndex={p.visible ? 0 : -1}
               style={{ left: p.x, top: p.y }}
-              className={`absolute z-40 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 transition-[opacity,transform] duration-300 ease-out ${
+              // hover: variants only apply on devices with a real hover (Tailwind v4), so touch is unaffected.
+              className={`group absolute z-40 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer flex-col items-center gap-2 transition-[opacity,transform] duration-200 ease-out ${
                 !p.visible
                   ? "pointer-events-none scale-90 opacity-0"
                   : isNearest
-                    ? "scale-110 opacity-100"
-                    : "scale-100 opacity-70"
+                    ? "scale-110 opacity-100 hover:scale-125"
+                    : "scale-100 opacity-70 hover:scale-125 hover:opacity-100"
               }`}
             >
               <span
-                className={`flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-sm transition-colors duration-300 ${
+                className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition-[color,background-color,border-color,box-shadow] duration-200 group-hover:border-brand-100 group-hover:bg-brand-900/90 group-hover:shadow-lg ${
                   isNearest
                     ? "artwork-icon-ring animate-artwork-icon-breathe border-brand-200/80 bg-brand-950/70"
                     : "border-brand-200/30 bg-brand-950/50"
@@ -310,19 +303,11 @@ export default function App() {
                   i
                 </span>
               </span>
-              {isNearest && (
-                <span className="flex items-center gap-1 rounded-full border border-brand-200/20 bg-brand-950/80 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-brand-100 shadow-md">
-                  <span className="rounded-[4px] border border-brand-100/40 px-1 font-sans text-[9px] not-italic tracking-normal text-brand-50">
-                    ↵
-                  </span>
-                  {t("artworkInteractHint")}
-                </span>
-              )}
             </button>
           );
         })}
 
-      {!selectedArtwork && !seatedSpot && nearestSeat && (
+      {!touchDevice && !selectedArtwork && !seatedSpot && nearestSeat && (
         <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-brand-200/20 bg-brand-950/80 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-brand-100 shadow-md">
           <span className="rounded-[4px] border border-brand-100/40 px-1 font-sans text-[9px] not-italic tracking-normal text-brand-50">
             ↵
@@ -331,7 +316,7 @@ export default function App() {
         </div>
       )}
 
-      {seatedSpot && (
+      {!touchDevice && seatedSpot && (
         <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-brand-200/20 bg-brand-950/80 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-brand-100 shadow-md">
           <span className="rounded-[4px] border border-brand-100/40 px-1 font-sans text-[9px] not-italic tracking-normal text-brand-50">
             ↵ / Esc
@@ -340,11 +325,25 @@ export default function App() {
         </div>
       )}
 
+      {touchDevice && !selectedArtwork && (seatedSpot || nearestSeat) && (
+        <button
+          type="button"
+          onClick={() => setSeatedSpot(seatedSpot ? null : nearestSeat)}
+          className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border border-brand-200/30 bg-brand-950/75 px-5 py-3 text-sm font-medium uppercase tracking-wide text-brand-50 shadow-lg backdrop-blur-md active:scale-95"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M7 4v9h10M7 13v7M17 13v7M7 9h8a2 2 0 0 1 2 2v2" />
+          </svg>
+          {t(seatedSpot ? "seatStandHint" : "seatInteractHint")}
+        </button>
+      )}
+
       {selectedArtwork && (
         <ArtworkDetailCard
           artwork={selectedArtwork}
           exhibitionId={exhibition.id}
           onClose={closeArtworkDetail}
+          fullscreen={touchDevice}
         />
       )}
 

@@ -5,6 +5,7 @@ import type { Exhibition } from '../3d/exhibitions';
 import GallerySceneCanvas from '../common/GallerySceneCanvas';
 import FullscreenToggleButton from '../common/FullscreenToggleButton';
 import LoadingScreen from '../common/LoadingScreen';
+import { useForcedLandscape } from '../../lib/useForcedLandscape';
 
 interface ExhibitionPreviewSceneProps {
   exhibition: Exhibition | null;
@@ -29,6 +30,7 @@ export default function ExhibitionPreviewScene({
 }: ExhibitionPreviewSceneProps) {
   const { t } = useTranslation();
   const [locked, setLocked] = useState(false);
+  const forcedLandscape = useForcedLandscape();
   const [, setIconPositions] = useState<ArtworkIconPosition[]>([]);
 
   if (showLoadingScreen) {
@@ -49,7 +51,7 @@ export default function ExhibitionPreviewScene({
   }
 
   return (
-    <div className="app-root">
+    <div className={`app-root${forcedLandscape ? " force-landscape" : ""}`}>
       <GallerySceneCanvas
         exhibition={exhibition}
         overlayHidden={locked}

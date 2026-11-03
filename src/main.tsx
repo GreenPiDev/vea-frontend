@@ -16,6 +16,7 @@ import { AuthProvider } from './lib/auth/AuthContext'
 import { ApiError } from './lib/api/client'
 import type { ToastMeta } from './lib/api/factory'
 import { AlertCircleIcon, CheckIcon, CloseIcon, InfoIcon } from './components/layout/icons'
+import PullToRefresh from './components/common/PullToRefresh'
 
 const TOAST_DURATION_MS = 4000
 
@@ -107,6 +108,7 @@ createRoot(document.getElementById('root')!).render(
           <Toaster position="top-right" gutter={12} toastOptions={{ duration: TOAST_DURATION_MS }}>
             {renderToast}
           </Toaster>
+          <PullToRefresh />
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/home" element={<App />} />

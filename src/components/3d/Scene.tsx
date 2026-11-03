@@ -8,6 +8,10 @@ import Gallery from "./Gallery";
 import Player from "./Player";
 import ArtworkIconProjector, { type ArtworkIconPosition } from "./ArtworkIconProjector";
 import SeatProximityTracker from "./SeatProximityTracker";
+import ClickNavigation from "./ClickNavigation";
+import WalkArtworkPicker from "./WalkArtworkPicker";
+import { createNavigationRequest } from "./clickNavigationGeometry";
+import type { NavigationMode } from "../../lib/navigationMode";
 import { buildRoomLayout } from "./galleryLayout";
 import { ExhibitionProvider } from "./ExhibitionContext";
 import type { Exhibition } from "./exhibitions";
@@ -55,6 +59,9 @@ interface SceneProps {
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
   seatedSpot?: SeatSpot | null;
   onNearestSeatChange?: (seat: SeatSpot | null) => void;
+  navigationMode: NavigationMode;
+  /** Click/tap on a painting in click-to-go mode (opens its info card in App.tsx). */
+  onArtworkClick?: (artworkId: string) => void;
 }
 
 export default function Scene({
@@ -64,7 +71,11 @@ export default function Scene({
   onCanvasReady,
   seatedSpot,
   onNearestSeatChange,
+  navigationMode,
+  onArtworkClick,
 }: SceneProps) {
+  // Click-to-go request shared by ClickNavigation (writes) and Player (reads every frame).
+  const [navigation] = useState(createNavigationRequest);
   // FPS-driven quality signal: start conservative and only spend extra pixels once the
   // device has proven it can hold frame rate, so mid/low-end GPUs don't pay retina-level
   // render cost by default. Combined with the window-size cap in AdaptiveRenderScale above.
@@ -83,6 +94,10 @@ export default function Scene({
       // mounted (@react-three/postprocessing does this unconditionally), so a value set here was silently
       // ignored and the HDR frame was hard-clipped. Tone mapping lives in the composer instead, see below.
       gl={{ antialias: false }}
+      // Layout size (offsetWidth/Height) instead of getBoundingClientRect: on a phone held upright the
+      // scene root is rotated 90° with CSS (useForcedLandscape.ts), and the bounding rect would report the
+      // rotated, portrait box — the wrong aspect ratio.
+      resize={{ offsetSize: true }}
       camera={{ fov: 65, near: 0.1, far: 100, position: layout.playerStart }}
       onCreated={({ gl }) => {
         gl.outputColorSpace = THREE.SRGBColorSpace;
@@ -104,7 +119,20 @@ export default function Scene({
         <Suspense fallback={null}>
           <Gallery />
         </Suspense>
-        <Player onLockChange={onLockChange} seatedSpot={seatedSpot} />
+        <Player
+          onLockChange={onLockChange}
+          seatedSpot={seatedSpot}
+          navigationMode={navigationMode}
+          navigation={navigation}
+        />
+        {navigationMode === "walk" && onArtworkClick && <WalkArtworkPicker onArtworkClick={onArtworkClick} />}
+        {navigationMode === "click" && (
+          <ClickNavigation
+            navigation={navigation}
+            movementLocked={Boolean(seatedSpot)}
+            onArtworkClick={onArtworkClick}
+          />
+        )}
         {onIconPositionsChange && (
           <ArtworkIconProjector onPositionsChange={onIconPositionsChange} />
         )}

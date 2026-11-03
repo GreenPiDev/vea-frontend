@@ -1,7 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr" translate="no">
   <head>
     <meta charset="UTF-8" />
+    <!-- The UI is already translated (tr/en via i18next). Stop Chrome's "Translate this page?" prompt: it
+         was triggered by a wrong lang="en" on Turkish content, and machine translation rewrites React's DOM
+         text nodes, which can crash the app ("Failed to execute 'removeChild'"). -->
+    <meta name="google" content="notranslate" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>sanal-sergi</title>

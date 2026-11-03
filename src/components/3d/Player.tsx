@@ -2,11 +2,17 @@ import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { PointerLockControls } from "@react-three/drei";
 import * as THREE from "three";
-import { EYE_HEIGHT, PLAYER_RADIUS, type ColliderBox } from "./galleryLayout";
+import { EYE_HEIGHT } from "./galleryLayout";
 import { useExhibition } from "./ExhibitionContext";
 import type { SeatSpot } from "./seating";
+import { angleDelta, collides, stepToward, type NavigationRequest } from "./clickNavigationGeometry";
+import type { NavigationMode } from "../../lib/navigationMode";
 
 const WALK_SPEED = 3.6;
+/** Click-to-go walking pace (m/s) — eases down over the last metre so arrival doesn't stop dead. */
+const CLICK_WALK_SPEED = 3.2;
+/** Exponential turn rate (per second) when a painting marker swings the view toward the work. */
+const LOOK_LERP_SPEED = 5;
 // Fixed drop from standing eye height while seated — no per-asset offset
 // (see seating.ts's design note), good enough for the chair/bench models
 // this ships with.
@@ -29,10 +35,14 @@ interface PlayerProps {
   onLockChange?: (locked: boolean) => void;
   /** Non-null while the visitor is sitting — see seating.ts/App.tsx's Enter state machine. WASD movement is suspended and the camera glides to this spot; mouse-look (PointerLockControls) stays fully active. */
   seatedSpot?: SeatSpot | null;
+  /** "walk": pointer-lock mouse-look. "click": ClickNavigation.tsx drives look/targets instead. WASD works in both. */
+  navigationMode: NavigationMode;
+  /** Click-to-go target/look request, written by ClickNavigation.tsx and consumed here every frame. */
+  navigation: NavigationRequest;
 }
 
-/** First-person walking controller: pointer-lock look + WASD move + wall collision. */
-export default function Player({ onLockChange, seatedSpot }: PlayerProps) {
+/** First-person controller: WASD move + wall collision, plus either pointer-lock look or click-to-go. */
+export default function Player({ onLockChange, seatedSpot, navigationMode, navigation }: PlayerProps) {
   const { camera } = useThree();
   const { layout } = useExhibition();
   const keys = useRef({ forward: false, back: false, left: false, right: false });
@@ -51,8 +61,16 @@ export default function Player({ onLockChange, seatedSpot }: PlayerProps) {
     // PointerLockControls reads the camera's live quaternion on every mouse
     // move rather than caching one at construction time, so setting the
     // initial yaw here is enough to seed the starting look direction.
+    // YXZ (yaw, then pitch) — the order PointerLockControls also decomposes into, so both look modes and
+    // the click-to-go turn read/write the same yaw/pitch angles.
+    camera.rotation.order = "YXZ";
     camera.rotation.set(0, layout.playerStartYaw, 0);
   }, [camera, layout.playerStart, layout.playerStartYaw]);
+
+  // Leaving walk mode unmounts PointerLockControls, which doesn't release an active lock by itself.
+  useEffect(() => {
+    if (navigationMode !== "walk" && document.pointerLockElement) document.exitPointerLock();
+  }, [navigationMode]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => setKey(e.code, true);
@@ -90,6 +108,9 @@ export default function Player({ onLockChange, seatedSpot }: PlayerProps) {
 
   useFrame((_, delta) => {
     if (seatedSpot) {
+      // Sitting overrides any walk in progress.
+      navigation.target = null;
+      navigation.look = null;
       // seatedSpot.rotationY is the placement's own facing (the direction
       // the furniture model's front — where its back/backrest is — points).
       // A visitor sitting IN it faces the opposite way, out into the room,
@@ -128,7 +149,38 @@ export default function Player({ onLockChange, seatedSpot }: PlayerProps) {
     }
 
     const { forward, back, left, right } = keys.current;
-    if (!forward && !back && !left && !right) return;
+    const anyKey = forward || back || left || right;
+    if (anyKey) {
+      // The keyboard always wins over a click-to-go walk in progress.
+      navigation.target = null;
+      navigation.look = null;
+    }
+
+    if (navigation.look) {
+      const k = Math.min(1, LOOK_LERP_SPEED * delta);
+      const dYaw = angleDelta(camera.rotation.y, navigation.look.yaw);
+      const dPitch = navigation.look.pitch - camera.rotation.x;
+      if (Math.abs(dYaw) < 1e-3 && Math.abs(dPitch) < 1e-3) {
+        camera.rotation.set(navigation.look.pitch, navigation.look.yaw, 0);
+        navigation.look = null;
+      } else {
+        camera.rotation.set(camera.rotation.x + dPitch * k, camera.rotation.y + dYaw * k, 0);
+      }
+    }
+
+    if (navigation.target && !anyKey) {
+      const pos = camera.position;
+      const remaining = Math.hypot(navigation.target.x - pos.x, navigation.target.z - pos.z);
+      const speed = CLICK_WALK_SPEED * Math.min(1, 0.25 + remaining);
+      const step = stepToward(pos, navigation.target, speed * Math.min(delta, 0.05), layout.colliders);
+      pos.x = step.x;
+      pos.z = step.z;
+      pos.y = EYE_HEIGHT;
+      if (step.arrived || step.blocked) navigation.target = null;
+      return;
+    }
+
+    if (!anyKey) return;
 
     camera.getWorldDirection(forwardDir.current);
     forwardDir.current.y = 0;
@@ -166,6 +218,8 @@ export default function Player({ onLockChange, seatedSpot }: PlayerProps) {
     pos.y = EYE_HEIGHT;
   });
 
+  if (navigationMode !== "walk") return null;
+
   return (
     <PointerLockControls
       // Scoped to the canvas wrapper (see App.tsx) — without this, drei
@@ -179,14 +233,4 @@ export default function Player({ onLockChange, seatedSpot }: PlayerProps) {
       onUnlock={() => onLockChange?.(false)}
     />
   );
-}
-
-function collides(x: number, z: number, colliders: ColliderBox[]): boolean {
-  const r = PLAYER_RADIUS;
-  for (const box of colliders) {
-    if (x + r > box.minX && x - r < box.maxX && z + r > box.minZ && z - r < box.maxZ) {
-      return true;
-    }
-  }
-  return false;
 }

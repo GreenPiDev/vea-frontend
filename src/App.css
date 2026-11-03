@@ -7,6 +7,19 @@
   background: #efeee8;
 }
 
+/* Phone held upright: lay the whole scene out landscape and turn it 90° clockwise (see
+   useForcedLandscape.ts). Box = viewport height × viewport width, rotated about its top-left corner,
+   then shifted right by its own (rotated) width so it exactly covers the screen. */
+.app-root.force-landscape {
+  inset: auto;
+  top: 0;
+  left: 100vw;
+  width: 100dvh;
+  height: 100vw;
+  transform-origin: top left;
+  transform: rotate(90deg);
+}
+
 .app-root canvas {
   display: block;
   outline: none;

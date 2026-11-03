@@ -7,9 +7,12 @@ type Step = 'email' | 'code';
 
 interface LoginProps {
   onSuccess?: () => void;
+  /** Focus the email field on mount. Off where the form is secondary content (e.g. inside the artwork
+   *  card), since on a phone a focused field immediately pops the keyboard over everything. */
+  autoFocusEmail?: boolean;
 }
 
-export default function Login({ onSuccess }: LoginProps) {
+export default function Login({ onSuccess, autoFocusEmail = true }: LoginProps) {
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
@@ -57,7 +60,7 @@ export default function Login({ onSuccess }: LoginProps) {
           <input
             type="email"
             required
-            autoFocus
+            autoFocus={autoFocusEmail}
             placeholder={t('authEmailPlaceholder')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}

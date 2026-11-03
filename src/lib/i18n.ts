@@ -19,4 +19,12 @@ void i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
 });
 
+// Keep <html lang> in step with the active UI language — browsers use it to decide whether to offer
+// page translation, and screen readers to pick a voice.
+const syncHtmlLang = (lng: string) => {
+  if (typeof document !== 'undefined') document.documentElement.lang = lng;
+};
+syncHtmlLang(i18n.language);
+i18n.on('languageChanged', syncHtmlLang);
+
 export default i18n;

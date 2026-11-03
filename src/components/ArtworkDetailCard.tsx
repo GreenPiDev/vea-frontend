@@ -7,6 +7,7 @@ import { useRecordArtworkView } from '../lib/api/domains/exhibitions';
 import { getViewSessionId } from '../lib/viewSession';
 import { ApiError } from '../lib/api/client';
 import Login from './auth/Login';
+import ZoomableImage from './common/ZoomableImage';
 
 const STATUS_KEYS: Record<NonNullable<Artwork['status']>, string> = {
   DRAFT: 'statusDraft',
@@ -27,6 +28,8 @@ interface ArtworkDetailCardProps {
   artwork: Artwork;
   exhibitionId: string;
   onClose: () => void;
+  /** Phones/tablets: take the whole screen (image left, details right) instead of a floating card. */
+  fullscreen?: boolean;
 }
 
 /**
@@ -36,7 +39,7 @@ interface ArtworkDetailCardProps {
  * handles releasing/re-acquiring pointer lock around this card's lifetime;
  * this component only deals with its own content and close affordances.
  */
-export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: ArtworkDetailCardProps) {
+export default function ArtworkDetailCard({ artwork, exhibitionId, onClose, fullscreen = false }: ArtworkDetailCardProps) {
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const createOffer = useCreateOffer();
@@ -112,12 +115,20 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
   return (
     <>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className={
+        fullscreen
+          ? 'fixed inset-0 z-50 flex bg-brand-50'
+          : '@container fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4'
+      }
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-brand-50 shadow-2xl md:flex-row"
+        className={
+          fullscreen
+            ? 'relative flex h-full w-full flex-row overflow-hidden bg-brand-50'
+            : 'relative flex max-h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-brand-50 shadow-2xl @3xl:max-h-[88%] @3xl:flex-row'
+        }
       >
         <button
           onClick={onClose}
@@ -127,23 +138,25 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
           ✕
         </button>
 
-        <button
-          type="button"
-          onClick={() => setLightboxOpen(true)}
+        <div
           aria-label={t('artworkDetailZoomLabel')}
-          className="group flex shrink-0 cursor-pointer flex-col items-center justify-center gap-2 bg-brand-950 pb-4 md:w-[40%]"
+          className={`flex shrink-0 flex-col items-center gap-2 bg-brand-950 pb-3 ${
+            fullscreen ? 'h-full w-[45%]' : 'h-80 @3xl:h-auto @3xl:w-[40%]'
+          }`}
         >
-          <img
+          {/* Pinch/wheel zooms in place; a tap opens the fullscreen viewer. */}
+          <ZoomableImage
             src={artwork.image}
             alt={artwork.title}
-            className="max-h-72 w-full object-contain p-4 transition group-hover:opacity-90 md:max-h-full md:p-6"
+            onTap={() => setLightboxOpen(true)}
+            className="min-h-0 w-full flex-1 p-4"
           />
-          <span className="animate-pulse text-xs font-medium text-brand-200">
-            {t('artworkDetailZoomHint')}
+          <span className="px-3 text-center text-xs font-medium text-brand-200">
+            {t(fullscreen ? 'artworkDetailZoomHintTouch' : 'artworkDetailZoomHint')}
           </span>
-        </button>
+        </div>
 
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+        <div className={`flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto ${fullscreen ? 'p-5 pr-14' : 'p-6'}`}>
           <div>
             <h2 className="text-2xl font-semibold leading-tight text-brand-900">{artwork.title}</h2>
             <p className="mt-1 text-base text-brand-600">
@@ -230,7 +243,7 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
           {isPurchasable && !isSold && !isOwnArtwork && !isAuthenticated && (
             <div>
               <p className="mb-2 text-base text-brand-600">{t('artworkDetailLoginPrompt')}</p>
-              <Login />
+              <Login autoFocusEmail={false} />
             </div>
           )}
 
@@ -288,22 +301,18 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose }: Ar
 
     {lightboxOpen && (
       <div
-        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4"
+        className={`fixed inset-0 z-[60] flex items-center justify-center bg-black/90 ${fullscreen ? '' : 'p-4'}`}
         onClick={() => setLightboxOpen(false)}
       >
         <button
           onClick={() => setLightboxOpen(false)}
           aria-label={t('artworkDetailClose')}
-          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
+          className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60"
         >
           ✕
         </button>
-        <img
-          src={artwork.image}
-          alt={artwork.title}
-          onClick={(e) => e.stopPropagation()}
-          className="h-full w-full cursor-zoom-out object-contain"
-        />
+        {/* Pinch / wheel / double-tap to zoom, drag to pan. */}
+        <ZoomableImage src={artwork.image} alt={artwork.title} className="h-full w-full" />
       </div>
     )}
     </>

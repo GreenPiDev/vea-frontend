@@ -1,5 +1,7 @@
 import { useTranslation } from "react-i18next";
+import { useState } from "react";
 import { useFullscreenToggle } from "../../lib/useFullscreenToggle";
+import { isTouchPrimaryDevice } from "../../lib/navigationMode";
 
 // The "⤢ Tam Ekran" / "⤡ Tam Ekrandan Çık" HUD button — identical markup
 // and behavior across every full-bleed 3D scene screen, so it's a shared
@@ -7,6 +9,9 @@ import { useFullscreenToggle } from "../../lib/useFullscreenToggle";
 export default function FullscreenToggleButton() {
   const { t } = useTranslation();
   const { isFullscreen, toggleFullscreen } = useFullscreenToggle();
+  // Phones/tablets already enter fullscreen automatically with the exhibition (lib/mobileImmersive.ts).
+  const [touchDevice] = useState(isTouchPrimaryDevice);
+  if (touchDevice) return null;
 
   return (
     <button className="hud-button" onClick={toggleFullscreen}>
