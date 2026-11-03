@@ -1,6 +1,5 @@
+import { API_URL, rewriteBackendUrls } from './apiBase';
 import { getAccessToken } from './authToken';
-
-const API_URL = import.meta.env.VITE_API_URL as string;
 
 export class ApiError extends Error {
   status: number;
@@ -20,7 +19,8 @@ interface RequestOptions {
 
 async function readBody<T>(res: Response): Promise<T> {
   const isJson = res.headers.get('content-type')?.includes('application/json');
-  const body = isJson ? await res.json() : undefined;
+  const raw = isJson ? await res.json() : undefined;
+  const body = import.meta.env.DEV ? rewriteBackendUrls(raw) : raw;
   if (!res.ok) {
     throw new ApiError(res.status, body);
   }

@@ -1,7 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
+import { WS_URL } from '../api/apiBase';
 import { getAccessToken } from '../api/authToken';
-
-const WS_URL = import.meta.env.VITE_API_URL as string;
 
 // One socket for the whole app — every hook that needs realtime data
 // (useExhibitionVisitorCount, useRealtimeQuerySync consumers like
@@ -19,11 +18,15 @@ const WS_URL = import.meta.env.VITE_API_URL as string;
 let socket: Socket | null = null;
 
 function getSocket(): Socket {
-  socket ??= io(WS_URL, {
-    transports: ['websocket'],
-    autoConnect: false,
-    auth: { token: getAccessToken() },
-  });
+  if (!socket) {
+    const options = {
+      transports: ['websocket'],
+      autoConnect: false,
+      auth: { token: getAccessToken() },
+    };
+    // WS_URL undefined in dev → same origin, through the Vite /socket.io proxy.
+    socket = WS_URL ? io(WS_URL, options) : io(options);
+  }
   return socket;
 }
 
