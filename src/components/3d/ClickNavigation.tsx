@@ -11,7 +11,6 @@ import {
   LOOK_SAMPLE_WINDOW_MS,
   PITCH_LIMIT,
   estimateLookVelocity,
-  zoomedFov,
   computeArtworkViewpoint,
   floorPointFromRay,
   pickArtwork,
@@ -23,6 +22,7 @@ import {
   type LookSample,
   type NavigationRequest,
 } from "./clickNavigationGeometry";
+import { clampZoom, fovForAspect, type CameraZoom } from "./cameraFov";
 
 /** Floor marker radius (m) — also the click/hover hit radius. */
 const MARKER_RADIUS = 0.3;
@@ -86,6 +86,8 @@ interface ClickNavigationProps {
   movementLocked: boolean;
   /** Click/tap on a painting. When set, paintings also get a hover outline + pointer cursor. */
   onArtworkClick?: (artworkId: string) => void;
+  /** Pinch / wheel magnification, applied to the camera by CameraFov (Scene.tsx). */
+  cameraZoom: CameraZoom;
 }
 
 /**
@@ -95,8 +97,9 @@ interface ClickNavigationProps {
  * than R3F's per-object raycasting: the scene's walls aren't event targets, so R3F would happily report
  * a floor hit behind a wall.
  */
-export default function ClickNavigation({ navigation, movementLocked, onArtworkClick }: ClickNavigationProps) {
+export default function ClickNavigation({ navigation, movementLocked, onArtworkClick, cameraZoom }: ClickNavigationProps) {
   const { camera, gl } = useThree();
+  const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
   const { exhibition, layout } = useExhibition();
 
   const artworks = useMemo(
@@ -104,8 +107,9 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
     [exhibition]
   );
   const viewpoints = useMemo(
-    () => artworks.map((a) => computeArtworkViewpoint(a, layout.colliders)),
-    [artworks, layout.colliders]
+    // Fitted to the unzoomed view: the standing spot shouldn't depend on a transient pinch.
+    () => artworks.map((a) => computeArtworkViewpoint(a, layout.colliders, { verticalFovDeg: fovForAspect(aspect), aspect })),
+    [artworks, layout.colliders, aspect]
   );
   const walls = useMemo(() => wallBoxes(layout), [layout]);
 
@@ -168,18 +172,10 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
     const pointers = new Map<number, { x: number; y: number }>();
     // Two-finger pinch in progress. Once a pinch starts, the gesture stays a pinch until every finger is
     // lifted — the finger left behind must not turn into a look-drag or a walk click.
-    let pinch: { startDistance: number; startFov: number } | null = null;
+    let pinch: { startDistance: number; startZoom: number } | null = null;
     let pinchUntilAllUp = false;
 
     const perspective = camera as THREE.PerspectiveCamera;
-    // The scene's normal field of view — zoom never goes wider than this, and it's restored on unmount.
-    const baseFov = perspective.fov;
-
-    function setFov(fov: number) {
-      if (Math.abs(fov - perspective.fov) < 1e-4) return;
-      perspective.fov = fov;
-      perspective.updateProjectionMatrix();
-    }
 
     function pinchDistance() {
       const [a, b] = [...pointers.values()];
@@ -237,7 +233,7 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
         press = null;
         samples = [];
         inertia.current.yaw = inertia.current.pitch = 0;
-        pinch = { startDistance: pinchDistance(), startFov: perspective.fov };
+        pinch = { startDistance: pinchDistance(), startZoom: cameraZoom.zoom };
         pinchUntilAllUp = true;
         return;
       }
@@ -251,7 +247,7 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
     function onPointerMove(e: PointerEvent) {
       if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
       if (pinch) {
-        if (pointers.size >= 2) setFov(zoomedFov(baseFov, pinch.startFov, pinchDistance() / pinch.startDistance));
+        if (pointers.size >= 2) cameraZoom.zoom = clampZoom((pinch.startZoom * pinchDistance()) / pinch.startDistance);
         return;
       }
       if (!press) {
@@ -330,7 +326,7 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
       e.preventDefault();
       // Firefox reports wheel steps in lines (deltaMode 1) rather than pixels.
       const pixels = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-      setFov(zoomedFov(baseFov, perspective.fov, Math.exp(-pixels * WHEEL_ZOOM_RATE)));
+      cameraZoom.zoom = clampZoom(cameraZoom.zoom * Math.exp(-pixels * WHEEL_ZOOM_RATE));
     }
 
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -342,7 +338,7 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
     return () => {
       canvas.removeEventListener("wheel", onWheel);
       // Walk mode (pointer-lock look) has no zoom control — hand it the normal view back.
-      setFov(baseFov);
+      cameraZoom.zoom = 1;
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
@@ -352,7 +348,7 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
       navigation.target = null;
       navigation.look = null;
     };
-  }, [camera, gl, navigation]);
+  }, [camera, gl, navigation, cameraZoom]);
 
   return (
     <>

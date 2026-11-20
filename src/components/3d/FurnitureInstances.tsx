@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { useGLTF, Instance, Instances } from "@react-three/drei";
+import { applyCeilingLight } from "./ceilingLight";
 
 export interface FurniturePlacementTransform {
   position: [number, number, number];
@@ -59,6 +60,8 @@ function extractParts(scene: THREE.Object3D): SubMeshPart[] {
       }
       if (child.geometry.index) geometry.setIndex(child.geometry.index.clone());
       geometry.applyMatrix4(child.matrixWorld);
+      // Lit by the same ceiling fixtures as the room (one-time, idempotent shader patch).
+      applyCeilingLight(child.material);
       parts.push({ geometry, material: child.material });
     }
   });

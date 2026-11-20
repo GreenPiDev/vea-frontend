@@ -1,10 +1,10 @@
+import { useLayoutEffect } from "react";
 import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
+import { ceilingLightsForLayout, setCeilingLights } from "./ceilingLight";
+import { HEMISPHERE_INTENSITY, ROOM_FILL_SCALE } from "./sceneLighting";
 
-// Ceiling fixtures used to also cast real spotLights for room fill; now the room's own
-// ambient/hemisphere fill carries that job alone, so their loss is compensated here rather
-// than in every theme's data. Ceiling fixtures below are purely cosmetic (emissive discs).
-const ROOM_FILL_BOOST = 1.55;
+// Fill strength is set in sceneLighting.ts (the scene's single exposure dial), not here.
 
 // Every ceiling fixture disc in a given room shares the exact same material (same theme,
 // same emissive color) — one per theme color, not one per disc, same reasoning as
@@ -27,12 +27,12 @@ function getCeilingFixtureMaterial(spotColor: string) {
 }
 
 /**
- * Lighting rig for the current exhibition room: the room's own soft ambient
- * fill (themed) is the only real light source, boosted to cover the room
- * evenly on its own. A sparse grid of ceiling fixtures is layered on top for
- * looks only — glowing discs with no attached spotLight — so per-painting
- * spotlights (see ArtworkLightPool.tsx) stay the sole visible "hot"
- * light source, like a real gallery's track-lit walls.
+ * Lighting rig for the current exhibition room. Three layers:
+ *  1. The ceiling fixtures — emissive discs that are ALSO the room's main, directional light, through
+ *     the analytic downlight term in ceilingLight.ts (floor pools, walls fading in below the ceiling,
+ *     a lit and a shaded side on furniture). Not three.js lights: fixed cost, no recompiles.
+ *  2. A dim themed ambient/hemisphere fill (sceneLighting.ts) — only there so corners never go black.
+ *  3. Per-painting picture lights (ArtworkLightPool.tsx), the brightest thing in view.
  *
  * No light in this rig casts real shadows — a one-time baked directional
  * "skylight" shadow was tried and dropped (didn't read as correct gallery
@@ -56,15 +56,22 @@ export default function GalleryLights() {
   const { layout, exhibition } = useExhibition();
   const { theme } = exhibition;
 
+  // The fixture discs below are also the room's directional light source (ceilingLight.ts): push their
+  // positions into the shared uniforms before the first frame. Uniforms are read at draw time, so no
+  // material recompiles when the room changes.
+  useLayoutEffect(() => {
+    setCeilingLights(ceilingLightsForLayout(layout.ceilingSpots, theme.ambientIntensity), theme.spotColor);
+  }, [layout.ceilingSpots, theme.ambientIntensity, theme.spotColor]);
+
   return (
     <>
       {/* Room's own default lighting — the only real light source besides each painting's spot */}
-      <ambientLight color={theme.ambientColor} intensity={theme.ambientIntensity * ROOM_FILL_BOOST} />
+      <ambientLight color={theme.ambientColor} intensity={theme.ambientIntensity * ROOM_FILL_SCALE} />
       <hemisphereLight
-        args={[theme.hemisphereSkyColor, theme.hemisphereGroundColor, 0.4 * ROOM_FILL_BOOST]}
+        args={[theme.hemisphereSkyColor, theme.hemisphereGroundColor, HEMISPHERE_INTENSITY * ROOM_FILL_SCALE]}
       />
 
-      {/* Small emissive fixture discs — purely cosmetic, cast no light themselves */}
+      {/* Emissive fixture discs — the visible source of the analytic ceiling light (ceilingLight.ts) */}
       {layout.ceilingSpots.map(([x, , z], i) => (
         <mesh
           key={`fixture-${i}`}

@@ -9,8 +9,21 @@
 // are laid out (the floor plane's UVs are tiled for the color texture, walls carry pre-scaled box UVs).
 
 import * as THREE from "three";
-import type { AoField } from "./roomAo";
+import { CEILING_AO, DEFAULT_AO_FIELD_OPTIONS, FURNITURE_CONTACT, FURNITURE_FIELD_RANGE, type AoField } from "./roomAo";
 import { EYE_HEIGHT, WALL_THICKNESS } from "./galleryLayout";
+import { CEILING_FILL_SCALE } from "./sceneLighting";
+import { CEILING_LIGHT_FRAGMENT_DECL, ceilingLightApply, ceilingLightUniforms } from "./ceilingLight";
+import {
+  CEILING_MACRO_VARIATION,
+  DEFAULT_MACRO_VARIATION,
+  MACRO_VARIATION_ALBEDO,
+  MACRO_VARIATION_DECL,
+  MACRO_VARIATION_ROUGHNESS,
+} from "./macroVariation";
+import { NORMAL_SCALE_LINE, SPEC_AA_DECLARE, SPEC_AA_NORMAL_MAP, SPEC_AA_ROUGHNESS } from "./specularAa";
+
+// three's normal_fragment_maps with the specular-AA hook (specularAa.ts) in place of the normalScale line.
+export const NORMAL_FRAGMENT_MAPS = THREE.ShaderChunk.normal_fragment_maps.replace(NORMAL_SCALE_LINE, SPEC_AA_NORMAL_MAP);
 
 export type RoomAoSurface = "floor" | "ceiling" | "wall";
 
@@ -18,8 +31,9 @@ const SURFACE_DEFINE: Record<RoomAoSurface, number> = { floor: 0, ceiling: 1, wa
 
 // Wall↔floor contact band: tight and fairly strong — this is the "object sits on the ground" cue.
 export const WALL_FLOOR_AO = { radius: 0.4, strength: 0.5 };
-// Wall↔ceiling band: wider and softer, ceilings collect less bounce light toward the edges.
-export const WALL_CEILING_AO = { radius: 0.6, strength: 0.4 };
+// Wall↔ceiling band: a thin, faint line (was radius 0.6 / strength 0.4 — the top 0.6 m of every wall went
+// visibly grey, and with the ceiling's own band it read as a soot stain, sergi-gercekcilestirme.md Adım 5).
+export const WALL_CEILING_AO = { radius: 0.3, strength: 0.25 };
 
 export interface RoomAoUniforms {
   uRoomAoMap: { value: THREE.Texture | null };
@@ -48,7 +62,7 @@ uniform vec4 uRoomAoBounds;
 uniform float uRoomWallHeight;
 uniform float uRoomAoReach;
 
-// .r = wall occlusion, .g = furniture occlusion (see roomAo.ts).
+// .r = wall occlusion, .g = encoded signed distance to the nearest furniture footprint (see roomAo.ts).
 vec2 roomAoField(vec2 xz) {
   return texture2D(uRoomAoMap, (xz - uRoomAoBounds.xy) / uRoomAoBounds.zw).rg;
 }
@@ -80,6 +94,24 @@ float roomAoBand(float d, float radius, float strength) {
   return 1.0 - strength * (1.0 - smoothstep(0.0, radius, d));
 }
 
+// Two-layer furniture contact shadow from the G channel's signed distance — mirrors roomAo.ts's
+// decodeFurnitureDistance() + furnitureContact(). Narrow dark core × wide soft pool.
+float roomFurnitureContact(float g) {
+  float d = g * ${(FURNITURE_FIELD_RANGE.inside + FURNITURE_FIELD_RANGE.outside).toFixed(3)} - ${FURNITURE_FIELD_RANGE.inside.toFixed(3)};
+  return (1.0 - ${FURNITURE_CONTACT.core.strength.toFixed(3)} * (1.0 - smoothstep(${FURNITURE_CONTACT.core.inner.toFixed(3)}, ${FURNITURE_CONTACT.core.outer.toFixed(3)}, d)))
+    * (1.0 - ${FURNITURE_CONTACT.soft.strength.toFixed(3)} * (1.0 - smoothstep(${FURNITURE_CONTACT.soft.inner.toFixed(3)}, ${FURNITURE_CONTACT.soft.outer.toFixed(3)}, d)));
+}
+
+// Scales the ceiling-fixture light (direct, so the AO below doesn't reach it): on the floor, furniture
+// blocks the overhead fixtures from the spot right under it (roomAo.ts FURNITURE_CONTACT.ceilingLightShare).
+float roomCeilingLightOcclusion() {
+  #if ROOM_AO_SURFACE == 0
+    return mix(1.0, roomFurnitureContact(roomAoField(vRoomAoWorldPos.xz).g), ${FURNITURE_CONTACT.ceilingLightShare.toFixed(3)});
+  #else
+    return 1.0;
+  #endif
+}
+
 float roomAmbientOcclusion() {
   #if ROOM_AO_SURFACE == 2
     // Walls: sampling the field one falloff-radius out along the wall's own normal puts the sample
@@ -94,10 +126,15 @@ float roomAmbientOcclusion() {
   #elif ROOM_AO_SURFACE == 0
     // Floor: walls and furniture contact shadows.
     vec2 ao = roomAoField(vRoomAoWorldPos.xz);
-    return ao.r * ao.g;
+    return ao.r * roomFurnitureContact(ao.g);
   #else
-    // Ceiling: walls only — furniture sits far below it.
-    return roomAoField(vRoomAoWorldPos.xz).r;
+    // Ceiling: walls only — furniture sits far below it. The wall channel is remapped to a much narrower,
+    // weaker band than the floor's (mirrors roomAo.ts's ceilingOcclusion()). Scaled down overall: the
+    // ceiling only gets bounce light in a real room, so it's kept darker than the walls (sceneLighting.ts).
+    float wallProximity = clamp(
+      (1.0 - roomAoField(vRoomAoWorldPos.xz).r) / ${DEFAULT_AO_FIELD_OPTIONS.wall.strength.toFixed(3)}, 0.0, 1.0);
+    float ceilingAo = 1.0 - ${CEILING_AO.strength.toFixed(3)} * pow(wallProximity, ${CEILING_AO.sharpness.toFixed(1)});
+    return ceilingAo * ${CEILING_FILL_SCALE.toFixed(3)};
   #endif
 }
 `;
@@ -129,13 +166,25 @@ export const ENVMAP_PHYSICAL_PARS = THREE.ShaderChunk.envmap_physical_pars_fragm
 );
 
 function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramParametersWithUniforms) {
-  Object.assign(shader.uniforms, (this.userData as { roomAoUniforms: RoomAoUniforms }).roomAoUniforms);
+  const data = this.userData as { roomAoUniforms: RoomAoUniforms; macroVariation: { value: number } };
+  Object.assign(shader.uniforms, data.roomAoUniforms, ceilingLightUniforms, { uMacroVariation: data.macroVariation });
   shader.vertexShader = shader.vertexShader
     .replace("#include <common>", `#include <common>\n${VERTEX_DECL}`)
     .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}`);
   shader.fragmentShader = shader.fragmentShader
-    .replace("#include <common>", `#include <common>\n${FRAGMENT_DECL}`)
+    .replace("#include <common>", `#include <common>\n${FRAGMENT_DECL}\n${CEILING_LIGHT_FRAGMENT_DECL}\n${MACRO_VARIATION_DECL}`)
+    // Low-frequency tone/gloss variation that breaks the scan's tiling lattice (macroVariation.ts).
+    .replace("#include <map_fragment>", `#include <map_fragment>\n${MACRO_VARIATION_ALBEDO}`)
+    .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>\n${MACRO_VARIATION_ROUGHNESS}`)
     .replace("#include <envmap_physical_pars_fragment>", ENVMAP_PHYSICAL_PARS)
+    // Specular AA (specularAa.ts): normal detail a pixel can't resolve becomes roughness, so glossy floors
+    // don't sparkle in the distance.
+    .replace("#include <normal_fragment_begin>", `${SPEC_AA_DECLARE}\n#include <normal_fragment_begin>`)
+    .replace("#include <normal_fragment_maps>", NORMAL_FRAGMENT_MAPS)
+    .replace("#include <lights_physical_fragment>", `#include <lights_physical_fragment>\n${SPEC_AA_ROUGHNESS}`)
+    // Directional light from the ceiling fixtures (ceilingLight.ts) — direct light, so the AO below
+    // doesn't touch it; only furniture contact shadows on the floor scale it.
+    .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>\n${ceilingLightApply("vRoomAoWorldPos", "roomCeilingLightOcclusion()")}`)
     .replace("#include <aomap_fragment>", `#include <aomap_fragment>\n${FRAGMENT_APPLY}`);
 }
 
@@ -143,14 +192,17 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
  * Patches `material` in place to receive room AO. Must be called before the material's first render.
  * Surfaces differ only by a `#define`, which three folds into the program cache key, so floor/ceiling/wall
  * each compile one program and every material of the same surface kind shares it.
+ * `macroVariation` is the ± albedo amplitude of the anti-tiling variation (a uniform, never a recompile).
  */
 export function applyRoomAo(
   material: THREE.MeshStandardMaterial,
   surface: RoomAoSurface,
-  uniforms: RoomAoUniforms
+  uniforms: RoomAoUniforms,
+  macroVariation: number = surface === "ceiling" ? CEILING_MACRO_VARIATION : DEFAULT_MACRO_VARIATION
 ): void {
   material.defines = { ...(material.defines ?? {}), ROOM_AO_SURFACE: SURFACE_DEFINE[surface] };
   material.userData.roomAoUniforms = uniforms;
+  material.userData.macroVariation = { value: macroVariation };
   material.onBeforeCompile = roomAoOnBeforeCompile;
   material.needsUpdate = true;
 }

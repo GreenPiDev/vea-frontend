@@ -59,6 +59,7 @@ function resolveFurniture(
       rotationY: placement.rotationY,
       halfWidth: def.footprint.width / 2,
       halfDepth: def.footprint.depth / 2,
+      round: def.round,
     });
     renderList.push({
       modelUrl: def.modelUrl,

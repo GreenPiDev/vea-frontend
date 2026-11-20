@@ -20,6 +20,17 @@ export interface FurnitureDef {
   thumbnailUrl?: string | null;
   /** Whether a visitor can sit in this model (armchair/bench/etc.) — see seating.ts. */
   isSeating: boolean;
+  /** Round base — gives a disc-shaped floor contact shadow (roomAo.ts). See isRoundFurnitureName. */
+  round?: boolean;
+}
+
+// The asset record has no shape field yet, so a round base is recognised from its name. Wrong guesses are
+// harmless (a slightly rounder or squarer contact shadow); replace with a real field when the backend gets one.
+const ROUND_NAME = /vazo|vase|bitki|plant|saks[ıi]|\bpot\b|yuvarlak|round|silindir|cylinder|\burn\b|amfora|amphora/i;
+
+/** Whether a furniture asset's name suggests a round base (vase, plant pot, round plinth). */
+export function isRoundFurnitureName(name: string): boolean {
+  return ROUND_NAME.test(name);
 }
 
 export function toFurnitureDef(asset: ApiFurnitureAsset): FurnitureDef {
@@ -31,5 +42,6 @@ export function toFurnitureDef(asset: ApiFurnitureAsset): FurnitureDef {
     scale: asset.scale,
     thumbnailUrl: asset.thumbnailUrl,
     isSeating: asset.isSeating,
+    round: isRoundFurnitureName(asset.name),
   };
 }

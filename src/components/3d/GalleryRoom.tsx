@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { useTexture } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import { useExhibition } from "./ExhibitionContext";
+import { isTouchPrimaryDevice } from "../../lib/navigationMode";
 import {
   CEILING_TEXTURES,
   DEFAULT_CEILING_TEXTURE,
@@ -23,12 +24,10 @@ import {
   type RoomAoUniforms,
 } from "./roomAoMaterial";
 
-// Exaggerates the ceiling's normal map perturbation strength (MeshStandardMaterial's default
-// normalScale is [1,1], i.e. the map's own baked depth, unmodified). The ceiling's own lighting
-// is close to head-on (see GalleryLights.tsx's doc comment on why a grazing light was tried and
-// reverted there instead of here) so its bump shading reads weaker than the walls' at matching
-// roughness — boosting normalScale compensates without touching any light or other surface.
-const CEILING_NORMAL_SCALE: [number, number] = [2.5, 2.5];
+// The ceiling scan's own baked depth, unexaggerated. It used to be boosted to 2.5 to make the bump
+// shading read under near head-on light, but that turned plaster into a blotchy, marble-like surface
+// that pulled the eye up (sergi-gercekcilestirme.md Adım 3) — a gallery ceiling should be calm.
+const CEILING_NORMAL_SCALE: [number, number] = [1, 1];
 
 /**
  * Static architecture of the current exhibition room: floor, ceiling and
@@ -123,7 +122,9 @@ function useSurfaceMaps(texture: SurfaceTexture) {
     // more texels along the foreshortened axis instead, fixing the "distance looks out of
     // focus" look. GPU/driver-side sampling cost only — no extra geometry or textures — so
     // it's effectively free on any GPU this scene already targets.
-    const maxAnisotropy = gl.capabilities.getMaxAnisotropy();
+    // Phones: capped at 4× — 16× on a floor filling half a high-resolution screen is a real fill-rate cost
+    // on mobile GPUs, and 4× already removes the distance blur.
+    const maxAnisotropy = Math.min(gl.capabilities.getMaxAnisotropy(), isTouchPrimaryDevice() ? 4 : Infinity);
     for (const t of [map, roughnessMap, normalMap]) {
       t.wrapS = THREE.RepeatWrapping;
       t.wrapT = THREE.RepeatWrapping;
@@ -183,9 +184,10 @@ function TexturedPlane({
       roughness: roughness ?? 1,
       color: color ?? "#ffffff",
     });
-    applyRoomAo(m, aoSurface, aoUniforms);
+    // The ceiling keeps applyRoomAo's calmer default; floors use the scan's own amplitude.
+    applyRoomAo(m, aoSurface, aoUniforms, aoSurface === "ceiling" ? undefined : texture.macroVariation);
     return m;
-  }, [map, roughnessMap, normalMap, color, roughness, metalness, normalScale, aoSurface, aoUniforms]);
+  }, [map, roughnessMap, normalMap, color, roughness, metalness, normalScale, aoSurface, aoUniforms, texture.macroVariation]);
 
   return (
     <mesh position={position} rotation={rotation} material={material}>
@@ -229,9 +231,9 @@ function TexturedWalls({
       roughness: roughness ?? 1,
       color: color ?? "#ffffff",
     });
-    applyRoomAo(m, "wall", aoUniforms);
+    applyRoomAo(m, "wall", aoUniforms, texture.macroVariation);
     return m;
-  }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, aoUniforms]);
+  }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, texture.macroVariation, aoUniforms]);
 
   const geometries = useMemo(
     () => walls.map((w) => buildTexturedBoxGeometry(w.size, texture.tileSize)),

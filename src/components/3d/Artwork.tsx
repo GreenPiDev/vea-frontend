@@ -3,9 +3,10 @@ import * as THREE from "three";
 import { useTexture, Text } from "@react-three/drei";
 import type { Artwork as ArtworkData, FrameStyle } from "./artworks";
 import { FRAME_TEXTURES } from "./frameTextures";
-import { buildTexturedBoxGeometry } from "./textureUv";
-import { FRAME_BORDER, FRAME_DEPTH } from "./artworkShadow";
+import { FRAME_BORDER } from "./artworkShadow";
+import { canvasZ, getFrameGeometry } from "./frameProfile";
 import { WEAVE_TILE_METERS, getCanvasWeaveNormalMap } from "./canvasWeave";
+import { cropToUvTransform, measureImageCrop } from "./artworkImageCrop";
 
 // Paint surface: a painting isn't a matte print. A thin varnish layer gives it a soft sheen the picture
 // light can catch (0.65 read like paper), and the shared linen weave normal map breaks that sheen up the
@@ -28,7 +29,15 @@ export default function Artwork({ data }: { data: ArtworkData }) {
   useMemo(() => {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 8;
-  }, [texture]);
+    // Skip flat scan margins (white mount board / scanner bed) baked into the photo — artworkImageCrop.ts.
+    // The texture is cached per URL, so every copy of this image shares the same crop.
+    const image = texture.image as (CanvasImageSource & { width: number; height: number }) | undefined;
+    if (image?.width) {
+      const { offset, repeat } = cropToUvTransform(measureImageCrop(data.image, image));
+      texture.offset.set(...offset);
+      texture.repeat.set(...repeat);
+    }
+  }, [texture, data.image]);
 
   const width = data.height * data.aspect;
 
@@ -44,19 +53,13 @@ export default function Artwork({ data }: { data: ArtworkData }) {
   }, [width, data.height]);
   useEffect(() => () => canvasGeometry.dispose(), [canvasGeometry]);
 
-  const frameSize: [number, number, number] = [
-    width + FRAME_BORDER * 2,
-    data.height + FRAME_BORDER * 2,
-    FRAME_DEPTH,
-  ];
-
   return (
     <group position={data.position} rotation={[0, data.rotationY, 0]}>
       {/* Frame — skipped when the artist marked their uploaded image as already framed (see artworks.ts's `frame` doc comment). "modernBlack" is the default for unframed backend artworks, all styles now render as real photo-scanned material. */}
-      {data.frame ? <FrameMesh style={data.frame} size={frameSize} /> : null}
+      {data.frame ? <FrameMesh style={data.frame} canvasWidth={width} canvasHeight={data.height} /> : null}
 
-      {/* Canvas */}
-      <mesh position={[0, 0, 0.004]} geometry={canvasGeometry}>
+      {/* Canvas — in the frame's rebate, 1.4 cm behind its face (frameProfile.ts) */}
+      <mesh position={[0, 0, canvasZ(data.frame)]} geometry={canvasGeometry}>
         <meshStandardMaterial
           map={texture}
           roughness={CANVAS_ROUGHNESS}
@@ -97,8 +100,8 @@ export default function Artwork({ data }: { data: ArtworkData }) {
   );
 }
 
-/** Real photo-scanned material on the frame box (gold/walnut scans, or the same gold scan re-tinted for "modernBlack" — see frameTextures.ts), tiled to the frame's own size (see textureUv.ts). */
-function FrameMesh({ style, size }: { style: FrameStyle; size: [number, number, number] }) {
+/** Moulded frame swept from its style's profile (frameProfile.ts), with the real photo-scanned material (gold/walnut scans, or the same gold scan re-tinted for "modernBlack" — see frameTextures.ts) following the moulding at real-world scale. */
+function FrameMesh({ style, canvasWidth, canvasHeight }: { style: FrameStyle; canvasWidth: number; canvasHeight: number }) {
   const frameStyle = FRAME_TEXTURES[style];
   const urls = frameStyle.metalnessMap
     ? [frameStyle.map, frameStyle.roughnessMap, frameStyle.metalnessMap]
@@ -134,11 +137,9 @@ function FrameMesh({ style, size }: { style: FrameStyle; size: [number, number, 
     return created;
   }, [style, map, roughnessMap, metalnessMap, frameStyle.metalness, frameStyle.roughness, frameStyle.color]);
 
-  const geometry = useMemo(
-    () => buildTexturedBoxGeometry(size, frameStyle.tileSize),
-    [size, frameStyle.tileSize]
-  );
-  useEffect(() => () => geometry.dispose(), [geometry]);
+  // Shared per style + size (cached in frameProfile.ts, not disposed per mesh). Front face at z = 0, back at
+  // −FRAME_DEPTH — the same volume the old box filled, so the wall shadow and picking still match.
+  const geometry = getFrameGeometry(style, canvasWidth, canvasHeight, frameStyle.tileSize);
 
-  return <mesh position={[0, 0, -FRAME_DEPTH / 2]} geometry={geometry} material={material} />;
+  return <mesh geometry={geometry} material={material} />;
 }

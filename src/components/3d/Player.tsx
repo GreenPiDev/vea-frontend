@@ -8,9 +8,13 @@ import type { SeatSpot } from "./seating";
 import { angleDelta, collides, stepToward, type NavigationRequest } from "./clickNavigationGeometry";
 import type { NavigationMode } from "../../lib/navigationMode";
 
-const WALK_SPEED = 3.6;
+/**
+ * WASD pace (m/s). A calm museum stroll (~2 m/s with the narrower camera, see cameraFov.ts) — the old
+ * 3.6 m/s was running speed and made the rooms feel small and game-like.
+ */
+const WALK_SPEED = 2.0;
 /** Click-to-go walking pace (m/s) — eases down over the last metre so arrival doesn't stop dead. */
-const CLICK_WALK_SPEED = 3.2;
+const CLICK_WALK_SPEED = 2.0;
 /** Exponential turn rate (per second) when a painting marker swings the view toward the work. */
 const LOOK_LERP_SPEED = 5;
 // Fixed drop from standing eye height while seated — no per-asset offset

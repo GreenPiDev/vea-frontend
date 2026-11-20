@@ -24,7 +24,10 @@ export const FRAME_TEXTURES: Record<"gold" | "walnut" | "modernBlack", FrameText
     metalnessMap: "/textures/Metal048A/metalness.jpg",
     tileSize: 0.6,
     metalness: 1,
-    roughness: 1,
+    // Above 1 on purpose: it multiplies the scan's roughness map (three clamps the product to 1), lifting
+    // the scan's glossiest texels. The picture lamp sits right above the frame's top moulding, and a
+    // near-mirror gold strip there read as a bright sticker (sergi-gercekcilestirme.md Adım 7).
+    roughness: 1.2,
   },
   walnut: {
     map: "/textures/Wood051/color.jpg",

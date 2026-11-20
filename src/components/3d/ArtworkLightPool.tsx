@@ -3,35 +3,17 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { Artwork as ArtworkData } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
-
-// Applied on top of each theme's own spotIntensity (exhibitions.ts/backendAdapter.ts) — one shared dial instead of
-// re-tuning every theme's value by hand.
-const SPOT_INTENSITY_SCALE = 0.6;
+// Applied on top of each theme's own spotIntensity (exhibitions.ts/backendAdapter.ts) — see sceneLighting.ts.
+import { SPOT_INTENSITY_SCALE } from "./sceneLighting";
+import { encodePictureLight, pictureLightPlacement } from "./pictureLight";
 const SPOT_FADE_NEAR_DISTANCE = 9;
 const SPOT_FADE_FAR_DISTANCE = 15;
-const LAMP_RISE = 0.45;
-const CEILING_CLEARANCE = 0.15;
-// The actual (invisible) light-emitting point sits farther out from the wall than the visible fixture (see
-// ArtworkFixtures.tsx). With the emitter close to the wall, its beam axis would be nearly parallel to the
-// wall surface, so the cone's outer rays would graze the wall and land near the fixture regardless of the
-// target's height, instead of converging where aimed. Pulling the real emission point out gives the beam a
-// steep enough angle to land squarely on each painting at its own height.
-const BEAM_STANDOFF = 1.6;
-// Cone half-angle was previously a single fixed value (0.42 rad) for every painting regardless of width —
-// at BEAM_STANDOFF that lights a ~1.4m-diameter circle on the wall, which fully covers a small canvas but
-// only grazes the center of a large one. Now derived per-painting from its physical width so the cone
-// actually spans the canvas either way; MIN keeps the previous tight look for small paintings, MAX stops
-// very wide paintings from flattening into an unrealistically broad floodlight.
-const SPOT_ANGLE_MIN = 0.5;
-const SPOT_ANGLE_MAX = 1.1;
-// Cone extends well past the canvas edge. three's penumbra fades from the inner cone (angle·(1−penumbra))
-// to the outer edge, so with the old 1.15 margin + 0.9 penumbra the canvas edge sat deep in the falloff
-// (~15% brightness — a visibly vignetted painting) and the light then stopped in a hard ring right after.
-// A real picture light does the opposite: the canvas is lit fairly evenly and the beam spills softly onto
-// the surrounding wall ("wall wash"). 1.6 margin + full penumbra puts the canvas edge at ~65% and spreads
-// the remainder as a gradual glow around it. Same light count, so no performance cost.
-const SPOT_WIDTH_MARGIN = 1.6;
-const SPOT_PENUMBRA = 1;
+// Where the light comes from and how it spreads over the canvas lives in pictureLight.ts (Adım 7): the
+// light leaves the visible lamp bar, and a patched spot term shapes it into an even, top-weighted window on
+// the wall. History, so nobody walks back into it: a plain round spot cone at the lamp lands its hot spot
+// right under the fixture (above the painting), so the emitter used to be pushed 1.6 m out into the room
+// (BEAM_STANDOFF) with a width-derived cone angle — which made the visible lamp and the real light origin
+// disagree and still left a round hot spot above the frame.
 
 // Fixed real-spotLight budget, independent of total artwork count. Every frame, these N lights are
 // imperatively repositioned onto the N artworks currently nearest the camera (sorted by XZ distance) —
@@ -58,34 +40,19 @@ const LIGHT_POOL_SIZE = 8;
 interface PreparedLight {
   artwork: ArtworkData;
   position: THREE.Vector3;
+  /** Point straight into the wall from the lamp — gives the spot its (horizontal) wall-normal direction. */
   aimPoint: THREE.Vector3;
-  angle: number;
+  shape: ReturnType<typeof encodePictureLight>;
 }
 
-// Lamp height follows each painting's own top edge (not a fixed rail shared by the whole wall) — a tall-ceiling
-// room would otherwise leave the fixed rail too far above a normally-hung painting for the beam to land on it.
-// placeArtworksAlongWall() guarantees CEILING_HEADROOM (0.73m) of clearance above every painting's top edge, so
-// LAMP_RISE sits comfortably under that; the wallHeight clamp is just a safety net for hand-authored static
-// artworks.ts entries that don't go through that placement math.
 function prepareLight(data: ArtworkData, wallHeight: number): PreparedLight {
-  const topEdge = data.position[1] + data.height / 2;
-  const lightY = Math.min(topEdge + LAMP_RISE, wallHeight - CEILING_CLEARANCE);
-  const normal = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), data.rotationY);
-  const position = new THREE.Vector3(
-    data.position[0] + normal.x * BEAM_STANDOFF,
-    lightY,
-    data.position[2] + normal.z * BEAM_STANDOFF
-  );
-  // Aim at the upper third of the canvas (not its center) — a real picture light grazes down from just under
-  // the frame top, it doesn't point square at the middle of the painting.
-  const aimPoint = new THREE.Vector3(data.position[0], topEdge - data.height * 0.15, data.position[2]);
-  const width = data.height * data.aspect;
-  const angle = THREE.MathUtils.clamp(
-    Math.atan((width / 2) * SPOT_WIDTH_MARGIN / BEAM_STANDOFF),
-    SPOT_ANGLE_MIN,
-    SPOT_ANGLE_MAX
-  );
-  return { artwork: data, position, aimPoint, angle };
+  const placement = pictureLightPlacement(data, wallHeight);
+  return {
+    artwork: data,
+    position: placement.position,
+    aimPoint: placement.position.clone().sub(placement.normal),
+    shape: encodePictureLight(placement),
+  };
 }
 
 /** All artwork picture-lights for the current room, as a fixed-size pool reassigned to the nearest paintings every frame — see module doc comment. */
@@ -131,7 +98,10 @@ export default function ArtworkLightPool({ artworks }: { artworks: ArtworkData[]
       const { light, distance } = entry;
       spotLight.position.copy(light.position);
       spotLight.color.set(exhibition.theme.spotColor);
-      spotLight.angle = light.angle;
+      spotLight.angle = light.shape.angle;
+      spotLight.penumbra = light.shape.penumbra;
+      spotLight.distance = light.shape.distance;
+      spotLight.decay = light.shape.decay;
       spotLight.target = target;
       target.position.copy(light.aimPoint);
       const fade =
@@ -145,14 +115,8 @@ export default function ArtworkLightPool({ artworks }: { artworks: ArtworkData[]
       {Array.from({ length: LIGHT_POOL_SIZE }, (_, i) => (
         <group key={i}>
           <object3D ref={(o) => { targetRefs.current[i] = o; }} />
-          <spotLight
-            ref={(l) => { lightRefs.current[i] = l; }}
-            angle={SPOT_ANGLE_MIN}
-            penumbra={SPOT_PENUMBRA}
-            intensity={0}
-            distance={7}
-            decay={2}
-          />
+          {/* angle/penumbra/distance/decay carry the picture-light window, not a cone (encodePictureLight). */}
+          <spotLight ref={(l) => { lightRefs.current[i] = l; }} intensity={0} />
         </group>
       ))}
     </>

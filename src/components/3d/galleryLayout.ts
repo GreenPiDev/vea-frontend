@@ -61,6 +61,8 @@ export interface PlacedFurnitureInput {
   rotationY: number;
   halfWidth: number;
   halfDepth: number;
+  /** Round base (vase, plant pot, drum plinth): its floor contact shadow is a disc/stadium (roomAo.ts). The collider stays a box. */
+  round?: boolean;
 }
 
 /** Conservative axis-aligned bounding box for a footprint rotated by yaw around its center — same ColliderBox shape walls use, so Player.tsx's collides() needs no changes to also block on furniture. */

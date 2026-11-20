@@ -3,17 +3,12 @@ import * as THREE from "three";
 import { Environment, Lightformer } from "@react-three/drei";
 import { useExhibition } from "./ExhibitionContext";
 import { EYE_HEIGHT, WALL_THICKNESS } from "./galleryLayout";
+import { ENVIRONMENT_INTENSITY, ENV_CEILING_COLOR_SCALE, ENV_CEILING_FIXTURE_INTENSITY } from "./sceneLighting";
 
-// How strongly the environment map lights/reflects on every MeshStandardMaterial in the scene. It adds on
-// top of GalleryLights.tsx's ambient/hemisphere fill. Raised from 0.6 when GalleryLights' two directional
-// "skylights" were removed (they caused a sourceless glare on glossy floors): the env map is the better
-// place to make up that lost brightness, since its light comes from the real ceiling fixtures and is
-// shaped by the room AO — a flat ambient boost would wash the corners back out.
-const ENVIRONMENT_INTENSITY = 1.0;
+// Env strength and fixture brightness live in sceneLighting.ts with the rest of the exposure balance.
 // Cubemap face size. Reflections on this scene's surfaces are all rough enough to be blurred by PMREM
 // anyway, so a higher resolution would only cost VRAM/startup time without visible gain.
 const ENVIRONMENT_RESOLUTION = 128;
-const CEILING_FIXTURE_INTENSITY = 6;
 const CEILING_FIXTURE_RADIUS = 0.35;
 
 function scaled(color: string, factor: number) {
@@ -48,7 +43,7 @@ export default function RoomEnvironment() {
     () => ({
       walls: scaled(theme.wallColor, 0.55),
       floor: scaled(theme.floorColor, 0.35),
-      ceiling: scaled(theme.ceilingColor, 0.7),
+      ceiling: scaled(theme.ceilingColor, ENV_CEILING_COLOR_SCALE),
     }),
     [theme.wallColor, theme.floorColor, theme.ceilingColor]
   );
@@ -82,7 +77,7 @@ export default function RoomEnvironment() {
           key={i}
           form="circle"
           color={theme.spotColor}
-          intensity={CEILING_FIXTURE_INTENSITY}
+          intensity={ENV_CEILING_FIXTURE_INTENSITY}
           scale={CEILING_FIXTURE_RADIUS}
           position={[x - cx, ceilingY - 0.03, z - cz]}
           rotation-x={Math.PI / 2}

@@ -36,12 +36,27 @@ export function createNavigationRequest(): NavigationRequest {
   return { target: null, look: null };
 }
 
-/** Painting → visitor distance range (m). The upper bound stays inside ArtworkIconProjector's 3.5 m icon radius. */
+/**
+ * Painting → visitor distance range (m). The upper bound stays just inside ArtworkIconProjector's 3.5 m
+ * icon radius (a client-approved value shared with the mobile app — don't push past it). The narrower
+ * camera (cameraFov.ts) needs more distance for large works, hence 3.4 rather than the old 3.2.
+ */
 const VIEW_DISTANCE_MIN = 1.2;
-const VIEW_DISTANCE_MAX = 3.2;
+const VIEW_DISTANCE_MAX = 3.4;
 /** Painting → floor marker centre (m): the marker sits at the foot of the work, clear of the wall. */
 export const MARKER_DISTANCE = 0.6;
 export const PITCH_LIMIT = Math.PI / 2 - 0.05;
+
+/** Camera view the standing spot is fitted to (vertical FOV in degrees, width / height). */
+export interface ViewFrustum {
+  verticalFovDeg: number;
+  aspect: number;
+}
+const DEFAULT_VIEW: ViewFrustum = { verticalFovDeg: 48, aspect: 16 / 9 };
+/** Largest share of the view (each axis) a painting may take when the visitor steps in front of it. */
+const VIEW_FILL = 0.7;
+/** Extra wall (m, total) kept visible around the work — room for the frame and the wall label. */
+const VIEW_MARGIN = 0.4;
 
 export function collides(x: number, z: number, colliders: ColliderBox[], radius = PLAYER_RADIUS): boolean {
   for (const box of colliders) {
@@ -127,9 +142,25 @@ export function walkableFloorPoint(
  * Standing spot straight in front of a painting: far enough to take the whole work in (scales with its
  * size), pulled closer if that spot would put the visitor inside a wall or a piece of furniture.
  */
-export function computeArtworkViewpoint(artwork: ArtworkData, colliders: ColliderBox[]): ArtworkViewpoint {
+export function computeArtworkViewpoint(
+  artwork: ArtworkData,
+  colliders: ColliderBox[],
+  view: ViewFrustum = DEFAULT_VIEW
+): ArtworkViewpoint {
   const width = artwork.height * artwork.aspect;
-  const ideal = Math.min(VIEW_DISTANCE_MAX, Math.max(VIEW_DISTANCE_MIN + 0.4, 0.9 + Math.max(width, artwork.height)));
+  // Distance at which the work (plus a little wall around it) fills at most VIEW_FILL of the view in
+  // both directions — the narrower, more natural camera (cameraFov.ts) needs more room than the old
+  // fixed 65° did, especially for large works on wide phone screens.
+  const halfV = Math.tan((view.verticalFovDeg * Math.PI) / 360);
+  const halfH = halfV * view.aspect;
+  const fitDistance = Math.max(
+    (artwork.height + VIEW_MARGIN) / (2 * halfV * VIEW_FILL),
+    (width + VIEW_MARGIN) / (2 * halfH * VIEW_FILL)
+  );
+  const ideal = Math.min(
+    VIEW_DISTANCE_MAX,
+    Math.max(VIEW_DISTANCE_MIN + 0.4, 0.9 + Math.max(width, artwork.height), fitDistance)
+  );
   // rotationY maps the painting's front (local +Z) to world (sin, 0, cos).
   const nx = Math.sin(artwork.rotationY);
   const nz = Math.cos(artwork.rotationY);
@@ -246,24 +277,7 @@ export function estimateLookVelocity(samples: LookSample[], releaseT: number): {
   return { yaw, pitch };
 }
 
-// --- Binocular zoom ------------------------------------------------------------------------------------
-// Pinch (touch) / mouse wheel narrows the camera's field of view instead of moving the visitor — a closer
-// look at a painting without walking into walls. The zoom persists while walking.
-
-/** Strongest magnification relative to the scene's normal field of view. */
-export const MAX_ZOOM = 2.5;
-
-/** FOV (degrees) after magnifying `currentFov` by `scale` (>1 zooms in), clamped to [1×, MAX_ZOOM×] of `baseFov`. */
-export function zoomedFov(baseFov: number, currentFov: number, scale: number): number {
-  const half = (deg: number) => Math.tan((deg * Math.PI) / 360);
-  const baseHalf = half(baseFov);
-  const nextHalf = clamp(half(currentFov) / scale, baseHalf / MAX_ZOOM, baseHalf);
-  return (Math.atan(nextHalf) * 360) / Math.PI;
-}
-
-function clamp(v: number, lo: number, hi: number) {
-  return Math.min(hi, Math.max(lo, v));
-}
+// Binocular zoom (pinch / mouse wheel) lives in cameraFov.ts.
 
 // --- Painting picking ----------------------------------------------------------------------------------
 

@@ -7,11 +7,13 @@
 // identical geometry).
 import * as THREE from "three";
 import type { Artwork as ArtworkData } from "./artworks";
+// Lamp height and arm length come from pictureLight.ts — the light is emitted from this fixture's LED strip,
+// so the two must never disagree.
+import { LAMP_STRIP_DROP, lampBarY, lampStandoff } from "./pictureLight";
 
-const LAMP_RISE = 0.45;
-const CEILING_CLEARANCE = 0.15;
 const BASE_STANDOFF = 0.1;
-const BAR_STANDOFF = 0.24;
+/** Painting height whose arm length the shared torus geometry is built for (others get a uniform scale). */
+const CANONICAL_PAINTING_HEIGHT = 1.4;
 const ARM_TANGENT_OFFSET = 0.09;
 
 /** Base cylinder length never varies per painting — same shared geometry for every instance, no per-instance scale needed. */
@@ -20,12 +22,14 @@ export const FIXTURE_BASE_LENGTH = ARM_TANGENT_OFFSET * 2 + 0.12;
 /**
  * The arm torus's ring radius is `hypot(barStandoff-baseStandoff, barY-baseY)/2`.
  * `barY-baseY` is a constant -0.26 unless the painting's lamp is clamped
- * against a low ceiling (see baseY's `Math.min` below) — this canonical
- * value is the shared torus geometry's radius; the rare clamped case is
- * handled with a per-instance uniform scale correction instead of its own
- * geometry.
+ * against a low ceiling (see baseY's `Math.min` below); the bar standoff
+ * grows with the painting (lampStandoff — bigger paintings get longer arms).
+ * This canonical value, for a typical painting, is the shared torus
+ * geometry's radius; every other instance gets a per-instance uniform scale
+ * correction instead of its own geometry.
  */
-export const CANONICAL_ARM_RADIUS = Math.hypot(BAR_STANDOFF - BASE_STANDOFF, 0.26) / 2;
+export const CANONICAL_ARM_RADIUS =
+  Math.hypot(lampStandoff(CANONICAL_PAINTING_HEIGHT) - BASE_STANDOFF, 0.26) / 2;
 
 export interface FixtureTransform {
   basePosition: [number, number, number];
@@ -44,8 +48,8 @@ export interface FixtureTransform {
 
 /** Computes one painting's picture-light fixture transform (base/arms/bar/LED strip) — same geometry ArtworkLightPool used to build inline, now a pure function so it can be called for every painting up front and batched into instanced pools. */
 export function computeFixtureTransform(data: ArtworkData, wallHeight: number): FixtureTransform {
-  const topEdge = data.position[1] + data.height / 2;
-  const lightY = Math.min(topEdge + LAMP_RISE, wallHeight - CEILING_CLEARANCE);
+  const lightY = lampBarY(data, wallHeight);
+  const barStandoff = lampStandoff(data.height);
 
   const normal = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), data.rotationY);
   const tangent = new THREE.Vector3(normal.z, 0, -normal.x);
@@ -57,16 +61,16 @@ export function computeFixtureTransform(data: ArtworkData, wallHeight: number): 
   const barLength = THREE.MathUtils.clamp(width * 0.55, 0.45, 1.3);
 
   const barPosition: [number, number, number] = [
-    data.position[0] + normal.x * BAR_STANDOFF,
+    data.position[0] + normal.x * barStandoff,
     barY,
-    data.position[2] + normal.z * BAR_STANDOFF,
+    data.position[2] + normal.z * barStandoff,
   ];
   const basePosition: [number, number, number] = [
     data.position[0] + normal.x * BASE_STANDOFF,
     baseY,
     data.position[2] + normal.z * BASE_STANDOFF,
   ];
-  const stripPosition: [number, number, number] = [barPosition[0], barY - 0.032 - 0.006, barPosition[2]];
+  const stripPosition: [number, number, number] = [barPosition[0], barY - LAMP_STRIP_DROP, barPosition[2]];
 
   const barQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
   const baseQuaternion = barQuaternion.clone();
@@ -74,7 +78,7 @@ export function computeFixtureTransform(data: ArtworkData, wallHeight: number): 
   const stripBasis = new THREE.Matrix4().makeBasis(tangent, new THREE.Vector3(0, 1, 0), normal);
   const stripQuaternion = new THREE.Quaternion().setFromRotationMatrix(stripBasis);
 
-  const aDiff = BAR_STANDOFF - BASE_STANDOFF;
+  const aDiff = barStandoff - BASE_STANDOFF;
   const bDiff = barY - baseY;
   const armRadius = Math.hypot(aDiff, bDiff) / 2;
   const angle0 = Math.atan2(bDiff, aDiff);
@@ -84,7 +88,7 @@ export function computeFixtureTransform(data: ArtworkData, wallHeight: number): 
     .setFromRotationMatrix(armBasis)
     .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle0));
 
-  const midStandoff = (BASE_STANDOFF + BAR_STANDOFF) / 2;
+  const midStandoff = (BASE_STANDOFF + barStandoff) / 2;
   const armCenters = ([-1, 1] as const).map((s) => {
     const t = s * ARM_TANGENT_OFFSET;
     return [

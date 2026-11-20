@@ -1,8 +1,19 @@
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Suspense, useContext, useEffect, useMemo, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { PerformanceMonitor, Stats } from "@react-three/drei";
-import { EffectComposer, Bloom, Vignette, SMAA, ToneMapping } from "@react-three/postprocessing";
-import { ToneMappingMode } from "postprocessing";
+import {
+  EffectComposer,
+  EffectComposerContext,
+  Bloom,
+  Vignette,
+  Noise,
+  SMAA,
+  ToneMapping,
+} from "@react-three/postprocessing";
+import SeparateFXAA from "./SeparateFXAA";
+import { antialiasMode, renderPixelRatio } from "./renderScale";
+import { isTouchPrimaryDevice } from "../../lib/navigationMode";
+import { BlendFunction, ToneMappingMode } from "postprocessing";
 import * as THREE from "three";
 import Gallery from "./Gallery";
 import Player from "./Player";
@@ -11,44 +22,62 @@ import SeatProximityTracker from "./SeatProximityTracker";
 import ClickNavigation from "./ClickNavigation";
 import WalkArtworkPicker from "./WalkArtworkPicker";
 import { createNavigationRequest } from "./clickNavigationGeometry";
+import { fovAtZoom, fovForAspect, type CameraZoom } from "./cameraFov";
 import type { NavigationMode } from "../../lib/navigationMode";
 import { buildRoomLayout } from "./galleryLayout";
 import { ExhibitionProvider } from "./ExhibitionContext";
 import type { Exhibition } from "./exhibitions";
 import type { SeatSpot } from "./seating";
 
-// Render cost scales with the actual number of pixels the GPU has to fill every frame —
-// a browser window maximized on a 4K TV or a wide external monitor has several times the
-// CSS pixel area of a laptop's own screen, even at the exact same pixel ratio. Capping the
-// renderer's *total* output pixel budget (not just its ratio relative to CSS size) means a
-// visitor on a huge screen gets a lower resolution render rather than a choppy one — fluid
-// over sharp, which matters more once this scene is walked around in than static sharpness
-// does. 1920x1080 is a deliberately conservative target; this is the ceiling, ordinary
-// laptop/phone windows rarely hit it and keep their normal (FPS-driven, see below) ratio.
-const MAX_RENDER_PIXELS = 1920 * 1080;
-// Never drop below this even on an enormous screen — past this point the blur would be more
-// distracting than the fluidity gain is worth.
-const MIN_RENDER_SCALE = 0.5;
+/**
+ * Starting point of the FPS-driven quality (0..1). Phones start mid-way (already ~1.8× on a 2.6× screen):
+ * starting higher meant several seconds of stutter while the monitor stepped down.
+ */
+const INITIAL_QUALITY = isTouchPrimaryDevice() ? 0.5 : 0.75;
+/** One FPS sample window = PERF_ITERATIONS × 250 ms; shorter than drei's 10 so a slow device adapts sooner. */
+const PERF_ITERATIONS = 6;
+/** How far one PerformanceMonitor incline/decline moves the quality. */
+const QUALITY_STEP = 0.25;
 
 /**
- * Combines two independent signals into the renderer's actual pixel ratio:
- * 1. `qualityScale` — FPS-driven (see PerformanceMonitor below): how much headroom this
- *    device has proven it has, same idea as before.
- * 2. A hard cap derived from the canvas's current CSS size, so `qualityScale` alone can
- *    never push a giant window past MAX_RENDER_PIXELS total fragments per frame.
- * Must live inside <Canvas> (needs live `size`/`gl` from the R3F render tree) rather than
- * going through the `dpr` prop, which only knows a flat ratio, not the window's actual
- * pixel area.
+ * Sets the renderer's pixel ratio from the screen density, the canvas size and the FPS-driven quality
+ * (renderScale.ts has the policy). Rendered *inside* <EffectComposer>: the composer sizes its buffers only
+ * when the canvas CSS size changes, not when the pixel ratio does, so it has to be resized here too —
+ * otherwise the post-processing chain keeps rendering at whatever ratio it started with.
  */
-function AdaptiveRenderScale({ qualityScale }: { qualityScale: number }) {
+function AdaptiveRenderScale({ quality }: { quality: number }) {
   const { gl, size } = useThree();
+  const { composer } = useContext(EffectComposerContext);
 
   useEffect(() => {
-    const sizeCapScale = Math.sqrt(MAX_RENDER_PIXELS / (size.width * size.height));
-    const scale = Math.max(MIN_RENDER_SCALE, Math.min(qualityScale, sizeCapScale));
-    gl.setPixelRatio(scale);
-  }, [gl, size, qualityScale]);
+    const ratio = renderPixelRatio({
+      devicePixelRatio: window.devicePixelRatio,
+      cssWidth: size.width,
+      cssHeight: size.height,
+      quality,
+    });
+    if (gl.getPixelRatio() === ratio) return;
+    gl.setPixelRatio(ratio);
+    composer.setSize(size.width, size.height);
+  }, [gl, composer, size, quality]);
 
+  return null;
+}
+
+/**
+ * The only writer of `camera.fov`: the aspect-derived base FOV (cameraFov.ts) narrowed by the click-mode
+ * pinch/wheel zoom. A per-frame compare is a handful of ALU ops and keeps resize + zoom from fighting
+ * over the camera; the projection matrix is only rebuilt when the value actually changes.
+ */
+function CameraFov({ cameraZoom }: { cameraZoom: CameraZoom }) {
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  const size = useThree((s) => s.size);
+  useFrame(() => {
+    const fov = fovAtZoom(fovForAspect(size.width / Math.max(1, size.height)), cameraZoom.zoom);
+    if (Math.abs(fov - camera.fov) < 1e-4) return;
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  });
   return null;
 }
 
@@ -76,10 +105,11 @@ export default function Scene({
 }: SceneProps) {
   // Click-to-go request shared by ClickNavigation (writes) and Player (reads every frame).
   const [navigation] = useState(createNavigationRequest);
-  // FPS-driven quality signal: start conservative and only spend extra pixels once the
-  // device has proven it can hold frame rate, so mid/low-end GPUs don't pay retina-level
-  // render cost by default. Combined with the window-size cap in AdaptiveRenderScale above.
-  const [qualityScale, setQualityScale] = useState(1);
+  // Pinch / wheel magnification shared by ClickNavigation (writes) and CameraFov (applies).
+  const [cameraZoom] = useState<CameraZoom>(() => ({ zoom: 1 }));
+  // FPS-driven quality (0..1), turned into a pixel ratio by AdaptiveRenderScale above.
+  const [quality, setQuality] = useState(INITIAL_QUALITY);
+  const [antialias] = useState(() => antialiasMode(window.devicePixelRatio));
 
   const layout = useMemo(
     () =>
@@ -98,27 +128,29 @@ export default function Scene({
       // scene root is rotated 90° with CSS (useForcedLandscape.ts), and the bounding rect would report the
       // rotated, portrait box — the wrong aspect ratio.
       resize={{ offsetSize: true }}
-      camera={{ fov: 65, near: 0.1, far: 100, position: layout.playerStart }}
+      // fov here is only the first frame's value — CameraFov derives the real one from the aspect ratio.
+      camera={{ fov: 48, near: 0.1, far: 100, position: layout.playerStart }}
       onCreated={({ gl }) => {
         gl.outputColorSpace = THREE.SRGBColorSpace;
         onCanvasReady?.(gl.domElement);
       }}
     >
-      <AdaptiveRenderScale qualityScale={qualityScale} />
       <PerformanceMonitor
-        onIncline={() => setQualityScale(1.5)}
-        onDecline={() => setQualityScale(1)}
-        // A borderline device can incline/decline back and forth every few seconds,
-        // which reads to the user as FPS randomly swinging. Once drei detects that
-        // oscillation (default: 3 flip-flops), settle on the conservative resolution
-        // instead of letting it keep bouncing.
-        onFallback={() => setQualityScale(1)}
+        factor={INITIAL_QUALITY}
+        step={QUALITY_STEP}
+        iterations={PERF_ITERATIONS}
+        onChange={({ factor }) => setQuality(factor)}
+        // A borderline device can incline/decline back and forth every few seconds, which reads to the
+        // user as the image randomly sharpening/softening. Once drei detects that oscillation (default:
+        // 3 flip-flops), settle one step below the current quality and stop adjusting.
+        onFallback={({ factor }) => setQuality(Math.max(0, factor - QUALITY_STEP))}
       />
       <color attach="background" args={[exhibition.theme.backgroundColor]} />
       <ExhibitionProvider exhibition={exhibition} layout={layout}>
         <Suspense fallback={null}>
           <Gallery />
         </Suspense>
+        <CameraFov cameraZoom={cameraZoom} />
         <Player
           onLockChange={onLockChange}
           seatedSpot={seatedSpot}
@@ -131,6 +163,7 @@ export default function Scene({
             navigation={navigation}
             movementLocked={Boolean(seatedSpot)}
             onArtworkClick={onArtworkClick}
+            cameraZoom={cameraZoom}
           />
         )}
         {onIconPositionsChange && (
@@ -149,17 +182,31 @@ export default function Scene({
           expensive option) — SMAA is a cheap edge-detection post-process pass instead, added last so
           it smooths the final composited frame (including Bloom's contribution) in one go. */}
       <EffectComposer multisampling={0}>
+        <AdaptiveRenderScale quality={quality} />
         {/* Bloom runs on the linear HDR frame (before tone mapping). Threshold 1.0 = only true light sources
             (emissive fixtures, values above display white) glow; the previous 0.82 also caught brightly
             spot-lit wall/canvas areas, giving paintings a hazy halo instead of a crisp lit surface. */}
-        <Bloom intensity={0.4} luminanceThreshold={1.0} luminanceSmoothing={0.25} mipmapBlur />
+        {/* Threshold 1.5 (was 1.0): since the exposure rebalance (sceneLighting.ts) the light areas of a
+            picture-lit canvas reach ~1.4 linear, and a painting must never glow like a lamp. The ceiling
+            fixture discs (emissive 3) and the picture-light LED strips (3.5) still clear it and keep their halo. */}
+        <Bloom intensity={0.4} luminanceThreshold={1.5} luminanceSmoothing={0.25} mipmapBlur />
         {/* Khronos PBR Neutral rather than ACES Filmic: ACES shifts hues and saturation (warm yellows/oranges
             especially), which misrepresents the artworks' real colors — the one thing a gallery must not do.
             Neutral leaves everything below ~0.8 essentially linear (so the room's existing brightness tuning
             still holds) and only rolls off the highlights that used to hard-clip into flat white patches. */}
         <ToneMapping mode={ToneMappingMode.NEUTRAL} />
-        <Vignette eskil={false} offset={0.22} darkness={0.55} />
-        <SMAA />
+        {/* Was offset 0.22 / darkness 0.55 — strong enough to read as a filter rather than a lens. With the
+            narrower camera (cameraFov.ts) a light touch is all that's left to do. */}
+        <Vignette eskil={false} offset={0.3} darkness={0.3} />
+        {/* Faint animated film grain, after tone mapping (works on display-referred values). A clean CG frame
+            has dead-flat colour areas and can band on smooth gradients; real camera footage always carries
+            some grain. OVERLAY rather than the default SCREEN: noise averages 0.5, and overlay(c, 0.5) = c, so
+            it adds texture without lifting the exposure (SCREEN only ever brightens), and its amplitude
+            scales with the underlying value in the darks, like premultiply would. Not a convolution, so it
+            merges into the same EffectPass as ToneMapping/Vignette — no extra pass, a few ALU per pixel. */}
+        <Noise blendFunction={BlendFunction.OVERLAY} opacity={0.05} />
+        {/* Single-pass FXAA on high-density (phone/retina) screens, SMAA elsewhere — see antialiasMode. */}
+        {antialias === "smaa" ? <SMAA /> : <SeparateFXAA />}
       </EffectComposer>
     </Canvas>
   );

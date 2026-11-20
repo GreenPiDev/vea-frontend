@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
+import * as THREE from "three";
+import { isRoundFurnitureName } from "./furniture";
+import { applyRoomAo, createRoomAoUniforms } from "./roomAoMaterial";
 import {
+  CEILING_AO,
   DEFAULT_AO_FIELD_OPTIONS,
+  FURNITURE_CONTACT,
+  FURNITURE_FIELD_RANGE,
   buildRoomAoField,
+  ceilingOcclusion,
+  contactFootprint,
+  decodeFurnitureDistance,
   distanceToFurnitureFootprint,
+  encodeFurnitureDistance,
+  furnitureContact,
+  signedDistanceToFurniture,
   distanceToWallFootprint,
   occlusionAtDistance,
   type AoField,
@@ -74,6 +86,43 @@ describe("occlusionAtDistance", () => {
   });
 });
 
+describe("ceilingOcclusion", () => {
+  const { radius, strength } = DEFAULT_AO_FIELD_OPTIONS.wall;
+  const floorAt = (d: number) => occlusionAtDistance(d, radius, strength);
+  const ceilingAt = (d: number) => ceilingOcclusion(floorAt(d));
+
+  it("is unoccluded where the field is", () => {
+    expect(ceilingOcclusion(1)).toBe(1);
+    expect(ceilingAt(radius)).toBe(1);
+  });
+
+  it("is weaker than the floor right at the wall", () => {
+    expect(ceilingAt(0)).toBeCloseTo(1 - CEILING_AO.strength);
+    expect(ceilingAt(0)).toBeGreaterThan(floorAt(0));
+  });
+
+  it("is a narrow band: practically gone a third of a metre out", () => {
+    expect(ceilingAt(0.35)).toBeGreaterThan(0.95);
+    // The floor is still clearly darkened at the same distance.
+    expect(floorAt(0.35)).toBeLessThan(0.75);
+  });
+
+  it("never darkens more than the floor and rises monotonically away from the wall", () => {
+    let prev = -1;
+    for (let d = 0; d <= radius; d += 0.05) {
+      const c = ceilingAt(d);
+      expect(c).toBeGreaterThanOrEqual(floorAt(d) - 1e-9);
+      expect(c).toBeGreaterThanOrEqual(prev);
+      prev = c;
+    }
+  });
+
+  it("tolerates 8-bit quantisation noise outside 0..1", () => {
+    expect(ceilingOcclusion(1.01)).toBe(1);
+    expect(ceilingOcclusion(0)).toBeCloseTo(1 - CEILING_AO.strength);
+  });
+});
+
 describe("buildRoomAoField", () => {
   const layout = buildRoomLayout([10, 8], 3.5);
   const field = buildRoomAoField(layout.room, layout.walls);
@@ -116,13 +165,113 @@ describe("buildRoomAoField", () => {
     expect(sample(f, 0.05, 0.25)).toBeLessThan(0.8);
   });
 
-  it("keeps furniture occlusion in its own channel", () => {
+  it("keeps furniture contact in its own channel, as a signed distance", () => {
     const bench: PlacedFurnitureInput = { x: 0, z: 0, rotationY: 0, halfWidth: 0.8, halfDepth: 0.25 };
     const f = buildRoomAoField(layout.room, layout.walls, [bench]);
-    // Under the bench: furniture channel at full strength, wall channel untouched.
-    expect(sample(f, 0.05, 0.05, 1)).toBeCloseTo(1 - DEFAULT_AO_FIELD_OPTIONS.furniture.strength, 2);
+    // Under the bench: deep inside the footprint, wall channel untouched.
+    expect(decodeFurnitureDistance(sample(f, 0.05, 0.05, 1))).toBeLessThan(-0.15);
     expect(sample(f, 0.05, 0.05, 0)).toBe(1);
-    // Beyond the furniture radius it's unoccluded again.
+    // Far away it saturates at the encodable maximum, where the contact shadow is gone.
     expect(sample(f, 0.05, 0.85, 1)).toBe(1);
+    expect(furnitureContact(decodeFurnitureDistance(1))).toBe(1);
+  });
+});
+
+describe("furniture contact shadow (Adım 11)", () => {
+  const bench: PlacedFurnitureInput = { x: 0, z: 0, rotationY: 0, halfWidth: 0.8, halfDepth: 0.25 };
+
+  it("encodes the signed distance losslessly enough (≤ 2 mm) across its range", () => {
+    for (let d = -FURNITURE_FIELD_RANGE.inside; d <= FURNITURE_FIELD_RANGE.outside; d += 0.013) {
+      expect(Math.abs(decodeFurnitureDistance(encodeFurnitureDistance(d) / 255) - d)).toBeLessThan(0.002);
+    }
+    expect(encodeFurnitureDistance(-5)).toBe(0);
+    expect(encodeFurnitureDistance(5)).toBe(255);
+  });
+
+  it("shrinks the footprint so the shadow doesn't spill past the object as a rectangle", () => {
+    const { hw, hd } = contactFootprint(bench);
+    expect(hw).toBeCloseTo(0.8 - FURNITURE_CONTACT.inset);
+    expect(hd).toBeCloseTo(0.25 - FURNITURE_CONTACT.inset);
+    // The model's own edge lies outside the contact footprint.
+    expect(signedDistanceToFurniture(0, 0.25, bench)).toBeCloseTo(FURNITURE_CONTACT.inset, 6);
+    // Tiny pieces keep a minimum footprint.
+    expect(contactFootprint({ ...bench, halfWidth: 0.02, halfDepth: 0.02 }).hw).toBe(FURNITURE_CONTACT.minHalf);
+  });
+
+  it("is negative inside, matches the unsigned distance along the flat sides", () => {
+    expect(signedDistanceToFurniture(0, 0, bench)).toBeCloseTo(-(0.25 - FURNITURE_CONTACT.inset), 6);
+    expect(signedDistanceToFurniture(0, 0.75, bench)).toBeCloseTo(distanceToFurnitureFootprint(0, 0.75, bench) + FURNITURE_CONTACT.inset, 6);
+  });
+
+  it("rounds the corners of a box footprint (no sharp rectangle)", () => {
+    const { hw, hd } = contactFootprint(bench);
+    // At the bounding corner of the inset rectangle the rounded SDF is clearly outside.
+    expect(signedDistanceToFurniture(hw, hd, bench)).toBeGreaterThan(0.02);
+  });
+
+  it("gives round pieces a disc: equal distance in every direction", () => {
+    const vase: PlacedFurnitureInput = { x: 1, z: 1, rotationY: 0.3, halfWidth: 0.2, halfDepth: 0.2, round: true };
+    const r = 0.2 - FURNITURE_CONTACT.inset;
+    for (let a = 0; a < Math.PI * 2; a += 0.4) {
+      expect(signedDistanceToFurniture(1 + Math.cos(a) * 0.5, 1 + Math.sin(a) * 0.5, vase)).toBeCloseTo(0.5 - r, 6);
+    }
+  });
+
+  it("has a dark narrow core and a wide faint pool", () => {
+    const under = furnitureContact(-0.2);
+    const edge = furnitureContact(0);
+    const near = furnitureContact(0.1);
+    const far = furnitureContact(0.3);
+    expect(under).toBeLessThan(0.4);
+    expect(under).toBeGreaterThan(0.25); // not a black hole
+    expect(edge).toBeLessThan(near);
+    expect(near - edge).toBeGreaterThan(0.2); // the core drops off sharply within ~10 cm
+    expect(far - near).toBeLessThan(near - edge); // then the soft pool fades slowly
+    expect(far).toBeLessThan(1);
+    expect(furnitureContact(FURNITURE_CONTACT.soft.outer)).toBe(1);
+    let prev = 0;
+    for (let d = -0.25; d <= 0.6; d += 0.01) {
+      const v = furnitureContact(d);
+      expect(v).toBeGreaterThanOrEqual(prev - 1e-12);
+      prev = v;
+    }
+  });
+
+  it("darkens only part of the ceiling-fixture light", () => {
+    expect(FURNITURE_CONTACT.ceilingLightShare).toBeGreaterThan(0);
+    expect(FURNITURE_CONTACT.ceilingLightShare).toBeLessThan(1);
+  });
+
+  it("stays smooth across overlapping pieces (union = nearest)", () => {
+    const a = { ...bench, x: -0.5 };
+    const b = { ...bench, x: 0.5 };
+    const layout = buildRoomLayout([10, 8], 3.5);
+    const f = buildRoomAoField(layout.room, layout.walls, [a, b]);
+    expect(decodeFurnitureDistance(sample(f, 0.05, 0.05, 1))).toBeLessThan(-0.15);
+  });
+});
+
+describe("round furniture detection + shader wiring", () => {
+  it("recognises round bases by name, leaves benches and plinths boxy", () => {
+    for (const n of ["Seramik Vazo", "Saksı Bitkisi", "Round side table", "Yuvarlak Kaide", "Amphora"]) {
+      expect(isRoundFurnitureName(n)).toBe(true);
+    }
+    for (const n of ["Antique canape", "Kaide", "Bank", "Sandalye", "Return desk"]) {
+      expect(isRoundFurnitureName(n)).toBe(false);
+    }
+  });
+
+  it("applies the contact shadow to the floor's AO and its ceiling-fixture light", () => {
+    const m = new THREE.MeshStandardMaterial();
+    const field = buildRoomAoField(buildRoomLayout([4, 4], 3).room, []);
+    applyRoomAo(m, "floor", createRoomAoUniforms(field, 3, 0.5));
+    const shader = {
+      uniforms: {} as Record<string, { value: unknown }>,
+      vertexShader: THREE.ShaderLib.physical.vertexShader,
+      fragmentShader: THREE.ShaderLib.physical.fragmentShader,
+    };
+    m.onBeforeCompile(shader as never, null as never);
+    expect(shader.fragmentShader).toContain("ao.r * roomFurnitureContact(ao.g)");
+    expect(shader.fragmentShader).toContain("* (roomCeilingLightOcclusion())");
   });
 });

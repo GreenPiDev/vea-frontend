@@ -12,8 +12,6 @@ import {
   pickArtwork,
   walkableFloorPoint,
   estimateLookVelocity,
-  zoomedFov,
-  MAX_ZOOM,
   MARKER_DISTANCE,
 } from "./clickNavigationGeometry";
 import { EYE_HEIGHT, WALL_CLEARANCE, buildRoomLayout, type ColliderBox } from "./galleryLayout";
@@ -92,7 +90,7 @@ describe("computeArtworkViewpoint", () => {
     const vp = computeArtworkViewpoint(painting, room.colliders);
     expect(vp.x).toBeCloseTo(0);
     expect(vp.z).toBeGreaterThan(painting.position[2] + 1.2);
-    expect(vp.z).toBeLessThanOrEqual(painting.position[2] + 3.2 + 1e-9);
+    expect(vp.z).toBeLessThanOrEqual(painting.position[2] + 3.4 + 1e-9);
     expect(vp.yaw).toBe(0);
     // Painting centre (1.6 m) is just below eye height → looking slightly down.
     expect(vp.pitch).toBeCloseTo(Math.atan2(1.6 - EYE_HEIGHT, vp.z - painting.position[2]));
@@ -112,6 +110,28 @@ describe("computeArtworkViewpoint", () => {
     const vp = computeArtworkViewpoint(painting, [...room.colliders, bench]);
     expect(vp.z).toBeLessThan(free.z);
     expect(collides(vp.x, vp.z, [...room.colliders, bench])).toBe(false);
+  });
+
+  it("stands further back for a large work on a narrow view, within the icon radius", () => {
+    // 2 m tall, 1 m wide: the old size-only formula put this at 2.9 m, where it filled ~80 % of a
+    // 44° (phone landscape) vertical view.
+    const tall = { ...painting, height: 2, aspect: 0.5 };
+    const view = { verticalFovDeg: 44, aspect: 19.5 / 9 };
+    const distance = computeArtworkViewpoint(tall, room.colliders, view).z - tall.position[2];
+    expect(distance).toBeGreaterThan(2.9 + 0.3);
+    expect(distance).toBeLessThan(3.5);
+  });
+
+  it("small works keep the size-based distance (no needless retreat)", () => {
+    const vp = computeArtworkViewpoint(painting, room.colliders, { verticalFovDeg: 48, aspect: 16 / 9 });
+    // 1.5 × 1 m → 0.9 + 1.5 = 2.4 m, already comfortably inside 70 % of a 48°/77° view.
+    expect(vp.z - painting.position[2]).toBeCloseTo(2.4);
+  });
+
+  it("a narrower camera never brings the visitor closer", () => {
+    const wide = computeArtworkViewpoint(painting, room.colliders, { verticalFovDeg: 58, aspect: 4 / 3 });
+    const narrow = computeArtworkViewpoint(painting, room.colliders, { verticalFovDeg: 44, aspect: 4 / 3 });
+    expect(narrow.z).toBeGreaterThanOrEqual(wide.z);
   });
 });
 
@@ -199,24 +219,6 @@ describe("estimateLookVelocity", () => {
   it("caps very fast swipes", () => {
     const v = estimateLookVelocity([{ t: 0, yaw: 0, pitch: 0 }, { t: 20, yaw: 1, pitch: 0 }], 25);
     expect(Math.hypot(v.yaw, v.pitch)).toBeCloseTo(5);
-  });
-});
-
-describe("zoomedFov", () => {
-  const half = (deg: number) => Math.tan((deg * Math.PI) / 360);
-
-  it("magnifies by the pinch scale", () => {
-    const fov = zoomedFov(65, 65, 2);
-    expect(half(65) / half(fov)).toBeCloseTo(2);
-  });
-
-  it("never zooms out past the normal view", () => {
-    expect(zoomedFov(65, 50, 0.1)).toBeCloseTo(65);
-  });
-
-  it("stops at the maximum magnification", () => {
-    const fov = zoomedFov(65, 65, 100);
-    expect(half(65) / half(fov)).toBeCloseTo(MAX_ZOOM);
   });
 });
 
