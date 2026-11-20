@@ -13,10 +13,7 @@ import {
   startDirectWalk,
   estimateLookVelocity,
   computeArtworkViewpoint,
-  floorPointFromRay,
-  pickViewpoint,
   pickWallTarget,
-  walkableFloorPoint,
   wallBoxes,
   type ArtworkViewpoint,
   type FloorPoint,
@@ -25,7 +22,7 @@ import {
   type WallTarget,
 } from "./clickNavigationGeometry";
 import { clampZoom, fovForAspect, type CameraZoom } from "./cameraFov";
-import { startRouteWalk } from "./routePlanner";
+import { artworkLevel, levelAt, levelNav, pickMarker, startLevelRouteWalk, startViewpointWalk, walkableLevelPoint, type LevelPoint } from "./levels";
 
 /** Floor marker radius (m) — also the click/hover hit radius. */
 const MARKER_RADIUS = 0.3;
@@ -107,10 +104,17 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
   const { layout, exhibition } = useExhibition();
   const { artworks, rects: labelRects } = useWallLabels();
+  // Walking levels (a mezzanine adds one, levels.ts): each painting is walked to on its own level.
+  const nav = useMemo(() => levelNav(layout), [layout]);
   const viewpoints = useMemo(
     // Fitted to the unzoomed view: the standing spot shouldn't depend on a transient pinch.
-    () => artworks.map((a) => computeArtworkViewpoint(a, layout.colliders, { verticalFovDeg: fovForAspect(aspect), aspect })),
-    [artworks, layout.colliders, aspect]
+    () =>
+      artworks.map((a) => {
+        const level = artworkLevel(nav, a);
+        const l = nav.levels[level];
+        return computeArtworkViewpoint(a, l.colliders, { verticalFovDeg: fovForAspect(aspect), aspect }, level, l.y);
+      }),
+    [artworks, nav, aspect]
   );
   const walls = useMemo(() => wallBoxes(layout), [layout]);
 
@@ -121,6 +125,8 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
   const destRingRef = useRef<THREE.Mesh>(null);
   // The floor-click target the destination ring marks; the ring hides once Player clears/replaces it.
   const destTarget = useRef<FloorPoint | null>(null);
+  // Height of the floor the destination ring lies on.
+  const destY = useRef(0);
 
   const wallColor = exhibition.theme.wallColor;
   useEffect(() => setOutlineWallColor(wallColor), [wallColor]);
@@ -132,13 +138,14 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
     const walking = destTarget.current !== null && navigation.target === destTarget.current;
     if (!walking) destTarget.current = null;
     ring.visible = walking;
+    if (walking) ring.position.y = destY.current + MARKER_LIFT;
   });
 
   useLayoutEffect(() => {
     const mesh = markersRef.current;
     if (!mesh) return;
     const matrix = new THREE.Matrix4();
-    viewpoints.forEach((vp, i) => mesh.setMatrixAt(i, matrix.makeTranslation(vp.marker.x, MARKER_LIFT, vp.marker.z)));
+    viewpoints.forEach((vp, i) => mesh.setMatrixAt(i, matrix.makeTranslation(vp.marker.x, (vp.floorY ?? 0) + MARKER_LIFT, vp.marker.z)));
     mesh.instanceMatrix.needsUpdate = true;
   }, [viewpoints]);
 
@@ -164,8 +171,8 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
   });
 
   // Latest values for the long-lived DOM listeners below, without re-binding them on every change.
-  const live = useRef({ viewpoints, walls, colliders: layout.colliders, movementLocked, artworks, labelRects, onArtworkClick, onLabelClick });
-  live.current = { viewpoints, walls, colliders: layout.colliders, movementLocked, artworks, labelRects, onArtworkClick, onLabelClick };
+  const live = useRef({ viewpoints, walls, nav, movementLocked, artworks, labelRects, onArtworkClick, onLabelClick });
+  live.current = { viewpoints, walls, nav, movementLocked, artworks, labelRects, onArtworkClick, onLabelClick };
 
   useEffect(() => {
     const canvas = gl.domElement;
@@ -193,7 +200,7 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
       ndc.set((e.offsetX / canvas.clientWidth) * 2 - 1, -(e.offsetY / canvas.clientHeight) * 2 + 1);
       raycaster.setFromCamera(ndc, camera);
       const { origin, direction } = raycaster.ray;
-      const { viewpoints, walls, colliders, artworks, labelRects, onArtworkClick, onLabelClick } = live.current;
+      const { viewpoints, walls, nav, artworks, labelRects, onArtworkClick, onLabelClick } = live.current;
       // A painting or wall label under the pointer wins over everything else — it's on a wall, so there's
       // no floor target behind it anyway.
       const target = pickWallTarget(
@@ -202,15 +209,15 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
         artworks,
         onLabelClick ? labelRects : null,
         walls,
-        onArtworkClick ? FRAME_BORDER : null
+        onArtworkClick ? FRAME_BORDER : null,
+        nav.blockers
       );
       if (target) return { target, marker: null, walkable: null };
-      const floor = floorPointFromRay(origin, direction);
-      // Markers sit right at the wall's foot, so they're tested against the raw floor hit (with their own
-      // wall line-of-sight check), not the stricter walkable point below.
-      const marker = floor ? pickViewpoint({ x: origin.x, z: origin.z }, floor, viewpoints, MARKER_RADIUS, walls) : null;
-      // Null when pointing at a wall, the ceiling or furniture — no walking there, no preview ring.
-      const walkable = walkableFloorPoint(origin, direction, walls, colliders);
+      // Markers sit right at the wall's foot, so they're tested against the raw floor hit on their own level
+      // (with their own wall/slab line-of-sight check), not the stricter walkable point below.
+      const marker = pickMarker(nav, origin, direction, viewpoints, MARKER_RADIUS, walls);
+      // Null when pointing at a wall, the ceiling, furniture or the stair — no walking there, no preview ring.
+      const walkable = walkableLevelPoint(nav, origin, direction, walls);
       return { target: null, marker, walkable };
     }
 
@@ -218,20 +225,20 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
       if (outlineRef.current) applyWallTargetOutline(outlineRef.current, target, live.current.labelRects);
     }
 
-    function showHover(hit: { target: WallTarget | null; marker: ArtworkViewpoint | null; walkable: FloorPoint | null } | null) {
+    function showHover(hit: { target: WallTarget | null; marker: ArtworkViewpoint | null; walkable: LevelPoint | null } | null) {
       const target = hit?.target ?? null;
       showOutline(target);
       const marker = hit?.marker ?? null;
       const hover = hoverRef.current;
       if (hover) {
         hover.visible = marker !== null;
-        if (marker) hover.position.set(marker.marker.x, MARKER_LIFT + 0.001, marker.marker.z);
+        if (marker) hover.position.set(marker.marker.x, (marker.floorY ?? 0) + MARKER_LIFT + 0.001, marker.marker.z);
       }
       const ring = cursorRingRef.current;
       if (ring) {
         const point = marker ? null : (hit?.walkable ?? null);
         ring.visible = point !== null;
-        if (point) ring.position.set(point.x, MARKER_LIFT, point.z);
+        if (point) ring.position.set(point.x, live.current.nav.levels[point.level].y + MARKER_LIFT, point.z);
       }
       canvas.style.cursor = marker || target ? "pointer" : "";
     }
@@ -315,14 +322,20 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
         return;
       }
       if (live.current.movementLocked) return;
+      const { nav } = live.current;
+      const here: LevelPoint = { x: camera.position.x, z: camera.position.z, level: levelAt(nav, camera.position.x, camera.position.z, camera.position.y) };
       if (hit.marker) {
-        // Around furniture/partitions in the way (routePlanner.ts), facing the work on arrival.
-        const { colliders, walls } = live.current;
-        startRouteWalk(navigation, { x: camera.position.x, z: camera.position.z }, hit.marker, colliders, walls);
+        // Around furniture/partitions in the way (routePlanner.ts) — and up/down the stair when the work is on
+        // the other level (levels.ts) — facing the work on arrival.
+        startViewpointWalk(navigation, nav, here, hit.marker);
       } else if (hit.walkable) {
-        startDirectWalk(navigation, hit.walkable);
-        destTarget.current = hit.walkable;
-        destRingRef.current?.position.set(hit.walkable.x, MARKER_LIFT, hit.walkable.z);
+        const dest = { x: hit.walkable.x, z: hit.walkable.z };
+        // Same level: the plain straight walk. The other level: routed over the stair.
+        if (hit.walkable.level === here.level) startDirectWalk(navigation, dest);
+        else startLevelRouteWalk(navigation, nav, here, hit.walkable, null);
+        destTarget.current = navigation.target;
+        destY.current = nav.levels[hit.walkable.level].y;
+        destRingRef.current?.position.set(dest.x, destY.current + MARKER_LIFT, dest.z);
       }
       // Wall / ceiling / furniture click: nothing happens.
       if (e.pointerType === "mouse") showHover(hit);

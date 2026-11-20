@@ -7,6 +7,7 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { findNearestSeat, type SeatSpot } from "./seating";
+import { EYE_HEIGHT } from "./galleryLayout";
 
 const UPDATE_INTERVAL = 0.1;
 
@@ -26,7 +27,7 @@ export default function SeatProximityTracker({ seats, disabled, onNearestSeatCha
     if (clock.elapsedTime - lastUpdate.current < UPDATE_INTERVAL) return;
     lastUpdate.current = clock.elapsedTime;
 
-    const nearest = findNearestSeat(seats, camera.position.x, camera.position.z);
+    const nearest = findNearestSeat(seats, camera.position.x, camera.position.z, camera.position.y - EYE_HEIGHT);
     const nextId = nearest?.seat.id ?? null;
     if (nextId === lastSeatId.current) return;
     lastSeatId.current = nextId;

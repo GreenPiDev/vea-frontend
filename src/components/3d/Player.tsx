@@ -5,7 +5,8 @@ import * as THREE from "three";
 import { EYE_HEIGHT } from "./galleryLayout";
 import { useExhibition } from "./ExhibitionContext";
 import type { SeatSpot } from "./seating";
-import { angleDelta, clearNavigation, collides, stepToward, wallBoxes, type NavigationRequest } from "./clickNavigationGeometry";
+import { angleDelta, clearNavigation, type NavigationRequest } from "./clickNavigationGeometry";
+import { collidesOnLevel, floorYAt, levelAt, levelNav, moveOnLevels, stepTowardOnLevels } from "./levels";
 import type { NavigationMode } from "../../lib/navigationMode";
 
 /**
@@ -51,8 +52,9 @@ interface PlayerProps {
 export default function Player({ onLockChange, seatedSpot, navigationMode, navigation }: PlayerProps) {
   const { camera } = useThree();
   const { layout } = useExhibition();
-  // A routed walk may pass through furniture, never through a wall (that's how a visitor ended up outside the room).
-  const walls = useMemo(() => wallBoxes(layout), [layout]);
+  // Collider sets per walking level (one level unless the room has a mezzanine, levels.ts). A routed walk may
+  // pass through furniture, never through a wall (that's how a visitor ended up outside the room).
+  const nav = useMemo(() => levelNav(layout), [layout]);
   const keys = useRef({ forward: false, back: false, left: false, right: false });
   // Tracks which seat we're currently gliding toward, so the one-time yaw
   // snap only fires on the frame a new sit begins, not every frame while
@@ -127,7 +129,7 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
         seatedIdRef.current = seatedSpot.id;
         camera.rotation.set(0, facingOutYaw, 0);
       }
-      seatTargetRef.current.set(seatedSpot.x, SEAT_EYE_HEIGHT, seatedSpot.z);
+      seatTargetRef.current.set(seatedSpot.x, (seatedSpot.y ?? 0) + SEAT_EYE_HEIGHT, seatedSpot.z);
       camera.position.lerp(seatTargetRef.current, Math.min(1, SIT_LERP_SPEED * delta));
       seatedRotationRef.current = facingOutYaw;
       return;
@@ -138,7 +140,8 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
       // visitor's next step, since the normal `pos.y = EYE_HEIGHT` reset at
       // the bottom of this function never runs while standing still.
       seatedIdRef.current = null;
-      camera.position.y = EYE_HEIGHT;
+      const seatLevel = levelAt(nav, camera.position.x, camera.position.z, camera.position.y - SEAT_EYE_HEIGHT + EYE_HEIGHT);
+      camera.position.y = floorYAt(nav, camera.position.x, camera.position.z, seatLevel) + EYE_HEIGHT;
 
       // Step out of the seat's own collider (see STAND_CLEARANCE_STEPS'
       // comment above) before WASD control resumes below.
@@ -146,10 +149,10 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
       const forwardZ = -Math.cos(seatedRotationRef.current);
       // Only when actually stuck in the seat's collider — a thumbnail-rail teleport may have already moved
       // the visitor somewhere free on this same frame, and must not be shoved forward.
-      if (collides(camera.position.x, camera.position.z, layout.colliders)) for (const clearance of STAND_CLEARANCE_STEPS) {
+      if (collidesOnLevel(nav, camera.position.x, camera.position.z, seatLevel)) for (const clearance of STAND_CLEARANCE_STEPS) {
         const nx = camera.position.x + forwardX * clearance;
         const nz = camera.position.z + forwardZ * clearance;
-        if (!collides(nx, nz, layout.colliders)) {
+        if (!collidesOnLevel(nav, nx, nz, seatLevel)) {
           camera.position.x = nx;
           camera.position.z = nz;
           break;
@@ -157,6 +160,8 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
       }
     }
 
+    // The visitor's level, from where the camera is (levels.ts) — a teleport only sets the camera height.
+    const level = levelAt(nav, camera.position.x, camera.position.z, camera.position.y);
     const { forward, back, left, right } = keys.current;
     const anyKey = forward || back || left || right;
     if (anyKey) {
@@ -185,13 +190,13 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
       // Eases down only over the last metre of the whole walk, not at every corner.
       const speed = (navigation.speed ?? CLICK_WALK_SPEED) * Math.min(1, 0.25 + remaining);
       const maxStep = speed * Math.min(delta, 0.05);
-      let step = stepToward(pos, leg, maxStep, layout.colliders);
-      // Something the route didn't account for (or a painting fenced in by furniture): walk through it.
+      const here = { x: pos.x, z: pos.z, level };
+      let step = stepTowardOnLevels(nav, here, leg, maxStep);
       // Furniture the route didn't account for (or a painting fenced in by it): walk through it — walls still stop us.
-      if (step.blocked && navigation.mustArrive) step = stepToward(pos, leg, maxStep, walls);
+      if (step.blocked && navigation.mustArrive) step = stepTowardOnLevels(nav, here, leg, maxStep, true);
       pos.x = step.x;
       pos.z = step.z;
-      pos.y = EYE_HEIGHT;
+      pos.y = step.floorY + EYE_HEIGHT;
       if (step.blocked && !step.arrived && navigation.mustArrive) {
         // A wall in the way (shouldn't happen with a planned route): stop here rather than leave the room.
         clearNavigation(navigation);
@@ -254,14 +259,10 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
     }
 
     const pos = camera.position;
-
-    if (dx !== 0 && !collides(pos.x + dx, pos.z, layout.colliders)) {
-      pos.x += dx;
-    }
-    if (dz !== 0 && !collides(pos.x, pos.z + dz, layout.colliders)) {
-      pos.z += dz;
-    }
-    pos.y = EYE_HEIGHT;
+    const moved = moveOnLevels(nav, { x: pos.x, z: pos.z, level }, dx, dz);
+    pos.x = moved.x;
+    pos.z = moved.z;
+    pos.y = moved.floorY + EYE_HEIGHT;
   });
 
   if (navigationMode !== "walk") return null;

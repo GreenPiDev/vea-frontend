@@ -7,6 +7,7 @@
 import type { Artwork as ArtworkData } from "./artworks";
 import { EYE_HEIGHT, PLAYER_RADIUS, type ColliderBox, type RoomLayout } from "./galleryLayout";
 import { balconyGeometries, railingColliders, solidWallBoxes } from "./balcony";
+import { blockedBefore, type SolidBox } from "./mezzanine";
 
 export interface FloorPoint {
   x: number;
@@ -22,6 +23,9 @@ export interface ArtworkViewpoint extends FloorPoint {
   yaw: number;
   /** Camera pitch (positive = looking up). */
   pitch: number;
+  /** Walking level of the standing spot and the floor height the marker lies on (levels.ts; 0 when unset). */
+  level?: number;
+  floorY?: number;
 }
 
 /**
@@ -173,7 +177,9 @@ export function walkableFloorPoint(
 export function computeArtworkViewpoint(
   artwork: ArtworkData,
   colliders: ColliderBox[],
-  view: ViewFrustum = DEFAULT_VIEW
+  view: ViewFrustum = DEFAULT_VIEW,
+  level = 0,
+  floorY = 0
 ): ArtworkViewpoint {
   const width = artwork.height * artwork.aspect;
   // Distance at which the work (plus a little wall around it) fills at most VIEW_FILL of the view in
@@ -207,7 +213,9 @@ export function computeArtworkViewpoint(
     z: pz + nz * distance,
     // Facing the painting = looking along -normal; camera forward at yaw ψ is (-sin ψ, -cos ψ).
     yaw: artwork.rotationY,
-    pitch: Math.atan2(py - EYE_HEIGHT, distance),
+    pitch: Math.atan2(py - floorY - EYE_HEIGHT, distance),
+    level,
+    floorY,
   };
 }
 
@@ -325,7 +333,8 @@ function rayRectOnWall(
   dir: { x: number; y: number; z: number },
   artwork: ArtworkData,
   rect: { cx: number; cy: number; halfW: number; halfH: number; planeZ: number },
-  walls: ColliderBox[]
+  walls: ColliderBox[],
+  blockers: SolidBox[]
 ): number | null {
   const nx = Math.sin(artwork.rotationY);
   const nz = Math.cos(artwork.rotationY);
@@ -344,6 +353,8 @@ function rayRectOnWall(
   // On the far side of a partition: its plane is reachable, the wall comes first.
   const inFront = { x: hx + nx * 0.05, z: hz + nz * 0.05 };
   if (!hasLineOfSight({ x: origin.x, z: origin.z }, inFront, walls)) return null;
+  // Behind the mezzanine slab (seen from below or above it).
+  if (blockers.length && blockedBefore(origin, dir, t, blockers)) return null;
   return t;
 }
 
@@ -357,7 +368,8 @@ export function pickArtwork(
   dir: { x: number; y: number; z: number },
   artworks: ArtworkData[],
   walls: ColliderBox[],
-  frameBorder: number
+  frameBorder: number,
+  blockers: SolidBox[] = []
 ): ArtworkHit | null {
   let best: ArtworkHit | null = null;
   for (const artwork of artworks) {
@@ -367,7 +379,8 @@ export function pickArtwork(
       dir,
       artwork,
       { cx: 0, cy: 0, halfW: (artwork.height * artwork.aspect) / 2 + border, halfH: artwork.height / 2 + border, planeZ: 0 },
-      walls
+      walls,
+      blockers
     );
     if (t !== null && (!best || t < best.distance)) best = { artwork, distance: t };
   }
@@ -390,13 +403,14 @@ export function pickWallLabel(
   dir: { x: number; y: number; z: number },
   artworks: ArtworkData[],
   labels: Map<string, LabelRect>,
-  walls: ColliderBox[]
+  walls: ColliderBox[],
+  blockers: SolidBox[] = []
 ): ArtworkHit | null {
   let best: ArtworkHit | null = null;
   for (const artwork of artworks) {
     const r = labels.get(artwork.id);
     if (!r) continue;
-    const t = rayRectOnWall(origin, dir, artwork, { cx: r.x, cy: r.y, halfW: r.halfW, halfH: r.halfH, planeZ: r.planeZ }, walls);
+    const t = rayRectOnWall(origin, dir, artwork, { cx: r.x, cy: r.y, halfW: r.halfW, halfH: r.halfH, planeZ: r.planeZ }, walls, blockers);
     if (t !== null && (!best || t < best.distance)) best = { artwork, distance: t };
   }
   return best;
@@ -414,10 +428,11 @@ export function pickWallTarget(
   artworks: ArtworkData[],
   labels: Map<string, LabelRect> | null,
   walls: ColliderBox[],
-  frameBorder: number | null
+  frameBorder: number | null,
+  blockers: SolidBox[] = []
 ): WallTarget | null {
-  const art = frameBorder === null ? null : pickArtwork(origin, dir, artworks, walls, frameBorder);
-  const label = labels ? pickWallLabel(origin, dir, artworks, labels, walls) : null;
+  const art = frameBorder === null ? null : pickArtwork(origin, dir, artworks, walls, frameBorder, blockers);
+  const label = labels ? pickWallLabel(origin, dir, artworks, labels, walls, blockers) : null;
   if (label && (!art || label.distance < art.distance)) return { ...label, kind: "label" };
   return art ? { ...art, kind: "artwork" } : null;
 }

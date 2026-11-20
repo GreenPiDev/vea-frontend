@@ -30,6 +30,7 @@ import {
 } from "./roomAoMaterial";
 import { addDaylightUv, buildDaylightAtlas, createDaylightTarget, rectUv, type DaylightAtlas } from "./daylightBake";
 import DaylightBaker from "./DaylightBaker";
+import { onSlab, type Mezzanine } from "./mezzanine";
 
 // The ceiling scan's own baked depth, unexaggerated. It used to be boosted to 2.5 to make the bump
 // shading read under near head-on light, but that turned plaster into a blotchy, marble-like surface
@@ -51,9 +52,15 @@ const CEILING_NORMAL_SCALE: [number, number] = [1, 1];
 export default function GalleryRoom() {
   const { layout, exhibition } = useExhibition();
   const { theme } = exhibition;
-  const { room, walls, wallHeight, furniture, windows } = layout;
-  // Walls with windows are drawn as solid pieces around the openings (colliders/AO keep the whole wall).
-  const renderWalls = useMemo(() => splitWallsAroundOpenings(walls, windows ?? []), [walls, windows]);
+  const { room, walls, wallHeight, furniture, windows, mezzanine } = layout;
+  // Walls with windows are drawn as solid pieces around the openings (colliders/AO keep the whole wall). A
+  // mezzanine's exposed slab edges render (and bake) as extra wall pieces.
+  const renderWalls = useMemo(
+    () => [...splitWallsAroundOpenings(walls, windows ?? []), ...(mezzanine?.edgeFaces ?? [])],
+    [walls, windows, mezzanine]
+  );
+  // Contact shadows per level: the room floor's field only knows the furniture standing on it.
+  const groundFurniture = useMemo(() => (mezzanine ? furniture?.filter((f) => !onSlab(f)) : furniture), [furniture, mezzanine]);
 
   const floorTexture = findTexture(FLOOR_TEXTURES, theme.floorTextureId) ?? DEFAULT_FLOOR_TEXTURE;
   const wallTexture = findTexture(WALL_TEXTURES, theme.wallTextureId) ?? DEFAULT_WALL_TEXTURE;
@@ -63,13 +70,22 @@ export default function GalleryRoom() {
   const aoUniforms = useMemo(
     () =>
       createRoomAoUniforms(
-        buildRoomAoField(room, walls, furniture),
+        buildRoomAoField(room, walls, groundFurniture),
         wallHeight,
         DEFAULT_AO_FIELD_OPTIONS.wall.radius
       ),
-    [room, walls, wallHeight, furniture]
+    [room, walls, wallHeight, groundFurniture]
   );
   useEffect(() => () => aoUniforms.uRoomAoMap.value?.dispose(), [aoUniforms]);
+  // The slab's own field: same footprint and walls (wall AO + env box stay right), its own furniture.
+  const slabAoUniforms = useMemo(
+    () =>
+      mezzanine
+        ? createRoomAoUniforms(buildRoomAoField(room, walls, furniture?.filter(onSlab)), wallHeight, DEFAULT_AO_FIELD_OPTIONS.wall.radius)
+        : null,
+    [mezzanine, room, walls, wallHeight, furniture]
+  );
+  useEffect(() => () => slabAoUniforms?.uRoomAoMap.value?.dispose(), [slabAoUniforms]);
 
   // Windowed rooms: floor/ceiling/walls read their daylight from a baked atlas (daylightBake.ts) instead
   // of evaluating it per pixel; rooms without windows compile no daylight code at all.
@@ -135,6 +151,21 @@ export default function GalleryRoom() {
 
       <Baseboards walls={renderWalls} wallColor={theme.wallColor} aoUniforms={aoUniforms} daylight={baseboardDaylight} />
 
+      {mezzanine && slabAoUniforms && (
+        <MezzanineSlab
+          mezzanine={mezzanine}
+          room={room}
+          floorTexture={floorTexture}
+          ceilingTexture={ceilingTexture ?? DEFAULT_CEILING_TEXTURE}
+          theme={theme}
+          ceilingTinted={!ceilingTexture}
+          topAo={slabAoUniforms}
+          undersideAo={aoUniforms}
+          // Not in the daylight atlas (it's keyed by x/z, which the room floor/ceiling already use): live terms.
+          daylight={bake ? LIVE_DAYLIGHT : NO_DAYLIGHT}
+        />
+      )}
+
       {bake && <DaylightBaker atlas={bake.atlas} target={bake.target} />}
 
       {windows && windows.length > 0 && <WindowFixtures windows={windows} />}
@@ -170,6 +201,98 @@ function Baseboards({
   }, [wallColor, aoUniforms, daylight]);
   useEffect(() => () => material.dispose(), [material]);
   return <mesh geometry={geometry} material={material} />;
+}
+
+/**
+ * A mezzanine's walk surface and underside: the room floor's and ceiling's own scans (same texture
+ * instances, so their UVs are fractions of the room footprint, exactly like the room's floor/ceiling planes —
+ * the parquet runs on unbroken from the floor plane's tiling). The edges are wall pieces (GalleryRoom).
+ */
+function MezzanineSlab({
+  mezzanine,
+  room,
+  floorTexture,
+  ceilingTexture,
+  theme,
+  ceilingTinted,
+  topAo,
+  undersideAo,
+  daylight,
+}: {
+  mezzanine: Mezzanine;
+  room: { center: [number, number]; size: [number, number] };
+  floorTexture: SurfaceTexture;
+  ceilingTexture: SurfaceTexture;
+  theme: ReturnType<typeof useExhibition>["exhibition"]["theme"];
+  ceilingTinted: boolean;
+  topAo: RoomAoUniforms;
+  undersideAo: RoomAoUniforms;
+  daylight: RoomDaylight;
+}) {
+  // Individual textures as memo deps: useSurfaceMaps returns a fresh object every render (a material rebuilt
+  // per render cost ~8 fps once, see the balcony perf note in CLAUDE.md).
+  const { map: floorMap, roughnessMap: floorRough, normalMap: floorNormal } = useSurfaceMaps(floorTexture);
+  const { map: ceilingMap, roughnessMap: ceilingRough, normalMap: ceilingNormal } = useSurfaceMaps(ceilingTexture);
+  const { rect, top, underside } = mezzanine;
+
+  const geometries = useMemo(() => {
+    const minX = room.center[0] - room.size[0] / 2;
+    const minZ = room.center[1] - room.size[1] / 2;
+    const plane = (y: number, faceUp: boolean) => {
+      const g = new THREE.PlaneGeometry(rect.maxX - rect.minX, rect.maxZ - rect.minZ);
+      g.rotateX(faceUp ? -Math.PI / 2 : Math.PI / 2);
+      g.translate((rect.minX + rect.maxX) / 2, y, (rect.minZ + rect.maxZ) / 2);
+      // Same mapping as the room's floor (rotated −π/2: v runs north) / ceiling (+π/2: v runs south) planes.
+      const pos = g.attributes.position;
+      const uv = g.attributes.uv;
+      for (let i = 0; i < pos.count; i++) {
+        const u = (pos.getX(i) - minX) / room.size[0];
+        const fz = (pos.getZ(i) - minZ) / room.size[1];
+        uv.setXY(i, u, faceUp ? 1 - fz : fz);
+      }
+      return g;
+    };
+    return { top: plane(top, true), underside: plane(underside, false) };
+  }, [rect, top, underside, room]);
+  useEffect(() => () => {
+    geometries.top.dispose();
+    geometries.underside.dispose();
+  }, [geometries]);
+
+  const materials = useMemo(() => {
+    const topMat = new THREE.MeshStandardMaterial({
+      map: floorMap,
+      roughnessMap: floorRough,
+      normalMap: floorNormal,
+      normalScale: new THREE.Vector2(...floorTexture.normalScale),
+      metalness: theme.floorTextureId ? 0 : (theme.floorMetalness ?? 0),
+      roughness: theme.floorTextureId ? 1 : (theme.floorRoughness ?? 1),
+      color: theme.floorTextureId ? "#ffffff" : theme.floorColor,
+    });
+    applyRoomAo(topMat, "floor", topAo, floorTexture.macroVariation, daylight);
+    const underMat = new THREE.MeshStandardMaterial({
+      map: ceilingMap,
+      roughnessMap: ceilingRough,
+      normalMap: ceilingNormal,
+      normalScale: new THREE.Vector2(...CEILING_NORMAL_SCALE),
+      metalness: 0,
+      roughness: ceilingTinted ? theme.wallRoughness : 1,
+      color: ceilingTinted ? theme.ceilingColor : "#ffffff",
+    });
+    applyRoomAo(underMat, "ceiling", undersideAo, undefined, daylight);
+    return { top: topMat, underside: underMat };
+  }, [floorMap, floorRough, floorNormal, ceilingMap, ceilingRough, ceilingNormal, floorTexture, theme, ceilingTinted, topAo, undersideAo, daylight]);
+  useEffect(() => () => {
+    materials.top.dispose();
+    materials.underside.dispose();
+  }, [materials]);
+
+  return (
+    <>
+      <mesh geometry={geometries.top} material={materials.top} />
+      <mesh geometry={geometries.underside} material={materials.underside} />
+    </>
+  );
 }
 
 // --- Textured surfaces ------------------------------------------------------

@@ -27,6 +27,8 @@ export interface Artwork {
   position: [number, number, number];
   /** Yaw so the painting's front faces into the room. */
   rotationY: number;
+  /** Floor height the work is seen from (m): the mezzanine's top for a work hung on the mezzanine, else 0/unset. */
+  floorY?: number;
 
   // The fields below are only populated for backend-sourced artworks (see
   // backendAdapter.ts's toRenderableArtwork) — the static demo ARTWORKS

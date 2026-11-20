@@ -6,6 +6,7 @@
 
 import { resolveWindowOpenings, type WindowOpening, type WindowPlacement } from "./windowOpenings";
 import { balconyGeometries, railingColliders, rectOverlapsCells, solidWallBoxes } from "./balcony";
+import { mezzanineLevels, onSlab, resolveMezzanine, type Level, type Mezzanine, type MezzanineSpec } from "./mezzanine";
 
 export const WALL_THICKNESS = 0.3;
 export const EYE_HEIGHT = 1.7;
@@ -54,12 +55,20 @@ export interface RoomLayout {
    * colliders are cut only at balcony doors (balcony.ts), and carry the balcony railings.
    */
   windows?: WindowOpening[];
+  /**
+   * A mezzanine (mezzanine.ts) and the two walking levels it makes (room floor, slab). Absent in a one-level
+   * room — then `colliders` is the only set (levels.ts's levelNav). With one, `colliders` = the room-floor level's.
+   */
+  mezzanine?: Mezzanine;
+  levels?: Level[];
 }
 
 /** A curator-placed ceiling fixture position, room-local meters — same coordinate space as GridCell/SpawnOverride. */
 export interface CeilingLightPoint {
   x: number;
   z: number;
+  /** Fixture height (m); default just under the ceiling. Fixtures under a mezzanine hang from its underside. */
+  y?: number;
 }
 
 /** A curator-placed furniture piece, resolved from a FurniturePlacement + its catalog footprint (see components/3d/furniture.ts) — room-local meters/radians, same coordinate space as GridCell/SpawnOverride. Only the half-extents are needed here; the model url/scale are render-only concerns backendAdapter.ts handles separately. */
@@ -71,6 +80,8 @@ export interface PlacedFurnitureInput {
   halfDepth: number;
   /** Round base (vase, plant pot, drum plinth): its floor contact shadow is a disc/stadium (roomAo.ts). The collider stays a box. */
   round?: boolean;
+  /** 1 = stands on the mezzanine (mezzanine.ts), 0/unset = on the room floor. */
+  level?: number;
 }
 
 /** Conservative axis-aligned bounding box for a footprint rotated by yaw around its center — same ColliderBox shape walls use, so Player.tsx's collides() needs no changes to also block on furniture. */
@@ -93,7 +104,8 @@ export function buildRoomLayout(
   wallHeight: number,
   ceilingLights?: CeilingLightPoint[],
   furniture?: PlacedFurnitureInput[],
-  windows?: WindowPlacement[]
+  windows?: WindowPlacement[],
+  mezzanine?: MezzanineSpec
 ): RoomLayout {
   const [W, D] = size;
   const H = wallHeight;
@@ -108,6 +120,8 @@ export function buildRoomLayout(
 
   const openings = resolveWindowOpenings(walls, windows, [0, 0]);
   const colliders = roomColliders(walls, openings, furniture);
+  const mezz = mezzanine ? resolveMezzanine(mezzanine, walls) : undefined;
+  const levels = mezz ? mezzanineLevels(mezz, walls, colliders, roomWallBoxes(walls, openings), (furniture ?? []).filter(onSlab).map(furnitureCollider)) : undefined;
 
   // Curator-placed fixtures (see ExhibitionTemplateForm.tsx/ExhibitionForm.tsx's
   // CeilingLightEditor) win when present; otherwise fall back to the sparse
@@ -116,7 +130,7 @@ export function buildRoomLayout(
   // actual highlighting either way, these are cosmetic discs only.
   const ceilingSpots: [number, number, number][] = [];
   if (ceilingLights?.length) {
-    for (const { x, z } of ceilingLights) ceilingSpots.push([x, H - 0.1, z]);
+    for (const { x, y, z } of ceilingLights) ceilingSpots.push([x, y ?? H - 0.1, z]);
   } else {
     const cols = Math.min(3, Math.max(2, Math.round(W / 8)));
     const rows = Math.min(3, Math.max(2, Math.round(D / 8)));
@@ -133,20 +147,26 @@ export function buildRoomLayout(
     wallHeight: H,
     room: { id: "room", center: [0, 0], size: [W, D] },
     walls,
-    colliders,
+    colliders: levels ? levels[0].colliders : colliders,
     ceilingSpots,
     playerStart: [0, EYE_HEIGHT, D / 2 - 2],
     playerStartYaw: 0,
     furniture,
     windows: openings,
+    ...(mezz && levels ? { mezzanine: mezz, levels } : {}),
   };
 }
 
-/** Walls (cut at balcony doors), balcony railings and furniture — everything the visitor can't walk through. */
+/** Walls (cut at balcony doors) and balcony railings — the room floor's walls for routing/line of sight. */
+function roomWallBoxes(walls: WallSegment[], openings: WindowOpening[]): ColliderBox[] {
+  return [...solidWallBoxes(walls, openings), ...railingColliders(balconyGeometries(openings))];
+}
+
+/** Walls (cut at balcony doors), balcony railings and room-floor furniture — everything the visitor can't walk through. */
 function roomColliders(walls: WallSegment[], openings: WindowOpening[], furniture?: PlacedFurnitureInput[]): ColliderBox[] {
-  const colliders = solidWallBoxes(walls, openings);
-  colliders.push(...railingColliders(balconyGeometries(openings)));
-  if (furniture?.length) colliders.push(...furniture.map(furnitureCollider));
+  const colliders = roomWallBoxes(walls, openings);
+  const ground = (furniture ?? []).filter((f) => !onSlab(f));
+  if (ground.length) colliders.push(...ground.map(furnitureCollider));
   return colliders;
 }
 
@@ -294,7 +314,7 @@ export function buildCustomRoomLayout(
   // rule as buildRoomLayout, skipped over any grid cell outside the footprint.
   const ceilingSpots: [number, number, number][] = [];
   if (ceilingLights?.length) {
-    for (const { x, z } of ceilingLights) ceilingSpots.push([x, wallHeight - 0.1, z]);
+    for (const { x, y, z } of ceilingLights) ceilingSpots.push([x, y ?? wallHeight - 0.1, z]);
   } else {
     const cols = Math.min(3, Math.max(1, Math.round(W / 8)));
     const rows = Math.min(3, Math.max(1, Math.round(D / 8)));

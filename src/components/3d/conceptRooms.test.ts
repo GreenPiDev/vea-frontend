@@ -15,7 +15,7 @@ import { SHOWCASE_ID } from "./showcaseExhibition";
 import { CEILING_TEXTURES, FLOOR_TEXTURES, WALL_TEXTURES, findTexture } from "./surfaceTextures";
 
 describe("concept rooms", () => {
-  it("are vitrin-2 … vitrin-10, registered once each next to vitrin-1", () => {
+  it("are vitrin-2 … vitrin-11, registered once each next to vitrin-1", () => {
     expect(CONCEPT_ROOM_SPECS.map((s) => s.id)).toEqual([
       "vitrin-2",
       "vitrin-3",
@@ -26,6 +26,7 @@ describe("concept rooms", () => {
       "vitrin-8",
       "vitrin-9",
       "vitrin-10",
+      "vitrin-11",
     ]);
     expect(SHOWCASE_ID).toBe("vitrin-1");
     const ids = EXHIBITIONS.map((e) => e.id);
@@ -64,6 +65,8 @@ for (const spec of CONCEPT_ROOM_SPECS) {
   const [W, D] = spec.roomSize;
   const arts = ex.artworks!;
   const widthOf = (a: (typeof arts)[number]) => a.height * a.aspect + 2 * FRAME_BORDER;
+  /** Floor the work is seen from (a mezzanine's top for works hung on it). */
+  const floorOf = (a: (typeof arts)[number]) => a.floorY ?? 0;
 
   function wallOf(a: (typeof arts)[number]) {
     const [x, , z] = a.position;
@@ -94,18 +97,26 @@ for (const spec of CONCEPT_ROOM_SPECS) {
 
     it("hangs at eye level, off the floor and well below the ceiling", () => {
       for (const a of arts) {
-        const y = a.position[1];
-        expect(y).toBe(conceptHangY(a.height));
+        // Measured from the floor it's seen from (the mezzanine's top for works hung on it).
+        const y = a.position[1] - floorOf(a);
+        expect(y).toBeCloseTo(conceptHangY(a.height), 10);
         expect(y - a.height / 2).toBeGreaterThanOrEqual(CONCEPT_MIN_BOTTOM - 1e-9);
         if (a.height <= 2 * (CONCEPT_HANG_CENTER_Y - CONCEPT_MIN_BOTTOM)) expect(y).toBe(CONCEPT_HANG_CENTER_Y);
-        expect(minCeilingFor(a.height), a.id).toBeLessThanOrEqual(spec.wallHeight);
-        expect(y + a.height / 2 + FRAME_BORDER, a.id).toBeLessThan(spec.wallHeight - 0.7);
+        // Under the slab, the slab's underside is the ceiling.
+        const m = layout.mezzanine;
+        const underSlab =
+          m && !a.floorY && a.position[0] > m.rect.minX - 0.3 && a.position[0] < m.rect.maxX + 0.3 && a.position[2] > m.rect.minZ - 0.3 && a.position[2] < m.rect.maxZ + 0.3;
+        const ceiling = underSlab ? m!.underside : spec.wallHeight - floorOf(a);
+        expect(minCeilingFor(a.height), a.id).toBeLessThanOrEqual(ceiling);
+        expect(y + a.height / 2 + FRAME_BORDER, a.id).toBeLessThan(ceiling - 0.7);
       }
     });
 
     it("leaves ≥ 1.5 m between neighbouring frames", () => {
       const byWall = new Map<string, typeof arts>();
-      for (const a of arts) byWall.set(wallOf(a)!.wall, [...(byWall.get(wallOf(a)!.wall) ?? []), a]);
+      // Per wall and level: a mezzanine work hangs above the ones below it.
+      const key = (a: (typeof arts)[number]) => `${wallOf(a)!.wall}|${floorOf(a)}`;
+      for (const a of arts) byWall.set(key(a), [...(byWall.get(key(a)) ?? []), a]);
       for (const works of byWall.values()) {
         const s = [...works].sort((p, q) => wallOf(p)!.along - wallOf(q)!.along);
         for (let i = 1; i < s.length; i++) {
@@ -116,9 +127,15 @@ for (const spec of CONCEPT_ROOM_SPECS) {
     });
 
     it("keeps furniture off the walls, colliding and clear of every painting's stand-in-front spot", () => {
-      // Walls (cut at balcony doors) and balcony railings come first, then one box per furniture piece.
+      // Walls (cut at balcony doors) and balcony railings come first, then one box per furniture piece (on its
+      // level, with a mezzanine: then the stair/columns follow on the room floor).
       const fixed = solidWallBoxes(layout.walls, layout.windows).length + railingColliders(balconyGeometries(layout.windows)).length;
-      expect(layout.colliders).toHaveLength(fixed + spec.furniture.length);
+      const pieces = (level: number) => spec.furniture.filter((f) => (f.level ?? 0) === level).length;
+      if (layout.levels) {
+        layout.levels.forEach((l, i) => expect(l.colliders.length - l.walls.length, `level ${i}`).toBe(pieces(i)));
+      } else {
+        expect(layout.colliders).toHaveLength(fixed + spec.furniture.length);
+      }
       for (const f of layout.furniture ?? []) {
         const r = Math.hypot(f.halfWidth, f.halfDepth);
         expect(Math.abs(f.x) + r).toBeLessThan(W / 2 - 0.15);
@@ -127,7 +144,11 @@ for (const spec of CONCEPT_ROOM_SPECS) {
       for (const a of arts) {
         const [x, , z] = a.position;
         const [vx, vz] = [x + Math.sin(a.rotationY) * 2, z + Math.cos(a.rotationY) * 2];
-        for (const c of layout.colliders.slice(fixed)) {
+        const level = a.floorY ? 1 : 0;
+        const furniture = layout.levels
+          ? layout.levels[level].colliders.filter((c) => !layout.levels![level].walls.some((w) => JSON.stringify(w) === JSON.stringify(c)))
+          : layout.colliders.slice(fixed);
+        for (const c of furniture) {
           const blocked = vx > c.minX - PLAYER_RADIUS && vx < c.maxX + PLAYER_RADIUS && vz > c.minZ - PLAYER_RADIUS && vz < c.maxZ + PLAYER_RADIUS;
           expect(blocked, a.id).toBe(false);
         }

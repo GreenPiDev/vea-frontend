@@ -8,6 +8,8 @@ export interface SeatSpot {
   x: number;
   z: number;
   rotationY: number;
+  /** Floor height of the seat (m): the mezzanine's top for a seat on it, else 0/unset. */
+  y?: number;
 }
 
 /** Floor-plane distance within which a seat's "Otur (Enter)" hint appears. */
@@ -16,11 +18,14 @@ export const SEAT_INTERACT_RADIUS = 1.5;
 export function findNearestSeat(
   seats: SeatSpot[],
   x: number,
-  z: number
+  z: number,
+  /** Visitor's floor height — a seat on another level (a mezzanine above/below) is never "nearest". */
+  floorY = 0
 ): { seat: SeatSpot; distanceSq: number } | null {
   const radiusSq = SEAT_INTERACT_RADIUS * SEAT_INTERACT_RADIUS;
   let nearest: { seat: SeatSpot; distanceSq: number } | null = null;
   for (const seat of seats) {
+    if (Math.abs((seat.y ?? 0) - floorY) > 1) continue;
     const dx = seat.x - x;
     const dz = seat.z - z;
     const distanceSq = dx * dx + dz * dz;

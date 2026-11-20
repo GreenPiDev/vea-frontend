@@ -26,6 +26,7 @@ import { isTouchPrimaryDevice } from "../../lib/navigationMode";
 import { CEILING_LIGHT_FLOOR_IRRADIANCE } from "./sceneLighting";
 import { WINDOW_LIGHT_FRAGMENT_DECL, windowLightUniforms } from "./windowLight";
 import { SUN_LIGHT_FRAGMENT_DECL, sunLightUniforms } from "./sunLight";
+import { SLAB_SHADOW_SOFTNESS, slabVisibility, type Mezzanine } from "./mezzanine";
 
 const WINDOW_TERM = (p: string, n: string) => `windowLightIrradiance(${p}, ${n})`;
 const SUN_TERM = (p: string, n: string) => `sunLightIrradiance(${p}, ${n})`;
@@ -57,13 +58,21 @@ export function fixturePower(height: number, floorIrradiance: number): number {
   return floorIrradiance * height * height;
 }
 
-/** Ceiling fixtures of a layout as lights, scaled by the theme's own ambient level (dark rooms stay dark). */
+/**
+ * Ceiling fixtures of a layout as lights, scaled by the theme's own ambient level (dark rooms stay dark).
+ * A fixture above a mezzanine is sized for the slab under it, not the room floor far below.
+ */
 export function ceilingLightsForLayout(
   ceilingSpots: RoomLayout["ceilingSpots"],
-  themeAmbientIntensity: number
+  themeAmbientIntensity: number,
+  mezzanine?: Pick<Mezzanine, "rect" | "top"> | null
 ): CeilingLight[] {
   const floorIrradiance = CEILING_LIGHT_FLOOR_IRRADIANCE * (themeAmbientIntensity / REFERENCE_AMBIENT);
-  return ceilingSpots.map(([x, y, z]) => ({ x, y, z, power: fixturePower(y, floorIrradiance) }));
+  return ceilingSpots.map(([x, y, z]) => {
+    const r = mezzanine?.rect;
+    const overSlab = !!r && y > mezzanine!.top && x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ;
+    return { x, y, z, power: fixturePower(overSlab ? y - mezzanine!.top : y, floorIrradiance) };
+  });
 }
 
 /**
@@ -102,7 +111,8 @@ export function clusterCeilingLights(lights: CeilingLight[], max: number): Ceili
 export function ceilingIrradiance(
   p: { x: number; y: number; z: number },
   n: { x: number; y: number; z: number },
-  lights: CeilingLight[]
+  lights: CeilingLight[],
+  mezzanine: Pick<Mezzanine, "rect" | "top" | "underside"> | null = null
 ): number {
   let e = 0;
   for (const l of lights) {
@@ -114,7 +124,7 @@ export function ceilingIrradiance(
     const down = Math.max(dy * inv, 0);
     const lobe = CEILING_LIGHT_UPLIGHT + (1 - CEILING_LIGHT_UPLIGHT) * Math.pow(down, CEILING_LIGHT_LOBE);
     const cos = Math.max((n.x * dx + n.y * dy + n.z * dz) * inv, 0);
-    e += (l.power * lobe * cos) / (d2 + CEILING_LIGHT_EPSILON);
+    e += ((l.power * lobe * cos) / (d2 + CEILING_LIGHT_EPSILON)) * slabVisibility(p, l, mezzanine);
   }
   return e;
 }
@@ -127,6 +137,10 @@ export interface CeilingLightUniforms {
   uCeilingLightCount: { value: number };
   /** Linear-space fixture colour (theme spotColor). */
   uCeilingLightColor: { value: THREE.Color };
+  /** Mezzanine slab (mezzanine.ts): footprint minX, minZ, maxX, maxZ … */
+  uSlabRect: { value: THREE.Vector4 };
+  /** … and underside, top, 1 when the room has one (0 = no slab, the test is skipped). */
+  uSlabY: { value: THREE.Vector3 };
 }
 
 /**
@@ -139,7 +153,19 @@ export const ceilingLightUniforms: CeilingLightUniforms = {
   uCeilingLights: { value: Array.from({ length: MAX_CEILING_LIGHTS }, () => new THREE.Vector4()) },
   uCeilingLightCount: { value: 0 },
   uCeilingLightColor: { value: new THREE.Color(1, 1, 1) },
+  uSlabRect: { value: new THREE.Vector4() },
+  uSlabY: { value: new THREE.Vector3() },
 };
+
+/** The current room's mezzanine slab (null: none) — it shadows the fixtures on the other side of it. */
+export function setCeilingSlab(m: Pick<Mezzanine, "rect" | "top" | "underside"> | null | undefined): void {
+  if (!m) {
+    ceilingLightUniforms.uSlabY.value.set(0, 0, 0);
+    return;
+  }
+  ceilingLightUniforms.uSlabRect.value.set(m.rect.minX, m.rect.minZ, m.rect.maxX, m.rect.maxZ);
+  ceilingLightUniforms.uSlabY.value.set(m.underside, m.top, 1);
+}
 
 /** Writes a room's lights into the shared uniforms (clustered down to MAX_CEILING_LIGHTS if needed). */
 export function setCeilingLights(lights: CeilingLight[], color: THREE.ColorRepresentation): void {
@@ -160,8 +186,23 @@ export const CEILING_ONLY_FRAGMENT_DECL = /* glsl */ `
 uniform vec4 uCeilingLights[MAX_CEILING_LIGHTS];
 uniform int uCeilingLightCount;
 uniform vec3 uCeilingLightColor;
+uniform vec4 uSlabRect;
+uniform vec3 uSlabY;
+
+// Mirrors mezzanine.ts's slabVisibility(): the segment p → light crossing the slab's mid-plane inside its
+// footprint is blocked, with a soft band at the edge.
+float slabVisibility(vec3 p, vec3 l) {
+  float mid = 0.5 * (uSlabY.x + uSlabY.y);
+  float a = p.y - mid;
+  float b = l.y - mid;
+  if (a * b >= 0.0) return 1.0;
+  vec2 q = mix(p.xz, l.xz, a / (a - b));
+  float outside = max(max(uSlabRect.x - q.x, q.x - uSlabRect.z), max(uSlabRect.y - q.y, q.y - uSlabRect.w));
+  return smoothstep(${(-SLAB_SHADOW_SOFTNESS / 2).toFixed(3)}, ${(SLAB_SHADOW_SOFTNESS / 2).toFixed(3)}, outside);
+}
 
 vec3 ceilingLightIrradiance(vec3 p, vec3 n) {
+  bool slab = uSlabY.z > 0.5;
   float e = 0.0;
   for (int i = 0; i < MAX_CEILING_LIGHTS; i++) {
     if (i >= uCeilingLightCount) break;
@@ -171,7 +212,9 @@ vec3 ceilingLightIrradiance(vec3 p, vec3 n) {
     vec3 L = toLight * inversesqrt(max(d2, 1e-8));
     float down = max(L.y, 0.0);
     float lobe = ${CEILING_LIGHT_UPLIGHT.toFixed(3)} + ${(1 - CEILING_LIGHT_UPLIGHT).toFixed(3)} * pow(down, ${CEILING_LIGHT_LOBE.toFixed(1)});
-    e += l.w * lobe * max(dot(n, L), 0.0) / (d2 + ${CEILING_LIGHT_EPSILON.toFixed(3)});
+    float term = l.w * lobe * max(dot(n, L), 0.0) / (d2 + ${CEILING_LIGHT_EPSILON.toFixed(3)});
+    if (slab && term > 0.0) term *= slabVisibility(p, l.xyz);
+    e += term;
   }
   return e * uCeilingLightColor;
 }

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo } from "react";
 import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
-import { ceilingLightsForLayout, setCeilingLights } from "./ceilingLight";
+import { ceilingLightsForLayout, setCeilingLights, setCeilingSlab } from "./ceilingLight";
 import { HEMISPHERE_INTENSITY, ROOM_FILL_SCALE } from "./sceneLighting";
 import { setWindowLights, windowLightsFor } from "./windowLight";
 import { setSunLight, sunSetupFor } from "./sunLight";
@@ -69,8 +69,10 @@ export default function GalleryLights() {
   // positions into the shared uniforms before the first frame. Uniforms are read at draw time, so no
   // material recompiles when the room changes.
   useLayoutEffect(() => {
-    setCeilingLights(ceilingLightsForLayout(layout.ceilingSpots, theme.ambientIntensity), theme.spotColor);
-  }, [layout.ceilingSpots, theme.ambientIntensity, theme.spotColor]);
+    setCeilingLights(ceilingLightsForLayout(layout.ceilingSpots, theme.ambientIntensity, layout.mezzanine), theme.spotColor);
+    // A mezzanine slab shadows the fixtures on its other side (always written: clears the previous room's).
+    setCeilingSlab(layout.mezzanine);
+  }, [layout.ceilingSpots, layout.mezzanine, theme.ambientIntensity, theme.spotColor]);
 
   // Daylight through the windows (windowLight.ts), coloured by the view outside. Always written — a room
   // without windows clears the previous room's.
@@ -114,10 +116,11 @@ export default function GalleryLights() {
       {daylight.fill.r + daylight.fill.g + daylight.fill.b > 0 && <ambientLight color={daylight.fill} intensity={1} />}
 
       {/* Emissive fixture discs — the visible source of the analytic ceiling light (ceilingLight.ts) */}
-      {layout.ceilingSpots.map(([x, , z], i) => (
+      {layout.ceilingSpots.map(([x, y, z], i) => (
         <mesh
           key={`fixture-${i}`}
-          position={[x, layout.wallHeight - 0.05, z]}
+          // Spots sit 10 cm under their ceiling (the room's, or a mezzanine's underside): the disc hangs from it.
+          position={[x, y + 0.05, z]}
           material={getCeilingFixtureMaterial(theme.spotColor)}
         >
           {/* radialSegments dropped from 20 to 10 — same reasoning as Artwork.tsx's fixture geometry: this disc

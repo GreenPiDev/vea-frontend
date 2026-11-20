@@ -13,12 +13,14 @@
 //   vitrin-8  Akşam Salonu        two tall west windows, low late-afternoon sun reaching deep across grey marble
 //   vitrin-9  Balkonlu Salon      a balcony door onto a sunny balcony over the park, two sash windows beside it
 //   vitrin-10 Gece Galerisi       a night visit: slate-blue room, glass wall + balcony onto a downtown skyline across a river
+//   vitrin-11 Asma Katlı Galeri   a double-height hall with a mezzanine along the north wall and an open steel stair
 //
 // Static (no backend), like the original; not listed on the homepage selector.
 
 import { ARTWORKS, type Artwork, type FrameStyle } from "./artworks";
 import type { Exhibition, ExhibitionTheme } from "./exhibitions";
-import { WALL_CLEARANCE, buildRoomLayout, type PlacedFurnitureInput } from "./galleryLayout";
+import { WALL_CLEARANCE, buildRoomLayout, type CeilingLightPoint, type PlacedFurnitureInput } from "./galleryLayout";
+import type { MezzanineSpec } from "./mezzanine";
 import type { SeatSpot } from "./seating";
 import type { WindowPlacement } from "./windowOpenings";
 
@@ -31,6 +33,8 @@ export interface ConceptWork {
   wall: ConceptWall;
   /** Offset along the wall from its centre (metres; x for north/south walls, z for east/west). */
   along: number;
+  /** 1 = hung on the mezzanine (above its slab, seen from it), unset = the room floor. */
+  level?: 1;
 }
 
 export interface ConceptFurniture {
@@ -43,6 +47,8 @@ export interface ConceptFurniture {
   depth: number;
   round?: boolean;
   seating?: boolean;
+  /** 1 = stands on the mezzanine. */
+  level?: 1;
 }
 
 export interface ConceptRoomSpec {
@@ -61,6 +67,10 @@ export interface ConceptRoomSpec {
   outdoor?: string;
   /** Turns the view (and its sun) around the vertical axis, radians — see Exhibition.outdoor.rotationY. */
   outdoorRotation?: number;
+  /** A mezzanine with its stair (mezzanine.ts). */
+  mezzanine?: MezzanineSpec;
+  /** Explicit fixtures (with heights — some hang under the mezzanine), replacing `lightGrid`. */
+  lights?: CeilingLightPoint[];
 }
 
 /** Hang centre line for normal-sized works (same as the original showcase). */
@@ -550,6 +560,69 @@ export const CONCEPT_ROOM_SPECS: ConceptRoomSpec[] = [
       { ...PLANT, x: 7, z: 3.8, rotationY: 0.3 },
     ],
   },
+  {
+    id: "vitrin-11",
+    name: "Asma Katlı Galeri",
+    subtitle: "Çift yükseklikli bir salon, kuzey duvarı boyunca bir asma kat ve açık çelik merdiven",
+    roomSize: [18, 12],
+    wallHeight: 7.6,
+    lightGrid: [3, 2],
+    // Airy contemporary hall: warm white walls, light oak, a calm plaster ceiling 7.6 m up.
+    theme: {
+      wallColor: "#e9e5dc",
+      wallRoughness: 0.92,
+      floorColor: "#cbb08a",
+      floorRoughness: 0.45,
+      floorMetalness: 0.02,
+      ceilingColor: "#f2efe9",
+      fogColor: "#e9e5dc",
+      backgroundColor: "#e9e5dc",
+      ambientColor: "#fff6ea",
+      ambientIntensity: 0.42,
+      hemisphereSkyColor: "#fff8ee",
+      hemisphereGroundColor: "#cbb08a",
+      spotColor: "#fff1dc",
+      spotIntensity: 22,
+      floorTextureId: "WoodFloor051",
+      ceilingTextureId: "Plaster007",
+    },
+    // Slab along the whole north wall (4 m deep, walk surface 3.8 m up, 3.5 m headroom under it); the stair
+    // climbs north along the east wall and lands at the slab's south edge.
+    mezzanine: {
+      rect: { minX: -8.85, maxX: 8.85, minZ: -5.85, maxZ: -1.85 },
+      top: 3.8,
+      stair: { axis: "z", dir: -1, across: [7.45, 8.85], topAt: -1.85 },
+    },
+    lights: [
+      // High ceiling over the open hall …
+      ...[-6, 0, 6].flatMap((x) => [0.4, 3.8].map((z) => ({ x, z }))),
+      // … over the mezzanine (sized for the slab below them) …
+      ...[-6, 0, 6].map((x) => ({ x, z: -3.85 })),
+      // … and hung from the slab's underside, over the low gallery beneath it.
+      ...[-6, -2, 2, 6].map((x) => ({ x, y: 3.4, z: -3.85 })),
+    ],
+    works: [
+      // Room floor: the big canvas faces the mezzanine across the hall.
+      { source: "raft-of-medusa", frame: "gold", wall: "south", along: 0 },
+      { source: "liberty-leading", frame: "gold", wall: "west", along: 2.2 },
+      // Under the slab.
+      { source: "the-kiss", frame: "modernBlack", wall: "north", along: -3.5 },
+      { source: "starry-night", frame: "modernBlack", wall: "north", along: 3 },
+      { source: "mona-lisa", frame: "modernBlack", wall: "west", along: -3.85 },
+      // On the mezzanine.
+      { source: "birth-of-venus", frame: "gold", wall: "north", along: -1.5, level: 1 },
+      { source: "the-scream", frame: "modernBlack", wall: "north", along: 4.5, level: 1 },
+      { source: "great-wave", frame: "modernBlack", wall: "east", along: -4.2, level: 1 },
+    ],
+    furniture: [
+      // Bench facing the raft across the hall.
+      { ...BENCH, x: 0, z: 1.8, rotationY: 0 },
+      { ...PLANT, x: -7.9, z: 5, rotationY: 0.4 },
+      // Up on the mezzanine: a bench looking out over the hall, a plant in the corner.
+      { ...BENCH, x: -5.5, z: -3, rotationY: 0, level: 1 },
+      { ...PLANT, x: -8, z: -5.1, rotationY: 0.2, level: 1 },
+    ],
+  },
 ];
 
 /** The work hung on its wall: real physical height, wall-face position and facing. */
@@ -558,7 +631,9 @@ export function hangConceptWork(spec: ConceptRoomSpec, work: ConceptWork): Artwo
   if (!base?.heightCm) throw new Error(`${spec.id}: unknown or unsized artwork "${work.source}"`);
   const [W, D] = spec.roomSize;
   const height = base.heightCm / 100;
-  const y = conceptHangY(height);
+  // A mezzanine work hangs by the same rules, measured from the slab it's seen from.
+  const floorY = work.level === 1 && spec.mezzanine ? spec.mezzanine.top : 0;
+  const y = floorY + conceptHangY(height);
   const northZ = -D / 2 + WALL_CLEARANCE;
   const southZ = D / 2 - WALL_CLEARANCE;
   const eastX = W / 2 - WALL_CLEARANCE;
@@ -569,7 +644,15 @@ export function hangConceptWork(spec: ConceptRoomSpec, work: ConceptWork): Artwo
     east: { position: [eastX, y, work.along], rotationY: -Math.PI / 2 },
     west: { position: [westX, y, work.along], rotationY: Math.PI / 2 },
   };
-  return { ...base, id: `${spec.id}-${base.id}`, exhibitionId: spec.id, height, frame: work.frame, ...placement[work.wall] };
+  return {
+    ...base,
+    id: `${spec.id}-${base.id}`,
+    exhibitionId: spec.id,
+    height,
+    frame: work.frame,
+    ...placement[work.wall],
+    ...(floorY ? { floorY } : {}),
+  };
 }
 
 export function furnitureFootprints(furniture: ConceptFurniture[]): PlacedFurnitureInput[] {
@@ -580,12 +663,14 @@ export function furnitureFootprints(furniture: ConceptFurniture[]): PlacedFurnit
     halfWidth: f.width / 2,
     halfDepth: f.depth / 2,
     round: f.round,
+    ...(f.level ? { level: f.level } : {}),
   }));
 }
 
 export function buildConceptExhibition(spec: ConceptRoomSpec): Exhibition {
+  const floorOf = (f: ConceptFurniture) => (f.level === 1 && spec.mezzanine ? spec.mezzanine.top : 0);
   const seats: SeatSpot[] = spec.furniture.flatMap((f, i) =>
-    f.seating ? [{ id: String(i), x: f.x, z: f.z, rotationY: f.rotationY }] : []
+    f.seating ? [{ id: String(i), x: f.x, z: f.z, rotationY: f.rotationY, ...(floorOf(f) ? { y: floorOf(f) } : {}) }] : []
   );
   return {
     id: spec.id,
@@ -597,13 +682,14 @@ export function buildConceptExhibition(spec: ConceptRoomSpec): Exhibition {
     customLayout: buildRoomLayout(
       spec.roomSize,
       spec.wallHeight,
-      conceptLightGrid(spec.roomSize, spec.lightGrid),
+      spec.lights ?? conceptLightGrid(spec.roomSize, spec.lightGrid),
       furnitureFootprints(spec.furniture),
-      spec.windows
+      spec.windows,
+      spec.mezzanine
     ),
     outdoor: spec.outdoor ? { panoramaId: spec.outdoor, rotationY: spec.outdoorRotation } : undefined,
     artworks: spec.works.map((w) => hangConceptWork(spec, w)),
-    furniture: spec.furniture.map((f) => ({ modelUrl: f.modelUrl, position: [f.x, 0, f.z], rotationY: f.rotationY, scale: 1, round: f.round })),
+    furniture: spec.furniture.map((f) => ({ modelUrl: f.modelUrl, position: [f.x, floorOf(f), f.z], rotationY: f.rotationY, scale: 1, round: f.round })),
     seats,
   };
 }

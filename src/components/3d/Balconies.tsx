@@ -3,9 +3,9 @@ import * as THREE from "three";
 import { useTexture } from "@react-three/drei";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { useExhibition } from "./ExhibitionContext";
+import { railingGeometry } from "./railingGeometry";
 import {
   BALCONY_SLAB,
-  RAILING_HEIGHT,
   balconyFacades,
   balconyGeometries,
   facadePanels,
@@ -22,54 +22,6 @@ const PAVING = findTexture(FLOOR_TEXTURES, "PavingStones142")!;
 const RENDER = findTexture(WALL_TEXTURES, "Plaster001")!;
 const FACADE_COLOR = "#d8d1c4";
 const RAILING = { color: "#2a2b2e", roughness: 0.45, metalness: 0.6 };
-
-// Railing members (m): posts at the corners and every ≤ 1.5 m, a flat handrail, a bottom rail, square balusters.
-const POST = 0.045;
-const POST_SPACING = 1.5;
-const HANDRAIL_W = 0.06;
-const HANDRAIL_H = 0.04;
-const BOTTOM_RAIL = 0.03;
-const BOTTOM_RAIL_Y = 0.08;
-const BALUSTER = 0.016;
-const BALUSTER_SPACING = 0.12;
-
-/** A box from two floor-plane points (a straight member), `w` thick across, spanning y0..y1. */
-function member(from: [number, number], to: [number, number], w: number, y0: number, y1: number): THREE.BufferGeometry {
-  const dx = to[0] - from[0];
-  const dz = to[1] - from[1];
-  const len = Math.hypot(dx, dz);
-  const g = new THREE.BoxGeometry(len + w, y1 - y0, w);
-  g.rotateY(-Math.atan2(dz, dx));
-  g.translate((from[0] + to[0]) / 2, (y0 + y1) / 2, (from[1] + to[1]) / 2);
-  return g;
-}
-
-function railingGeometry(balconies: BalconyGeometry[]): THREE.BufferGeometry | null {
-  const parts: THREE.BufferGeometry[] = [];
-  for (const b of balconies) {
-    for (const { from, to } of b.railings) {
-      const len = Math.hypot(to[0] - from[0], to[1] - from[1]);
-      const at = (t: number): [number, number] => [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t];
-      parts.push(member(from, to, HANDRAIL_W, RAILING_HEIGHT - HANDRAIL_H, RAILING_HEIGHT));
-      parts.push(member(from, to, BOTTOM_RAIL, BOTTOM_RAIL_Y, BOTTOM_RAIL_Y + BOTTOM_RAIL));
-      const posts = Math.max(1, Math.ceil(len / POST_SPACING));
-      for (let i = 0; i <= posts; i++) {
-        const p = at(i / posts);
-        parts.push(member(p, p, POST, 0, RAILING_HEIGHT - HANDRAIL_H));
-      }
-      const n = Math.floor(len / BALUSTER_SPACING);
-      for (let i = 1; i < n; i++) {
-        const p = at(i / n);
-        parts.push(member(p, p, BALUSTER, BOTTOM_RAIL_Y + BOTTOM_RAIL, RAILING_HEIGHT - HANDRAIL_H));
-      }
-    }
-  }
-  if (!parts.length) return null;
-  const merged = mergeGeometries(parts.map((p) => p.toNonIndexed()));
-  for (const p of parts) p.dispose();
-  merged?.deleteAttribute("uv");
-  return merged;
-}
 
 /** Platform slabs, UVs in world metres ÷ tile, so the paving runs on across balconies. */
 function slabGeometry(balconies: BalconyGeometry[], tileSize: number): THREE.BufferGeometry | null {
@@ -165,7 +117,7 @@ export default function Balconies() {
 
   const built = useMemo(() => {
     const slab = slabGeometry(balconies, PAVING.tileSize);
-    const railing = railingGeometry(balconies);
+    const railing = railingGeometry(balconies.flatMap((b) => b.railings));
     const facade = facadeGeometry(facades, windows ?? [], RENDER.tileSize);
 
     const slabMaterial = new THREE.MeshStandardMaterial({ ...paving, normalScale: new THREE.Vector2(...PAVING.normalScale), roughness: 1 });

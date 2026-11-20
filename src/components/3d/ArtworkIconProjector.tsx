@@ -9,6 +9,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
 import { ARTWORKS } from "./artworks";
+import { EYE_HEIGHT } from "./galleryLayout";
 
 export interface ArtworkIconPosition {
   id: string;
@@ -59,7 +60,9 @@ export default function ArtworkIconProjector({
 
       const dx = camera.position.x - artwork.position[0];
       const dz = camera.position.z - artwork.position[2];
-      const nearEnough = dx * dx + dz * dz <= APPEAR_RADIUS * APPEAR_RADIUS;
+      // Same floor only: a mezzanine work right above (or below) the visitor isn't "in front of" them.
+      const sameFloor = Math.abs(camera.position.y - EYE_HEIGHT - (artwork.floorY ?? 0)) < 1;
+      const nearEnough = sameFloor && dx * dx + dz * dz <= APPEAR_RADIUS * APPEAR_RADIUS;
 
       vector.current.set(
         artwork.position[0] + cos * marginX,

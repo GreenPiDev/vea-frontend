@@ -6,6 +6,7 @@ import { FRAME_BORDER } from "./artworkShadow";
 import { applyWallTargetOutline, outlineGeometry, outlineMaterial, setOutlineWallColor, tickOutline } from "./artworkOutline";
 import { pickWallTarget, wallBoxes, type WallTarget } from "./clickNavigationGeometry";
 import { useWallLabels } from "./useWallLabels";
+import { levelNav } from "./levels";
 
 /** Re-aim at ~10 Hz — the outline doesn't need per-frame precision. */
 const UPDATE_INTERVAL = 0.1;
@@ -27,6 +28,8 @@ export default function WalkArtworkPicker({
   const { layout, exhibition } = useExhibition();
   const { artworks, rects: labelRects } = useWallLabels();
   const walls = useMemo(() => wallBoxes(layout), [layout]);
+  // A mezzanine slab hides the works behind it (levels.ts).
+  const blockers = useMemo(() => levelNav(layout).blockers, [layout]);
   const outlineRef = useRef<THREE.Mesh>(null);
   const aimed = useRef<WallTarget | null>(null);
   const lastUpdate = useRef(0);
@@ -44,7 +47,7 @@ export default function WalkArtworkPicker({
     if (document.pointerLockElement === gl.domElement) {
       raycaster.setFromCamera(SCREEN_CENTRE, camera);
       const { origin, direction } = raycaster.ray;
-      target = pickWallTarget(origin, direction, artworks, hasLabelClick ? labelRects : null, walls, FRAME_BORDER);
+      target = pickWallTarget(origin, direction, artworks, hasLabelClick ? labelRects : null, walls, FRAME_BORDER, blockers);
     }
     const prev = aimed.current;
     if (target?.artwork !== prev?.artwork || target?.kind !== prev?.kind) {

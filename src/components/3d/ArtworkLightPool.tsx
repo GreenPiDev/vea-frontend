@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { Artwork as ArtworkData } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
+import { EYE_HEIGHT } from "./galleryLayout";
 // Applied on top of each theme's own spotIntensity (exhibitions.ts/backendAdapter.ts) — see sceneLighting.ts.
 import { SPOT_INTENSITY_SCALE } from "./sceneLighting";
 import { encodePictureLight, pictureLightPlacement } from "./pictureLight";
@@ -16,7 +17,7 @@ const SPOT_FADE_FAR_DISTANCE = 15;
 // disagree and still left a round hot spot above the frame.
 
 // Fixed real-spotLight budget, independent of total artwork count. Every frame, these N lights are
-// imperatively repositioned onto the N artworks currently nearest the camera (sorted by XZ distance) —
+// imperatively repositioned onto the N artworks currently nearest the camera (sorted by distance, height included for mezzanine rooms) —
 // a "virtual lights" / light-pooling technique, not per-artwork lights.
 //
 // This replaces two earlier, both-flawed approaches (2026-10-19):
@@ -74,13 +75,16 @@ export default function ArtworkLightPool({ artworks }: { artworks: ArtworkData[]
 
   useFrame(() => {
     const cx = camera.position.x;
+    const cy = camera.position.y;
     const cz = camera.position.z;
     const list = scratch.current;
     list.length = 0;
     for (const light of prepared) {
       const dx = cx - light.artwork.position[0];
       const dz = cz - light.artwork.position[2];
-      list.push({ light, distance: Math.hypot(dx, dz) });
+      // Height counts too (a mezzanine's works hang right above the ones below): eye vs the work's floor.
+      const dy = cy - EYE_HEIGHT - (light.artwork.floorY ?? 0);
+      list.push({ light, distance: Math.hypot(dx, dy, dz) });
     }
     list.sort((a, b) => a.distance - b.distance);
 

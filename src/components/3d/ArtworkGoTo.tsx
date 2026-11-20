@@ -5,6 +5,7 @@ import { useWallLabels } from "./useWallLabels";
 import { EYE_HEIGHT } from "./galleryLayout";
 import { clearNavigation, computeArtworkViewpoint, type NavigationRequest } from "./clickNavigationGeometry";
 import { fovForAspect } from "./cameraFov";
+import { artworkLevel, levelNav } from "./levels";
 
 /** "Take me to this painting" from outside the Canvas (the thumbnail rail). `seq` makes a repeat click on the same work a new request. */
 export interface ArtworkGoToRequest {
@@ -33,9 +34,13 @@ export default function ArtworkGoTo({ request, navigation }: { request: ArtworkG
     const { camera, aspect, layout, artworks, navigation } = live.current;
     const artwork = artworks.find((a) => a.id === request.artworkId);
     if (!artwork) return;
-    const viewpoint = computeArtworkViewpoint(artwork, layout.colliders, { verticalFovDeg: fovForAspect(aspect), aspect });
+    // On the level the work is seen from (a mezzanine work: up on the slab, levels.ts).
+    const nav = levelNav(layout);
+    const level = artworkLevel(nav, artwork);
+    const { colliders, y } = nav.levels[level];
+    const viewpoint = computeArtworkViewpoint(artwork, colliders, { verticalFovDeg: fovForAspect(aspect), aspect }, level, y);
     clearNavigation(navigation);
-    camera.position.set(viewpoint.x, EYE_HEIGHT, viewpoint.z);
+    camera.position.set(viewpoint.x, y + EYE_HEIGHT, viewpoint.z);
     camera.rotation.set(viewpoint.pitch, viewpoint.yaw, 0);
   }, [request]);
 

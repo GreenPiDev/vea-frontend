@@ -6,6 +6,7 @@ import GalleryFurniture from "./GalleryFurniture";
 import RoomEnvironment from "./RoomEnvironment";
 import OutdoorPanorama from "./OutdoorPanorama";
 import Balconies from "./Balconies";
+import MezzanineStructure from "./MezzanineStructure";
 import { useExhibition } from "./ExhibitionContext";
 import { findOutdoorPanorama } from "./outdoorPanoramas";
 
@@ -25,6 +26,11 @@ export default function Gallery() {
       {hasBalcony && (
         <Suspense fallback={null}>
           <Balconies />
+        </Suspense>
+      )}
+      {layout.mezzanine && (
+        <Suspense fallback={null}>
+          <MezzanineStructure />
         </Suspense>
       )}
       <RoomEnvironment />

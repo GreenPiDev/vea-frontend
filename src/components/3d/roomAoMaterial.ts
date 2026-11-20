@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { CEILING_AO, DEFAULT_AO_FIELD_OPTIONS, FURNITURE_CONTACT, FURNITURE_FIELD_RANGE, type AoField } from "./roomAo";
 import { EYE_HEIGHT, WALL_THICKNESS } from "./galleryLayout";
 import { CEILING_FILL_SCALE } from "./sceneLighting";
+import { UNDER_SLAB_REACH, UNDER_SLAB_SHADE } from "./mezzanine";
 import { CEILING_LIGHT_FRAGMENT_DECL, CEILING_ONLY_FRAGMENT_DECL, ceilingLightApply, ceilingLightUniforms } from "./ceilingLight";
 import { windowLightUniforms } from "./windowLight";
 import { sunLightUniforms } from "./sunLight";
@@ -193,11 +194,30 @@ float roomAmbientOcclusion() {
 }
 `;
 
+// Mezzanine (mezzanine.ts), after the ceiling-light declarations (it reads their uSlabRect/uSlabY): the fill
+// under the slab is dimmed (it's a low, covered space — mirrors underSlabShade()), and on walls the slab's top
+// gets the same floor contact band as the room floor. 1 everywhere in a room without one.
+const SLAB_AO_DECL = /* glsl */ `
+float roomSlabOcclusion() {
+  if (uSlabY.z < 0.5) return 1.0;
+  vec3 p = vRoomAoWorldPos;
+  float outside = max(max(uSlabRect.x - p.x, p.x - uSlabRect.z), max(uSlabRect.y - p.z, p.z - uSlabRect.w));
+  float shade = 1.0;
+  if (p.y < uSlabY.x - 0.01)
+    shade = 1.0 - ${UNDER_SLAB_SHADE.toFixed(3)} * (1.0 - smoothstep(${(-UNDER_SLAB_REACH).toFixed(3)}, 0.3, outside));
+  #if ROOM_AO_SURFACE == 2
+    if (p.y > uSlabY.y - 0.01 && outside < 0.2)
+      shade *= roomAoBand(p.y - uSlabY.y, ${WALL_FLOOR_AO.radius.toFixed(3)}, ${WALL_FLOOR_AO.strength.toFixed(3)});
+  #endif
+  return shade;
+}
+`;
+
 // Mirrors three r185's aomap_fragment.glsl.js body (minus the texture read), so indirect specular
 // from the environment map gets the same roughness-aware specular occlusion a real aoMap would.
 const FRAGMENT_APPLY = /* glsl */ `
 {
-  float ambientOcclusion = roomAmbientOcclusion();
+  float ambientOcclusion = roomAmbientOcclusion() * roomSlabOcclusion();
   reflectedLight.indirectDiffuse *= ambientOcclusion;
   #if defined( USE_CLEARCOAT )
     clearcoatSpecularIndirect *= ambientOcclusion;
@@ -233,7 +253,7 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
     .replace("#include <common>", `#include <common>\n${VERTEX_DECL}${baked ? DAYLIGHT_VERTEX_DECL : ""}`)
     .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}${baked ? DAYLIGHT_VERTEX_BODY : ""}`);
   shader.fragmentShader = shader.fragmentShader
-    .replace("#include <common>", `#include <common>\n${FRAGMENT_DECL}\n${lightDecl}\n${MACRO_VARIATION_DECL}`)
+    .replace("#include <common>", `#include <common>\n${FRAGMENT_DECL}\n${lightDecl}\n${SLAB_AO_DECL}\n${MACRO_VARIATION_DECL}`)
     // Low-frequency tone/gloss variation that breaks the scan's tiling lattice (macroVariation.ts).
     .replace("#include <map_fragment>", `#include <map_fragment>\n${MACRO_VARIATION_ALBEDO}`)
     .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>\n${MACRO_VARIATION_ROUGHNESS}`)

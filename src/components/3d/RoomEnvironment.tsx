@@ -101,14 +101,15 @@ export default function RoomEnvironment() {
         <planeGeometry args={[w, d]} />
         <meshBasicMaterial color={colors.ceiling} toneMapped={false} />
       </mesh>
-      {ceilingSpots.map(([x, , z], i) => (
+      {ceilingSpots.map(([x, y, z], i) => (
         <Lightformer
           key={i}
           form="circle"
           color={theme.spotColor}
           intensity={ENV_CEILING_FIXTURE_INTENSITY}
           scale={CEILING_FIXTURE_RADIUS}
-          position={[x - cx, ceilingY - 0.03, z - cz]}
+          // At the fixture's own height (spots hang 10 cm under their ceiling — a mezzanine's underside too).
+          position={[x - cx, y + 0.07 - EYE_HEIGHT, z - cz]}
           rotation-x={Math.PI / 2}
         />
       ))}

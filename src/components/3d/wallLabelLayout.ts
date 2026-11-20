@@ -243,7 +243,8 @@ function sameWallNeighbours(a: Artwork, all: Artwork[]) {
       const dz = b.position[2] - a.position[2];
       return { b, along: dx * right[0] + dz * right[1], depth: dx * normal[0] + dz * normal[1] };
     })
-    .filter((n) => Math.abs(n.depth) < 0.05);
+    // Same wall plane and overlapping in height — a work hung above another (a mezzanine) is no neighbour.
+    .filter((n) => Math.abs(n.depth) < 0.05 && Math.abs(n.b.position[1] - a.position[1]) < frameHalfHeight(a) + frameHalfHeight(n.b));
 }
 
 /** Free wall beside the frame on one side (m), up to a corner/partition or the next work's frame. */
@@ -308,7 +309,7 @@ export function labelCenterY(a: Artwork, labelHeight: number): number {
   const lo = bottom + labelHeight / 2;
   const hi = top - labelHeight / 2;
   if (lo > hi) return a.position[1];
-  return Math.min(Math.max(LABEL_CENTER_Y, lo), hi);
+  return Math.min(Math.max((a.floorY ?? 0) + LABEL_CENTER_Y, lo), hi);
 }
 
 /**
