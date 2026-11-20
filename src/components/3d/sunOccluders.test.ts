@@ -119,7 +119,8 @@ describe("packing", () => {
     writeSunOccluderUniforms([{ ...cube, round: true, opacity: 0.5 }, cube]);
     expect(sunOccluderUniforms.uSunOccluderCount.value).toBe(2);
     expect(sunOccluderUniforms.uSunOccluders.value[1].w).toBe(-0.5);
-    expect(sunOccluderUniforms.uSunOccluders.value[3].w).toBe(1);
+    expect(sunOccluderUniforms.uSunOccluders.value[4].w).toBe(1);
+    expect(sunOccluderUniforms.uSunOccluders.value[0].w).toBeCloseTo(Math.hypot(0.5, 0.5, 0.5) + 0.01, 9);
 
     setSunOccluderSource("test:a", [a, b], 1);
     setSunOccluderSource("test:b", [b], 0);

@@ -22,6 +22,7 @@ import { isTouchPrimaryDevice } from "../../lib/navigationMode";
 import { panoramaToWorld } from "./windowLight";
 import type { WindowOpening } from "./windowOpenings";
 import { SUN_OCCLUDER_FRAGMENT_DECL, setSunReachTest, sunOccluderUniforms, type SunOccluderUniforms } from "./sunOccluders";
+import { bumpDaylightRevision } from "./daylightBake";
 
 /** Windows the sun can shine through at once — one mask tile each in the 4 × 2 atlas. */
 export const MAX_SUN_WINDOWS = isTouchPrimaryDevice() ? 4 : 8;
@@ -153,6 +154,7 @@ export const sunLightUniforms: SunLightUniforms & SunOccluderUniforms = {
 
 /** Writes a room's sun into the shared uniforms and re-uploads the mask atlas; an overcast/windowless room switches it off. */
 export function setSunLight(setup: SunSetup): void {
+  bumpDaylightRevision(); // re-bake the room surfaces (daylightBake.ts)
   const u = sunLightUniforms;
   const n = setup.direction ? Math.min(setup.windows.length, MAX_SUN_WINDOWS) : 0;
   const atlas = u.uSunMask.value;

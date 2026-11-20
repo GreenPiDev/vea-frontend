@@ -12,7 +12,7 @@ import * as THREE from "three";
 import { CEILING_AO, DEFAULT_AO_FIELD_OPTIONS, FURNITURE_CONTACT, FURNITURE_FIELD_RANGE, type AoField } from "./roomAo";
 import { EYE_HEIGHT, WALL_THICKNESS } from "./galleryLayout";
 import { CEILING_FILL_SCALE } from "./sceneLighting";
-import { CEILING_LIGHT_FRAGMENT_DECL, ceilingLightApply, ceilingLightUniforms } from "./ceilingLight";
+import { CEILING_LIGHT_FRAGMENT_DECL, CEILING_ONLY_FRAGMENT_DECL, ceilingLightApply, ceilingLightUniforms } from "./ceilingLight";
 import { windowLightUniforms } from "./windowLight";
 import { sunLightUniforms } from "./sunLight";
 import {
@@ -45,6 +45,58 @@ export interface RoomAoUniforms {
   /** How far along a wall's normal to sample the field for wall↔wall corner occlusion — the field's radius. */
   uRoomAoReach: { value: number };
 }
+
+/**
+ * Where a room surface gets its window daylight + sun from: nowhere (a room without windows — no daylight
+ * code at all), the baked atlas (daylightBake.ts — floor, ceiling, walls) or the live per-pixel terms
+ * (baseboards, which aren't in the atlas).
+ */
+export type RoomDaylight = { mode: "none" } | { mode: "live" } | { mode: "baked"; uniforms: DaylightBakeUniforms };
+
+const DAYLIGHT_DEFINE = { none: 0, baked: 1, live: 2 } as const;
+
+export interface DaylightBakeUniforms {
+  uDaylightMap: { value: THREE.Texture | null };
+  /** Floor/ceiling footprint: minX, minZ, sizeX, sizeZ. */
+  uDaylightBounds: { value: THREE.Vector4 };
+  /** Atlas UV rects (u0, v0, du, dv) of the floor and the ceiling. */
+  uDaylightFloorRect: { value: THREE.Vector4 };
+  uDaylightCeilingRect: { value: THREE.Vector4 };
+}
+
+const DAYLIGHT_VERTEX_DECL = /* glsl */ `
+#if ROOM_AO_SURFACE == 2
+attribute vec2 daylightUv;
+varying vec2 vDaylightUv;
+#endif
+`;
+const DAYLIGHT_VERTEX_BODY = /* glsl */ `
+#if ROOM_AO_SURFACE == 2
+vDaylightUv = daylightUv;
+#endif
+`;
+const DAYLIGHT_FRAGMENT_DECL = /* glsl */ `
+uniform sampler2D uDaylightMap;
+uniform vec4 uDaylightBounds;
+uniform vec4 uDaylightFloorRect;
+uniform vec4 uDaylightCeilingRect;
+#if ROOM_AO_SURFACE == 2
+varying vec2 vDaylightUv;
+#endif
+vec3 roomBakedDaylight() {
+  #if ROOM_AO_SURFACE == 2
+    return texture2D(uDaylightMap, vDaylightUv).rgb;
+  #else
+    vec2 f = clamp((vRoomAoWorldPos.xz - uDaylightBounds.xy) / uDaylightBounds.zw, 0.0, 1.0);
+    #if ROOM_AO_SURFACE == 0
+      vec4 r = uDaylightFloorRect;
+    #else
+      vec4 r = uDaylightCeilingRect;
+    #endif
+    return texture2D(uDaylightMap, r.xy + f * r.zw).rgb;
+  #endif
+}
+`;
 
 const VERTEX_DECL = /* glsl */ `
 varying vec3 vRoomAoWorldPos;
@@ -168,13 +220,20 @@ export const ENVMAP_PHYSICAL_PARS = THREE.ShaderChunk.envmap_physical_pars_fragm
 );
 
 function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramParametersWithUniforms) {
-  const data = this.userData as { roomAoUniforms: RoomAoUniforms; macroVariation: { value: number } };
-  Object.assign(shader.uniforms, data.roomAoUniforms, ceilingLightUniforms, windowLightUniforms, sunLightUniforms, { uMacroVariation: data.macroVariation });
+  const data = this.userData as { roomAoUniforms: RoomAoUniforms; macroVariation: { value: number }; daylight: RoomDaylight };
+  const daylight = data.daylight;
+  Object.assign(shader.uniforms, data.roomAoUniforms, ceilingLightUniforms, { uMacroVariation: data.macroVariation });
+  if (daylight.mode === "live") Object.assign(shader.uniforms, windowLightUniforms, sunLightUniforms);
+  if (daylight.mode === "baked") Object.assign(shader.uniforms, daylight.uniforms);
+  const lightDecl =
+    daylight.mode === "live" ? CEILING_LIGHT_FRAGMENT_DECL : daylight.mode === "baked" ? `${CEILING_ONLY_FRAGMENT_DECL}\n${DAYLIGHT_FRAGMENT_DECL}` : CEILING_ONLY_FRAGMENT_DECL;
+  const daylightTerm = daylight.mode === "live" ? undefined : daylight.mode === "baked" ? "roomBakedDaylight()" : "vec3(0.0)";
+  const baked = daylight.mode === "baked";
   shader.vertexShader = shader.vertexShader
-    .replace("#include <common>", `#include <common>\n${VERTEX_DECL}`)
-    .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}`);
+    .replace("#include <common>", `#include <common>\n${VERTEX_DECL}${baked ? DAYLIGHT_VERTEX_DECL : ""}`)
+    .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}${baked ? DAYLIGHT_VERTEX_BODY : ""}`);
   shader.fragmentShader = shader.fragmentShader
-    .replace("#include <common>", `#include <common>\n${FRAGMENT_DECL}\n${CEILING_LIGHT_FRAGMENT_DECL}\n${MACRO_VARIATION_DECL}`)
+    .replace("#include <common>", `#include <common>\n${FRAGMENT_DECL}\n${lightDecl}\n${MACRO_VARIATION_DECL}`)
     // Low-frequency tone/gloss variation that breaks the scan's tiling lattice (macroVariation.ts).
     .replace("#include <map_fragment>", `#include <map_fragment>\n${MACRO_VARIATION_ALBEDO}`)
     .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>\n${MACRO_VARIATION_ROUGHNESS}`)
@@ -186,7 +245,7 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
     .replace("#include <lights_physical_fragment>", `#include <lights_physical_fragment>\n${SPEC_AA_ROUGHNESS}`)
     // Directional light from the ceiling fixtures (ceilingLight.ts) — direct light, so the AO below
     // doesn't touch it; only furniture contact shadows on the floor scale it.
-    .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>\n${ceilingLightApply("vRoomAoWorldPos", "roomCeilingLightOcclusion()")}`)
+    .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>\n${ceilingLightApply("vRoomAoWorldPos", "roomCeilingLightOcclusion()", daylightTerm)}`)
     .replace("#include <aomap_fragment>", `#include <aomap_fragment>\n${FRAGMENT_APPLY}`);
 }
 
@@ -195,15 +254,18 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
  * Surfaces differ only by a `#define`, which three folds into the program cache key, so floor/ceiling/wall
  * each compile one program and every material of the same surface kind shares it.
  * `macroVariation` is the ± albedo amplitude of the anti-tiling variation (a uniform, never a recompile).
+ * `daylight` picks the daylight source (RoomDaylight) — a define too, so each mode is its own program.
  */
 export function applyRoomAo(
   material: THREE.MeshStandardMaterial,
   surface: RoomAoSurface,
   uniforms: RoomAoUniforms,
-  macroVariation: number = surface === "ceiling" ? CEILING_MACRO_VARIATION : DEFAULT_MACRO_VARIATION
+  macroVariation: number = surface === "ceiling" ? CEILING_MACRO_VARIATION : DEFAULT_MACRO_VARIATION,
+  daylight: RoomDaylight = { mode: "live" }
 ): void {
-  material.defines = { ...(material.defines ?? {}), ROOM_AO_SURFACE: SURFACE_DEFINE[surface] };
+  material.defines = { ...(material.defines ?? {}), ROOM_AO_SURFACE: SURFACE_DEFINE[surface], ROOM_DAYLIGHT: DAYLIGHT_DEFINE[daylight.mode] };
   material.userData.roomAoUniforms = uniforms;
+  material.userData.daylight = daylight;
   material.userData.macroVariation = { value: macroVariation };
   material.onBeforeCompile = roomAoOnBeforeCompile;
   material.needsUpdate = true;

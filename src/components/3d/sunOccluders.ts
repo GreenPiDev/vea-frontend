@@ -18,8 +18,9 @@
 
 import * as THREE from "three";
 import { isTouchPrimaryDevice } from "../../lib/navigationMode";
+import { bumpDaylightRevision } from "./daylightBake";
 
-/** Uniform array size (2 × vec4 per volume). */
+/** Uniform array size (3 × vec4 per volume). */
 export const MAX_SUN_OCCLUDERS = isTouchPrimaryDevice() ? 8 : 16;
 /** Penumbra stand-in: depth (m) inside a volume over which a ray's shadow fades in, at the caster … */
 export const SUN_SHADOW_SOFTNESS = 0.02;
@@ -180,24 +181,27 @@ export function packSunOccluders(candidates: SunOccluder[], reaches: (p: THREE.V
 // --- GPU side ------------------------------------------------------------------------------------------
 
 export interface SunOccluderUniforms {
-  /** Per volume, 2 × vec4: (centre, rotationY), (half extents, ±opacity — negative = cylinder). */
+  /** Per volume, 3 × vec4: (centre, bounding radius), (half extents, ±opacity — negative = cylinder), (cos yaw, sin yaw, –, –). */
   uSunOccluders: { value: THREE.Vector4[] };
   uSunOccluderCount: { value: number };
 }
 
 export const sunOccluderUniforms: SunOccluderUniforms = {
-  uSunOccluders: { value: Array.from({ length: MAX_SUN_OCCLUDERS * 2 }, () => new THREE.Vector4()) },
+  uSunOccluders: { value: Array.from({ length: MAX_SUN_OCCLUDERS * 3 }, () => new THREE.Vector4()) },
   uSunOccluderCount: { value: 0 },
 };
 
 export function writeSunOccluderUniforms(occluders: SunOccluder[]): void {
+  bumpDaylightRevision(); // re-bake the room surfaces (daylightBake.ts)
   const n = Math.min(occluders.length, MAX_SUN_OCCLUDERS);
   const v = sunOccluderUniforms.uSunOccluders.value;
   for (let i = 0; i < n; i++) {
     const o = occluders[i];
     const opacity = o.opacity ?? 1;
-    v[i * 2].set(o.center[0], o.center[1], o.center[2], o.rotationY);
-    v[i * 2 + 1].set(o.half[0], o.half[1], o.half[2], o.round ? -opacity : opacity);
+    const radius = Math.hypot(...o.half) + SUN_OCCLUDER_SELF_MARGIN;
+    v[i * 3].set(o.center[0], o.center[1], o.center[2], radius);
+    v[i * 3 + 1].set(o.half[0], o.half[1], o.half[2], o.round ? -opacity : opacity);
+    v[i * 3 + 2].set(Math.cos(o.rotationY), Math.sin(o.rotationY), 0, 0);
   }
   sunOccluderUniforms.uSunOccluderCount.value = n;
 }
@@ -237,19 +241,25 @@ export function setSunReachTest(test: ((p: THREE.Vector3) => boolean) | null): v
 
 export const SUN_OCCLUDER_FRAGMENT_DECL = /* glsl */ `
 #define MAX_SUN_OCCLUDERS ${MAX_SUN_OCCLUDERS}
-uniform vec4 uSunOccluders[MAX_SUN_OCCLUDERS * 2];
+uniform vec4 uSunOccluders[MAX_SUN_OCCLUDERS * 3];
 uniform int uSunOccluderCount;
 
 float sunOccluderVisibility(vec3 p, vec3 dir) {
   float vis = 1.0;
   for (int i = 0; i < MAX_SUN_OCCLUDERS; i++) {
     if (i >= uSunOccluderCount) break;
-    vec4 a = uSunOccluders[i * 2];
-    vec4 b = uSunOccluders[i * 2 + 1];
-    bool isRound = b.w < 0.0;
-    float c = cos(a.w);
-    float s = sin(a.w);
+    vec4 a = uSunOccluders[i * 3];
     vec3 d = p - a.xyz;
+    // Cheap reject first: the ray misses the volume's bounding sphere (most volumes, most fragments).
+    float tc = -dot(d, dir);
+    float dd = dot(d, d);
+    float r2 = a.w * a.w;
+    if (dd - tc * tc > r2 || (tc < 0.0 && dd > r2)) continue;
+    vec4 b = uSunOccluders[i * 3 + 1];
+    vec2 cs = uSunOccluders[i * 3 + 2].xy;
+    bool isRound = b.w < 0.0;
+    float c = cs.x;
+    float s = cs.y;
     vec3 l = vec3(c * d.x - s * d.z, d.y, s * d.x + c * d.z);
     vec3 hm = b.xyz + ${SUN_OCCLUDER_SELF_MARGIN.toFixed(3)};
     if (abs(l.y) < hm.y) {

@@ -27,6 +27,9 @@ import { CEILING_LIGHT_FLOOR_IRRADIANCE } from "./sceneLighting";
 import { WINDOW_LIGHT_FRAGMENT_DECL, windowLightUniforms } from "./windowLight";
 import { SUN_LIGHT_FRAGMENT_DECL, sunLightUniforms } from "./sunLight";
 
+const WINDOW_TERM = (p: string, n: string) => `windowLightIrradiance(${p}, ${n})`;
+const SUN_TERM = (p: string, n: string) => `sunLightIrradiance(${p}, ${n})`;
+
 /** Uniform array size. Phones get fewer slots — the loop runs per fragment on every room surface. */
 export const MAX_CEILING_LIGHTS = isTouchPrimaryDevice() ? 12 : 24;
 /** Exponent of the downward lobe: 2 ≈ a wide downlight — soft floor pools, walls fade in below the ceiling. */
@@ -151,10 +154,8 @@ export function setCeilingLights(lights: CeilingLight[], color: THREE.ColorRepre
   ceilingLightUniforms.uCeilingLightColor.value.set(color);
 }
 
-/** Declarations + irradiance functions (ceiling fixtures + window daylight, windowLight.ts). Needs a world-space position/normal from the caller. */
-export const CEILING_LIGHT_FRAGMENT_DECL = /* glsl */ `
-${WINDOW_LIGHT_FRAGMENT_DECL}
-${SUN_LIGHT_FRAGMENT_DECL}
+/** Ceiling fixtures only (room surfaces whose daylight is baked, or rooms without windows). */
+export const CEILING_ONLY_FRAGMENT_DECL = /* glsl */ `
 #define MAX_CEILING_LIGHTS ${MAX_CEILING_LIGHTS}
 uniform vec4 uCeilingLights[MAX_CEILING_LIGHTS];
 uniform int uCeilingLightCount;
@@ -176,20 +177,28 @@ vec3 ceilingLightIrradiance(vec3 p, vec3 n) {
 }
 `;
 
+/** Declarations + irradiance functions (ceiling fixtures + live window daylight and sun). Needs a world-space position/normal from the caller. */
+export const CEILING_LIGHT_FRAGMENT_DECL = /* glsl */ `
+${WINDOW_LIGHT_FRAGMENT_DECL}
+${SUN_LIGHT_FRAGMENT_DECL}
+${CEILING_ONLY_FRAGMENT_DECL}
+`;
+
 /**
  * Inserted after three's `lights_fragment_end` (where direct lights have been summed). Adds the ceiling
  * fixtures, the windows' daylight (windowLight.ts) and the sun patches (sunLight.ts) — all direct, diffuse-only,
  * with visible sources. `normal` is the
  * view-space shading normal *with* the normal map applied, so the room's surface relief catches this
  * light too; it's brought to world space to match the light positions. `worldPos` is the caller's varying;
- * `occlusion` an optional GLSL float expression scaling the term (the floor's furniture contact shadow).
+ * `occlusion` an optional GLSL float expression scaling the term (the floor's furniture contact shadow);
+ * `daylight` replaces the live window + sun terms (a baked lookup, or "vec3(0.0)" in a room without windows).
  */
-export function ceilingLightApply(worldPos: string, occlusion = "1.0"): string {
+export function ceilingLightApply(worldPos: string, occlusion = "1.0", daylight?: string): string {
+  const day = daylight ?? `${WINDOW_TERM(worldPos, "ceilingN")} + ${SUN_TERM(worldPos, "ceilingN")}`;
   return /* glsl */ `
 {
   vec3 ceilingN = normalize(inverseTransformDirection(normal, viewMatrix));
-  reflectedLight.directDiffuse += (ceilingLightIrradiance(${worldPos}, ceilingN) + windowLightIrradiance(${worldPos}, ceilingN)
-      + sunLightIrradiance(${worldPos}, ceilingN))
+  reflectedLight.directDiffuse += (ceilingLightIrradiance(${worldPos}, ceilingN) + ${day})
     * BRDF_Lambert(material.diffuseColor) * (${occlusion});
 }
 `;
@@ -231,7 +240,7 @@ function daylightApply(worldPos: string): string {
   return /* glsl */ `
 {
   vec3 ceilingN = normalize(inverseTransformDirection(normal, viewMatrix));
-  reflectedLight.directDiffuse += (windowLightIrradiance(${worldPos}, ceilingN) + sunLightIrradiance(${worldPos}, ceilingN))
+  reflectedLight.directDiffuse += (${WINDOW_TERM(worldPos, "ceilingN")} + ${SUN_TERM(worldPos, "ceilingN")})
     * BRDF_Lambert(material.diffuseColor);
 }
 `;

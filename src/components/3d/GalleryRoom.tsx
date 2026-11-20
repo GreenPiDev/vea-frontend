@@ -23,9 +23,13 @@ import { DEFAULT_AO_FIELD_OPTIONS, buildRoomAoField } from "./roomAo";
 import {
   applyRoomAo,
   createRoomAoUniforms,
+  type DaylightBakeUniforms,
   type RoomAoSurface,
   type RoomAoUniforms,
+  type RoomDaylight,
 } from "./roomAoMaterial";
+import { addDaylightUv, buildDaylightAtlas, createDaylightTarget, rectUv, type DaylightAtlas } from "./daylightBake";
+import DaylightBaker from "./DaylightBaker";
 
 // The ceiling scan's own baked depth, unexaggerated. It used to be boosted to 2.5 to make the bump
 // shading read under near head-on light, but that turned plaster into a blotchy, marble-like surface
@@ -67,6 +71,25 @@ export default function GalleryRoom() {
   );
   useEffect(() => () => aoUniforms.uRoomAoMap.value?.dispose(), [aoUniforms]);
 
+  // Windowed rooms: floor/ceiling/walls read their daylight from a baked atlas (daylightBake.ts) instead
+  // of evaluating it per pixel; rooms without windows compile no daylight code at all.
+  const bake = useMemo(() => {
+    if (!windows?.length) return null;
+    const atlas = buildDaylightAtlas(renderWalls, room, wallHeight);
+    const target = createDaylightTarget(atlas);
+    const uniforms: DaylightBakeUniforms = {
+      uDaylightMap: { value: target.texture },
+      uDaylightBounds: { value: new THREE.Vector4(...atlas.bounds) },
+      uDaylightFloorRect: { value: new THREE.Vector4(...rectUv(atlas, atlas.floor)) },
+      uDaylightCeilingRect: { value: new THREE.Vector4(...rectUv(atlas, atlas.ceiling)) },
+    };
+    return { atlas, target, daylight: { mode: "baked", uniforms } as RoomDaylight };
+  }, [windows, renderWalls, room, wallHeight]);
+  useEffect(() => () => bake?.target.dispose(), [bake]);
+  const surfaceDaylight: RoomDaylight = bake?.daylight ?? NO_DAYLIGHT;
+  // Baseboards aren't in the atlas: live terms where there are windows.
+  const baseboardDaylight: RoomDaylight = bake ? LIVE_DAYLIGHT : NO_DAYLIGHT;
+
   return (
     <group>
       <TexturedPlane
@@ -80,6 +103,7 @@ export default function GalleryRoom() {
         normalScale={floorTexture.normalScale}
         aoSurface="floor"
         aoUniforms={aoUniforms}
+        daylight={surfaceDaylight}
       />
 
       <TexturedPlane
@@ -96,6 +120,7 @@ export default function GalleryRoom() {
         normalScale={CEILING_NORMAL_SCALE}
         aoSurface="ceiling"
         aoUniforms={aoUniforms}
+        daylight={surfaceDaylight}
       />
 
       <TexturedWalls
@@ -104,24 +129,33 @@ export default function GalleryRoom() {
         color={theme.wallTextureId ? undefined : theme.wallColor}
         roughness={theme.wallTextureId ? undefined : theme.wallRoughness}
         aoUniforms={aoUniforms}
+        daylight={surfaceDaylight}
+        atlas={bake?.atlas ?? null}
       />
 
-      <Baseboards walls={renderWalls} wallColor={theme.wallColor} aoUniforms={aoUniforms} />
+      <Baseboards walls={renderWalls} wallColor={theme.wallColor} aoUniforms={aoUniforms} daylight={baseboardDaylight} />
+
+      {bake && <DaylightBaker atlas={bake.atlas} target={bake.target} />}
 
       {windows && windows.length > 0 && <WindowFixtures windows={windows} />}
     </group>
   );
 }
 
+const NO_DAYLIGHT: RoomDaylight = { mode: "none" };
+const LIVE_DAYLIGHT: RoomDaylight = { mode: "live" };
+
 /** Skirting boards along every wall base, lit through the walls' own room-AO patch (see baseboard.ts). */
 function Baseboards({
   walls,
   wallColor,
   aoUniforms,
+  daylight,
 }: {
   walls: WallSegment[];
   wallColor: string;
   aoUniforms: RoomAoUniforms;
+  daylight: RoomDaylight;
 }) {
   const geometry = useMemo(() => buildBaseboardGeometry(walls), [walls]);
   useEffect(() => () => geometry.dispose(), [geometry]);
@@ -131,9 +165,9 @@ function Baseboards({
       roughness: BASEBOARD_ROUGHNESS,
       metalness: 0,
     });
-    applyRoomAo(m, "wall", aoUniforms);
+    applyRoomAo(m, "wall", aoUniforms, undefined, daylight);
     return m;
-  }, [wallColor, aoUniforms]);
+  }, [wallColor, aoUniforms, daylight]);
   useEffect(() => () => material.dispose(), [material]);
   return <mesh geometry={geometry} material={material} />;
 }
@@ -180,6 +214,7 @@ function TexturedPlane({
   normalScale,
   aoSurface,
   aoUniforms,
+  daylight,
 }: {
   position: [number, number, number];
   rotation: [number, number, number];
@@ -195,6 +230,7 @@ function TexturedPlane({
   normalScale?: [number, number];
   aoSurface: RoomAoSurface;
   aoUniforms: RoomAoUniforms;
+  daylight: RoomDaylight;
 }) {
   const { map, roughnessMap, normalMap } = useSurfaceMaps(texture);
 
@@ -219,9 +255,9 @@ function TexturedPlane({
       color: color ?? "#ffffff",
     });
     // The ceiling keeps applyRoomAo's calmer default; floors use the scan's own amplitude.
-    applyRoomAo(m, aoSurface, aoUniforms, aoSurface === "ceiling" ? undefined : texture.macroVariation);
+    applyRoomAo(m, aoSurface, aoUniforms, aoSurface === "ceiling" ? undefined : texture.macroVariation, daylight);
     return m;
-  }, [map, roughnessMap, normalMap, color, roughness, metalness, normalScale, aoSurface, aoUniforms, texture.macroVariation]);
+  }, [map, roughnessMap, normalMap, color, roughness, metalness, normalScale, aoSurface, aoUniforms, texture.macroVariation, daylight]);
 
   return (
     <mesh position={position} rotation={rotation} material={material}>
@@ -236,6 +272,8 @@ function TexturedWalls({
   color,
   roughness,
   aoUniforms,
+  daylight,
+  atlas,
 }: {
   walls: WallSegment[];
   texture: SurfaceTexture;
@@ -243,6 +281,9 @@ function TexturedWalls({
   color?: string;
   roughness?: number;
   aoUniforms: RoomAoUniforms;
+  daylight: RoomDaylight;
+  /** Daylight atlas of a windowed room — each wall geometry gets its `daylightUv` into it. */
+  atlas: DaylightAtlas | null;
 }) {
   const { map, roughnessMap, normalMap } = useSurfaceMaps(texture);
 
@@ -265,20 +306,22 @@ function TexturedWalls({
       roughness: roughness ?? 1,
       color: color ?? "#ffffff",
     });
-    applyRoomAo(m, "wall", aoUniforms, texture.macroVariation);
+    applyRoomAo(m, "wall", aoUniforms, texture.macroVariation, daylight);
     return m;
-  }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, texture.macroVariation, aoUniforms]);
+  }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, texture.macroVariation, aoUniforms, daylight]);
 
   const geometries = useMemo(
     () =>
-      walls.map((w) =>
+      walls.map((w, i) => {
         // Pieces of a wall cut around a window (id "wall:n") share world-anchored UVs so the scan runs on
         // across the cut; whole walls keep their own UVs (unchanged look in rooms without windows).
-        w.id.includes(":")
+        const geometry = w.id.includes(":")
           ? buildWorldUvBoxGeometry(w.size, w.position, texture.tileSize)
-          : buildTexturedBoxGeometry(w.size, texture.tileSize)
-      ),
-    [walls, texture.tileSize]
+          : buildTexturedBoxGeometry(w.size, texture.tileSize);
+        if (atlas) addDaylightUv(geometry, atlas, i, w.size);
+        return geometry;
+      }),
+    [walls, texture.tileSize, atlas]
   );
 
   useEffect(() => {

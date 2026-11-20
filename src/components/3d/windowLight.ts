@@ -24,6 +24,7 @@ import { DAYLIGHT_DESATURATION, DAYLIGHT_WINDOW_GAIN } from "./sceneLighting";
 import { PANORAMA_LIGHT, PANORAMA_LIGHT_GRID_H, PANORAMA_LIGHT_GRID_W } from "./outdoorPanoramaLight";
 import { GLASS_ABSORPTION, WINDOW_SETBACK, buildWindowParts, windowTransmissionMask } from "./windowGeometry";
 import type { WindowOpening } from "./windowOpenings";
+import { bumpDaylightRevision } from "./daylightBake";
 
 /** Area-light slots: the windows themselves, then the sun patches' floor bounce (daylightBounce.ts). */
 export const MAX_WINDOW_LIGHTS = isTouchPrimaryDevice() ? 6 : 12;
@@ -165,6 +166,7 @@ export const windowLightUniforms: WindowLightUniforms = {
 
 /** Writes a room's window lights into the shared uniforms; an empty list switches daylight off. */
 export function setWindowLights(lights: WindowLight[]): void {
+  bumpDaylightRevision(); // re-bake the room surfaces (daylightBake.ts)
   const n = Math.min(lights.length, MAX_WINDOW_LIGHTS);
   for (let i = 0; i < n; i++) {
     const l = lights[i];
@@ -182,10 +184,14 @@ uniform vec3 uWindowRadiance[MAX_WINDOW_LIGHTS];
 uniform vec3 uWindowNormal[MAX_WINDOW_LIGHTS];
 uniform int uWindowCount;
 
-float windowEdge(vec3 a, vec3 b, vec3 n) {
-  vec3 g = cross(a, b);
-  float len = length(g);
-  return len < 1e-6 ? 0.0 : acos(clamp(dot(a, b), -1.0, 1.0)) * dot(n, g) / len;
+// Edge term θ·(a×b)/|a×b| of Lambert's polygon formula without acos/length: Heitz et al. 2017's cubic fit of
+// θ/sin θ (LTC area lights, error < 0.1 %) — the exact version cost 4 acos + 4 sqrt per window per fragment.
+vec3 windowEdge(vec3 a, vec3 b) {
+  float x = dot(a, b);
+  float y = abs(x);
+  float v = (0.8543985 + (0.4965155 + 0.0145206 * y) * y) / (3.4175940 + (4.1616724 + y) * y);
+  float thetaOverSin = x > 0.0 ? v : 0.5 * inversesqrt(max(1.0 - x * x, 1e-7)) - v;
+  return cross(a, b) * thetaOverSin;
 }
 
 vec3 windowLightIrradiance(vec3 p, vec3 n) {
@@ -198,7 +204,7 @@ vec3 windowLightIrradiance(vec3 p, vec3 n) {
     vec3 v1 = normalize(uWindowCorners[i * 4 + 1] - p);
     vec3 v2 = normalize(uWindowCorners[i * 4 + 2] - p);
     vec3 v3 = normalize(uWindowCorners[i * 4 + 3] - p);
-    float f = windowEdge(v0, v1, n) + windowEdge(v1, v2, n) + windowEdge(v2, v3, n) + windowEdge(v3, v0, n);
+    float f = dot(n, windowEdge(v0, v1) + windowEdge(v1, v2) + windowEdge(v2, v3) + windowEdge(v3, v0));
     e += max(-0.5 * f, 0.0) * uWindowRadiance[i];
   }
   return e;
