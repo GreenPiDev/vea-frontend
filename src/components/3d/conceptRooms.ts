@@ -1,4 +1,4 @@
-// Concept showcase rooms (/exhibition/vitrin-2 … vitrin-8) — sibling demos of the original Vitrin room
+// Concept showcase rooms (/exhibition/vitrin-2 … vitrin-10) — sibling demos of the original Vitrin room
 // (showcaseExhibition.ts, /exhibition/vitrin-1). Same hanging rules (see showcaseExhibition.ts / the plan in
 // sergi-gercekcilestirme.md Adım 13: real canvas sizes, 1.5 m centre line, one focal work per wall, ≥ 1.5 m
 // between frames, ≤ 8 works so every one gets a picture light), but each one differs in floor, wall and
@@ -11,6 +11,8 @@
 //   vitrin-6  Bahçe Salonu        three classic timber windows onto a garden, light oak parquet
 //   vitrin-7  Deniz Cam Galeri    floor-to-ceiling glazing + steel windows onto the sea, terrazzo
 //   vitrin-8  Akşam Salonu        two tall west windows, low late-afternoon sun reaching deep across grey marble
+//   vitrin-9  Balkonlu Salon      a balcony door onto a sunny balcony over the park, two sash windows beside it
+//   vitrin-10 Gece Galerisi       a night visit: slate-blue room, glass wall + balcony onto a downtown skyline across a river
 //
 // Static (no backend), like the original; not listed on the homepage selector.
 
@@ -408,6 +410,144 @@ export const CONCEPT_ROOM_SPECS: ConceptRoomSpec[] = [
       // Vase on its pedestal in the northern patch — a ~6 m shadow across the floor and up the north wall.
       { ...PEDESTAL, x: -4.3, z: -3.6, rotationY: 0 },
       { ...PLANT, x: 7.1, z: 4.1, rotationY: 0.4 },
+    ],
+  },
+  {
+    id: "vitrin-9",
+    name: "Balkonlu Salon",
+    subtitle: "Parka bakan güneşli bir balkona açılan kapı ve iki yanında pencereler",
+    roomSize: [14, 9],
+    wallHeight: 3.8,
+    lightGrid: [3, 2],
+    theme: {
+      wallColor: "#efe6d8",
+      wallRoughness: 0.9,
+      floorColor: "#8a3b34",
+      floorRoughness: 0.95,
+      floorMetalness: 0,
+      ceilingColor: "#f1ebe0",
+      fogColor: "#efe6d8",
+      backgroundColor: "#efe6d8",
+      ambientColor: "#fff1de",
+      ambientIntensity: 0.38,
+      hemisphereSkyColor: "#fff3e2",
+      hemisphereGroundColor: "#8a3b34",
+      spotColor: "#ffeed4",
+      spotIntensity: 22,
+      floorTextureId: "Carpet013",
+      ceilingTextureId: "Plaster007",
+    },
+    // South wall: a balcony door in the middle (4.4 × 2 m platform outside it), a sash window either side.
+    windows: [
+      {
+        id: "b0",
+        wallId: "south",
+        alongFraction: 0.5,
+        width: 1.6,
+        height: 2.6,
+        sillHeight: 0,
+        styleId: "balcony" as const,
+        balconyWidth: 4.4,
+        balconyDepth: 2,
+      },
+      ...[-4.6, 4.6].map((x, i) => ({
+        id: `w${i}`,
+        wallId: "south",
+        alongFraction: (x + 7) / 14,
+        width: 1.4,
+        height: 2.4,
+        sillHeight: 0.7,
+        styleId: "classic" as const,
+      })),
+    ],
+    outdoor: "park",
+    // phi' = phi − rotation = π/2 − 0.35: the low sun stands south (+z), a little east — in front of the balcony,
+    // so the platform is sunlit and long patches run in through the door and the windows.
+    outdoorRotation: 0.6177 - (Math.PI / 2 - 0.35),
+    works: [
+      { source: "the-kiss", frame: "gold", wall: "north", along: 0 },
+      { source: "starry-night", frame: "walnut", wall: "north", along: -4.2 },
+      { source: "the-scream", frame: "walnut", wall: "north", along: 4.2 },
+      { source: "birth-of-venus", frame: "gold", wall: "east", along: 0 },
+      { source: "great-wave", frame: "walnut", wall: "west", along: 0 },
+      // Between the balcony door and the windows.
+      { source: "mona-lisa", frame: "gold", wall: "south", along: -2.4 },
+      { source: "pearl-earring", frame: "gold", wall: "south", along: 2.4 },
+    ],
+    furniture: [
+      // Bench facing The Kiss, with the balcony at its back.
+      { ...BENCH, x: 0, z: 0.5, rotationY: FACE_NORTH },
+      { ...PLANT, x: 5.9, z: -3.4, rotationY: 0.5 },
+    ],
+  },
+  {
+    id: "vitrin-10",
+    name: "Gece Galerisi",
+    subtitle: "Nehrin karşısındaki ışıklı gökdelenlere bakan cam cephe ve balkon",
+    roomSize: [16, 10],
+    wallHeight: 4.5,
+    lightGrid: [3, 2],
+    // Night: a slate-blue room, a little dimmer and cooler than the day rooms, the warm picture lights carry
+    // it; the skyline is the only light outside (no sun, a faint blue glow through the glass). The first take
+    // (#2b313b walls, #1b1e24 ceiling, fill 0.22) read pitch black in the browser — night comes from the view
+    // and the lighting contrast, not from black paint.
+    theme: {
+      wallColor: "#5c6573",
+      wallRoughness: 0.9,
+      floorColor: "#5a5d62",
+      floorRoughness: 0.3,
+      floorMetalness: 0.02,
+      ceilingColor: "#4a505b",
+      fogColor: "#5c6573",
+      backgroundColor: "#5c6573",
+      ambientColor: "#dde3f0",
+      ambientIntensity: 0.32,
+      hemisphereSkyColor: "#b4c0d8",
+      hemisphereGroundColor: "#5a5d62",
+      spotColor: "#ffe2b8",
+      spotIntensity: 28,
+      floorTextureId: "Concrete048",
+    },
+    // North wall: a balcony door in the middle (5 × 2.2 m platform) between two floor-to-ceiling glazings.
+    windows: [
+      {
+        id: "b0",
+        wallId: "north",
+        alongFraction: 0.5,
+        width: 1.8,
+        height: 2.8,
+        sillHeight: 0,
+        styleId: "balcony" as const,
+        balconyWidth: 5,
+        balconyDepth: 2.2,
+      },
+      ...[-5, 5].map((x, i) => ({
+        id: `g${i}`,
+        wallId: "north",
+        alongFraction: (x + 8) / 16,
+        width: 3.2,
+        height: 4.35,
+        sillHeight: 0,
+        styleId: "panorama" as const,
+      })),
+    ],
+    outdoor: "night",
+    // The downtown cluster is painted at u = 0.5 (phi = 0); turned to −z (phi' = −π/2) it rises straight out
+    // from the balcony and spreads across both glass walls.
+    outdoorRotation: Math.PI / 2,
+    works: [
+      { source: "liberty-leading", frame: "gold", wall: "south", along: 0 },
+      { source: "mona-lisa", frame: "modernBlack", wall: "south", along: -5.2 },
+      { source: "pearl-earring", frame: "modernBlack", wall: "south", along: 5.2 },
+      { source: "birth-of-venus", frame: "modernBlack", wall: "east", along: 0 },
+      { source: "starry-night", frame: "modernBlack", wall: "west", along: -2.2 },
+      { source: "the-scream", frame: "modernBlack", wall: "west", along: 2.2 },
+    ],
+    furniture: [
+      // Bench facing the glass wall and the skyline.
+      { ...BENCH, x: 0, z: 0.5, rotationY: FACE_NORTH },
+      { ...PEDESTAL, x: -6.5, z: 3.5, rotationY: 0 },
+      { ...PLANT, x: 7, z: 3.8, rotationY: 0.3 },
     ],
   },
 ];

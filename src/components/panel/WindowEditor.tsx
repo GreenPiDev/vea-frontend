@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BlueprintLayout } from '../3d/backendAdapter';
-import type { WindowStyleId } from '../../lib/api/domains/exhibitionTemplates';
+import type { WindowPlacementData, WindowStyleId } from '../../lib/api/domains/exhibitionTemplates';
 import { OUTDOOR_PANORAMAS } from '../3d/outdoorPanoramas';
 import { PANORAMA_LIGHT } from '../3d/outdoorPanoramaLight';
 import { panoramaToWorld } from '../3d/windowLight';
-import { MAX_WINDOWS_PER_ROOM, WINDOW_STYLE_IDS } from '../3d/windowOpenings';
+import { MAX_WINDOWS_PER_ROOM, WINDOW_STYLE_IDS, balconySpan, clampBalconyDepth } from '../3d/windowOpenings';
+import { rectOverlapsCells, type FloorRect } from '../3d/balcony';
+import { WALL_THICKNESS } from '../3d/galleryLayout';
 import type { EditorWall, WindowEditorState } from './useWindowEditor';
 
 const MARGIN = 1.4;
@@ -17,12 +19,23 @@ const STYLE_LABEL: Record<WindowStyleId, string> = {
   classic: 'windowStyleClassic',
   modern: 'windowStyleModern',
   panorama: 'windowStylePanorama',
+  balcony: 'windowStyleBalcony',
 };
 
 type Run = BlueprintLayout['wallRuns'][number];
 
 const runMin = (r: Run) => Math.min(r.start, r.end);
 const runLength = (r: Run) => Math.abs(r.end - r.start);
+
+/** Plan rectangle of a balcony door's platform, outside its wall (same rules as balcony.ts at render time). */
+function balconyRect(run: Run, w: WindowPlacementData): FloorRect {
+  const start = runMin(run);
+  const [a0, a1] = balconySpan(start + w.alongFraction * runLength(run), w.width, w.balconyWidth, start, start + runLength(run));
+  const face = run.fixed + (run.outward * WALL_THICKNESS) / 2;
+  const edge = face + run.outward * clampBalconyDepth(w.balconyDepth);
+  const [n0, n1] = face < edge ? [face, edge] : [edge, face];
+  return run.orientation === 'horizontal' ? { minX: a0, maxX: a1, minZ: n0, maxZ: n1 } : { minX: n0, maxX: n1, minZ: a0, maxZ: a1 };
+}
 
 interface WindowEditorProps {
   /** Live floor plan of the room being edited (null while the shape isn't resolvable yet). */
@@ -47,14 +60,20 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
   if (!blueprint || !wallHeight) return null;
 
   const { bounds, wallRuns, cells } = blueprint;
-  const minX = bounds.minX - MARGIN;
-  const minZ = bounds.minZ - MARGIN;
-  const width = bounds.maxX - bounds.minX + MARGIN * 2;
-  const depth = bounds.maxZ - bounds.minZ + MARGIN * 2;
+  // Room around the plan for balconies sticking out of it (and the sun beyond).
+  const balconyReach = Math.max(0, ...editor.windows.filter((w) => w.styleId === 'balcony').map((w) => clampBalconyDepth(w.balconyDepth)));
+  const margin = MARGIN + balconyReach;
+  const minX = bounds.minX - margin;
+  const minZ = bounds.minZ - margin;
+  const width = bounds.maxX - bounds.minX + margin * 2;
+  const depth = bounds.maxZ - bounds.minZ + margin * 2;
 
   const wallOf = (id: string): EditorWall | null => {
     const run = wallRuns.find((r) => r.id === id);
-    return run ? { id, length: runLength(run), height: wallHeight } : null;
+    if (!run) return null;
+    // A drawn room's balcony may not reach into another part of its own footprint (an L's inner corner).
+    const balconyFits = cells ? (p: WindowPlacementData) => !rectOverlapsCells(balconyRect(run, p), cells) : undefined;
+    return { id, length: runLength(run), height: wallHeight, balconyFits };
   };
 
   function toLocal(e: { clientX: number; clientY: number }) {
@@ -80,8 +99,8 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
       setNotice(t('windowEditorMaxReached', { max: MAX_WINDOWS_PER_ROOM }));
       return;
     }
-    const ok = editor.addWindow({ id: run.id, length: runLength(run), height: wallHeight! }, fractionOn(run, p));
-    setNotice(ok ? null : t('windowEditorNoRoom'));
+    const ok = editor.addWindow(wallOf(run.id)!, fractionOn(run, p));
+    setNotice(ok ? null : t(editor.newStyle === 'balcony' ? 'windowEditorBalconyBlocked' : 'windowEditorNoRoom'));
   }
 
   function handleWindowPointerDown(id: string, e: React.PointerEvent<SVGRectElement>) {
@@ -119,11 +138,12 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
     const hx = (bounds.maxX - bounds.minX) / 2;
     const hz = (bounds.maxZ - bounds.minZ) / 2;
     const tEdge = Math.min(Math.abs(dx) > 1e-6 ? hx / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? hz / Math.abs(dy) : Infinity);
-    sunMarker = { x: cx + dx * (tEdge + 0.75), y: cz + dy * (tEdge + 0.75), dx, dy };
+    sunMarker = { x: cx + dx * (tEdge + 0.75 + balconyReach), y: cz + dy * (tEdge + 0.75 + balconyReach), dx, dy };
   }
 
   const selected = editor.selected;
   const selectedWall = selected ? wallOf(selected.wallId) : null;
+  const isBalcony = selected?.styleId === 'balcony';
   const rotationDeg = Math.round((((editor.outdoor.rotationY ?? 0) * 180) / Math.PI + 360) % 360);
 
   return (
@@ -186,6 +206,24 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
 
         {editor.windows.map((w) => {
           const run = wallRuns.find((r) => r.id === w.wallId);
+          if (!run || w.styleId !== 'balcony') return null;
+          const r = balconyRect(run, w);
+          return (
+            <rect
+              key={`balcony:${w.id}`}
+              x={r.minX}
+              y={r.minZ}
+              width={r.maxX - r.minX}
+              height={r.maxZ - r.minZ}
+              strokeWidth={0.05}
+              strokeDasharray="0.12 0.08"
+              className={`pointer-events-none ${selected?.id === w.id ? 'fill-brand-300 stroke-brand-800' : 'fill-brand-100 stroke-brand-600'}`}
+            />
+          );
+        })}
+
+        {editor.windows.map((w) => {
+          const run = wallRuns.find((r) => r.id === w.wallId);
           if (!run) return null;
           const c = runMin(run) + w.alongFraction * runLength(run);
           const horizontal = run.orientation === 'horizontal';
@@ -198,7 +236,15 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
               width={horizontal ? w.width : WINDOW_THICKNESS}
               height={horizontal ? WINDOW_THICKNESS : w.width}
               rx={0.05}
-              className={`cursor-grab ${isSelected ? 'fill-sky-400 stroke-sky-800' : 'fill-sky-200 stroke-sky-600'}`}
+              className={`cursor-grab ${
+                w.styleId === 'balcony'
+                  ? isSelected
+                    ? 'fill-brand-500 stroke-brand-900'
+                    : 'fill-brand-400 stroke-brand-700'
+                  : isSelected
+                    ? 'fill-sky-400 stroke-sky-800'
+                    : 'fill-sky-200 stroke-sky-600'
+              }`}
               strokeWidth={0.06}
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => handleWindowPointerDown(w.id, e)}
@@ -244,9 +290,9 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
       {selected && selectedWall && (
         <div className="flex flex-col gap-2 rounded-md border border-brand-200 bg-white p-3 text-sm text-brand-800">
           <div className="flex items-center justify-between">
-            <span className="font-medium">{t('windowEditorSelected')}</span>
+            <span className="font-medium">{t(isBalcony ? 'windowEditorSelectedBalcony' : 'windowEditorSelected')}</span>
             <button type="button" onClick={() => editor.removeWindow(selected.id)} className="text-xs text-red-700 hover:underline">
-              {t('windowEditorRemove')}
+              {t(isBalcony ? 'windowEditorRemoveBalcony' : 'windowEditorRemove')}
             </button>
           </div>
           <label className="flex items-center justify-between gap-2">
@@ -264,21 +310,39 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
             </select>
           </label>
           <MetresField
-            label={t('windowEditorWidth')}
+            label={t(isBalcony ? 'windowEditorDoorWidth' : 'windowEditorWidth')}
             value={selected.width}
             onCommit={(v) => editor.updateWindow(selected.id, { width: v }, selectedWall) || setNotice(t('windowEditorNoRoom'))}
           />
           <MetresField
-            label={t('windowEditorHeight')}
+            label={t(isBalcony ? 'windowEditorDoorHeight' : 'windowEditorHeight')}
             value={selected.height}
             onCommit={(v) => editor.updateWindow(selected.id, { height: v }, selectedWall)}
           />
-          <MetresField
-            label={t('windowEditorSill')}
-            hint={t('windowEditorSillHint')}
-            value={selected.sillHeight}
-            onCommit={(v) => editor.updateWindow(selected.id, { sillHeight: v }, selectedWall)}
-          />
+          {isBalcony ? (
+            <>
+              <MetresField
+                label={t('windowEditorBalconyWidth')}
+                value={selected.balconyWidth ?? 0}
+                onCommit={(v) => editor.updateWindow(selected.id, { balconyWidth: v }, selectedWall) || setNotice(t('windowEditorNoRoom'))}
+              />
+              <MetresField
+                label={t('windowEditorBalconyDepth')}
+                value={selected.balconyDepth ?? 0}
+                onCommit={(v) =>
+                  editor.updateWindow(selected.id, { balconyDepth: v }, selectedWall) || setNotice(t('windowEditorBalconyBlocked'))
+                }
+              />
+              <p className="text-xs text-brand-500">{t('windowEditorBalconyHint')}</p>
+            </>
+          ) : (
+            <MetresField
+              label={t('windowEditorSill')}
+              hint={t('windowEditorSillHint')}
+              value={selected.sillHeight}
+              onCommit={(v) => editor.updateWindow(selected.id, { sillHeight: v }, selectedWall)}
+            />
+          )}
         </div>
       )}
 

@@ -5,6 +5,7 @@
 // being hand-authored per room.
 
 import { resolveWindowOpenings, type WindowOpening, type WindowPlacement } from "./windowOpenings";
+import { balconyGeometries, railingColliders, rectOverlapsCells, solidWallBoxes } from "./balcony";
 
 export const WALL_THICKNESS = 0.3;
 export const EYE_HEIGHT = 1.7;
@@ -48,7 +49,10 @@ export interface RoomLayout {
   playerStartYaw: number;
   /** Exact (rotated) furniture footprints — `colliders` only has their conservative AABBs. Used for floor contact shadows (roomAo.ts). */
   furniture?: PlacedFurnitureInput[];
-  /** Resolved window openings (windowOpenings.ts). `walls`/`colliders` stay uncut — GalleryRoom cuts the rendered walls. */
+  /**
+   * Resolved window openings (windowOpenings.ts). `walls` stay uncut — GalleryRoom cuts the rendered walls. The
+   * colliders are cut only at balcony doors (balcony.ts), and carry the balcony railings.
+   */
   windows?: WindowOpening[];
 }
 
@@ -102,13 +106,8 @@ export function buildRoomLayout(
     { id: "west", position: [-W / 2, H / 2, 0], size: [T, H, D] },
   ];
 
-  const colliders: ColliderBox[] = walls.map((w) => ({
-    minX: w.position[0] - w.size[0] / 2,
-    maxX: w.position[0] + w.size[0] / 2,
-    minZ: w.position[2] - w.size[2] / 2,
-    maxZ: w.position[2] + w.size[2] / 2,
-  }));
-  if (furniture?.length) colliders.push(...furniture.map(furnitureCollider));
+  const openings = resolveWindowOpenings(walls, windows, [0, 0]);
+  const colliders = roomColliders(walls, openings, furniture);
 
   // Curator-placed fixtures (see ExhibitionTemplateForm.tsx/ExhibitionForm.tsx's
   // CeilingLightEditor) win when present; otherwise fall back to the sparse
@@ -139,8 +138,16 @@ export function buildRoomLayout(
     playerStart: [0, EYE_HEIGHT, D / 2 - 2],
     playerStartYaw: 0,
     furniture,
-    windows: resolveWindowOpenings(walls, windows, [0, 0]),
+    windows: openings,
   };
+}
+
+/** Walls (cut at balcony doors), balcony railings and furniture — everything the visitor can't walk through. */
+function roomColliders(walls: WallSegment[], openings: WindowOpening[], furniture?: PlacedFurnitureInput[]): ColliderBox[] {
+  const colliders = solidWallBoxes(walls, openings);
+  colliders.push(...railingColliders(balconyGeometries(openings)));
+  if (furniture?.length) colliders.push(...furniture.map(furnitureCollider));
+  return colliders;
 }
 
 // --- Custom (user-drawn) room support -------------------------------------
@@ -270,14 +277,16 @@ export function buildCustomRoomLayout(
   const maxZ = Math.max(...zs);
   const W = maxX - minX;
   const D = maxZ - minZ;
+  const centerX = (minX + maxX) / 2;
+  const centerZ = (minZ + maxZ) / 2;
 
-  const colliders: ColliderBox[] = wallRuns.map((w) => ({
-    minX: w.position[0] - w.size[0] / 2,
-    maxX: w.position[0] + w.size[0] / 2,
-    minZ: w.position[2] - w.size[2] / 2,
-    maxZ: w.position[2] + w.size[2] / 2,
-  }));
-  if (furniture?.length) colliders.push(...furniture.map(furnitureCollider));
+  // Resolved against the runs (not `walls`): they carry the `outward` side the windows face away from. A balcony
+  // that would reach into another part of the footprint (an L-shaped room's inner corner) is dropped, door and all.
+  const openings = resolveWindowOpenings(wallRuns, windows, [centerX, centerZ]).filter(
+    (o) => !o.balcony || !rectOverlapsCells(balconyGeometries([o])[0].floor, cells)
+  );
+  const colliders = roomColliders(wallRuns, openings, furniture);
+
 
   // Curator-placed fixtures win when present (not footprint-checked — the editor
   // only ever lets the curator click inside the drawn floor plan, see
@@ -308,8 +317,6 @@ export function buildCustomRoomLayout(
 
   // Player starts on the occupied cell closest to the footprint's centroid,
   // unless the builder passed an explicit user-chosen spawn cell + facing.
-  const centerX = (minX + maxX) / 2;
-  const centerZ = (minZ + maxZ) / 2;
   let start = cells[0];
   let bestDist = Infinity;
   for (const c of cells) {
@@ -332,8 +339,7 @@ export function buildCustomRoomLayout(
     playerStart: [start.x + 0.5, EYE_HEIGHT, start.z + 0.5],
     playerStartYaw: spawnOverride?.yaw ?? 0,
     furniture,
-    // Resolved against the runs (not `walls`): they carry the `outward` side the windows face away from.
-    windows: resolveWindowOpenings(wallRuns, windows, [centerX, centerZ]),
+    windows: openings,
   };
 
   return { layout, wallRuns };

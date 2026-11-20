@@ -87,3 +87,17 @@ export const DAYLIGHT_FILL_SCALE = 0.7;
 export const DAYLIGHT_FILL_MAX = 0.45;
 /** Window panels in the environment map: × the visible view's brightness, so reflections of a window read like the window. */
 export const ENV_WINDOW_INTENSITY = 1;
+/**
+ * Balconies (outdoorLight.ts): outside surfaces are lit by the panorama itself, not by the room. Sky light =
+ * the panorama's cosine-weighted mean around the surface normal × the background intensity × this, so a
+ * balcony floor reads about as bright as the ground in the photo next to it. Tune by eye.
+ */
+export const OUTDOOR_SKY_GAIN = 1;
+/** Direct sun on outside surfaces at normal incidence (no glass in the way). */
+export const OUTDOOR_SUN_IRRADIANCE = 4;
+/**
+ * Room light spilling out through a balcony's door and the other openings on its wall (outdoorLight.ts): each
+ * opening is a Lambertian rectangle on the wall's outer face with this linear radiance — roughly a lit gallery
+ * interior seen through it. Negligible next to daylight on a sunny balcony, the main light on it at night.
+ */
+export const OUTDOOR_ROOM_SPILL: [number, number, number] = [0.2, 0.16, 0.11];

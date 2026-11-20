@@ -63,9 +63,10 @@ export default function WindowFixtures({ windows }: { windows: WindowOpening[] }
       if (style.hardware) add(`${styleId}:hardware`, hardware, style.hardware);
     }
 
-    const glassGeometry = mergeGeometries(panes)!;
+    // A room whose only openings are balcony doors has no glass at all.
+    const glass = panes.length ? { geometry: mergeGeometries(panes)!, material: createGlassMaterial() } : null;
     for (const p of panes) p.dispose();
-    return { meshes, glass: { geometry: glassGeometry, material: createGlassMaterial() } };
+    return { meshes, glass };
   }, [windows]);
 
   useEffect(
@@ -74,8 +75,8 @@ export default function WindowFixtures({ windows }: { windows: WindowOpening[] }
         m.geometry.dispose();
         m.material.dispose();
       }
-      built.glass.geometry.dispose();
-      built.glass.material.dispose();
+      built.glass?.geometry.dispose();
+      built.glass?.material.dispose();
     },
     [built]
   );
@@ -85,7 +86,7 @@ export default function WindowFixtures({ windows }: { windows: WindowOpening[] }
       {built.meshes.map((m) => (
         <mesh key={m.key} geometry={m.geometry} material={m.material} />
       ))}
-      <mesh geometry={built.glass.geometry} material={built.glass.material} renderOrder={1} />
+      {built.glass && <mesh geometry={built.glass.geometry} material={built.glass.material} renderOrder={1} />}
     </group>
   );
 }

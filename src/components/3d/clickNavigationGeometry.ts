@@ -6,6 +6,7 @@
 
 import type { Artwork as ArtworkData } from "./artworks";
 import { EYE_HEIGHT, PLAYER_RADIUS, type ColliderBox, type RoomLayout } from "./galleryLayout";
+import { balconyGeometries, railingColliders, solidWallBoxes } from "./balcony";
 
 export interface FloorPoint {
   x: number;
@@ -95,14 +96,13 @@ export function collides(x: number, z: number, colliders: ColliderBox[], radius 
   return false;
 }
 
-/** The layout's walls as boxes — RoomLayout.colliders also holds furniture, which is low enough to see over. */
-export function wallBoxes(layout: Pick<RoomLayout, "walls">): ColliderBox[] {
-  return layout.walls.map((w) => ({
-    minX: w.position[0] - w.size[0] / 2,
-    maxX: w.position[0] + w.size[0] / 2,
-    minZ: w.position[2] - w.size[2] / 2,
-    maxZ: w.position[2] + w.size[2] / 2,
-  }));
+/**
+ * The layout's walls as boxes — RoomLayout.colliders also holds furniture, which is low enough to see over.
+ * Open at balcony doors; balcony railings count as walls here, so the ground beyond them (the panorama) is
+ * never a floor point to walk to (balcony.ts).
+ */
+export function wallBoxes(layout: Pick<RoomLayout, "walls" | "windows">): ColliderBox[] {
+  return [...solidWallBoxes(layout.walls, layout.windows), ...railingColliders(balconyGeometries(layout.windows))];
 }
 
 /** Parameter t ∈ [0, 1] where segment a→b first enters `box` (slab method), or null if it never does. */

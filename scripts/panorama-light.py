@@ -17,7 +17,9 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-PANORAMAS = ["garden", "seaside", "city", "park"]
+PANORAMAS = ["garden", "seaside", "city", "park", "night"]
+# Night views: street lamps and lit towers are bright compact blobs too — never a sun.
+NO_SUN = {"night"}
 GRID_W, GRID_H = 16, 8
 # A sun needs a compact blob at full brightness; an overcast sky has none (city).
 SUN_MIN_LUMA = 0.97
@@ -40,7 +42,7 @@ def analyse(name):
     ys, xs = np.nonzero(sky > SUN_MIN_LUMA * sky.max())
     near = (np.abs(ys - iy) < 20) & (np.abs(xs - ix) < 20)
     sun = None
-    if sky.max() > SUN_MIN_LUMA and near.sum() >= SUN_MIN_PIXELS:
+    if name not in NO_SUN and sky.max() > SUN_MIN_LUMA and near.sum() >= SUN_MIN_PIXELS:
         u = (xs[near].mean() + 0.5) / 1024
         v = 1 - (ys[near].mean() + 0.5) / 512
         sun = ((u - 0.5) * 2 * math.pi, (v - 0.5) * math.pi)

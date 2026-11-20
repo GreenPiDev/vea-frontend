@@ -8,6 +8,12 @@ export interface EditorWall {
   id: string;
   length: number;
   height: number;
+  /** Custom rooms: false when a balcony placed like this would reach into another part of the footprint. */
+  balconyFits?: (placement: WindowPlacementData) => boolean;
+}
+
+function fits(p: WindowPlacementData, wall: EditorWall): boolean {
+  return p.styleId !== 'balcony' || !wall.balconyFits || wall.balconyFits(p);
 }
 
 /**
@@ -35,7 +41,7 @@ export function useWindowEditor(initialWindows?: WindowPlacementData[], initialO
       wall.length,
       wall.height
     ) as WindowPlacementData;
-    if (windowCollides(placement, windows, wall.length)) return false;
+    if (windowCollides(placement, windows, wall.length) || !fits(placement, wall)) return false;
     nextId.current++;
     setWindows((prev) => [...prev, placement]);
     setSelectedId(placement.id);
@@ -47,10 +53,14 @@ export function useWindowEditor(initialWindows?: WindowPlacementData[], initialO
     const current = windows.find((w) => w.id === id);
     if (!current) return false;
     let next = { ...current, ...patch };
-    // A new style brings its own sensible proportions (a floor-to-ceiling glazing isn't a sash window resized).
-    if (patch.styleId && patch.styleId !== current.styleId) next = { ...next, ...defaultWindow(patch.styleId, wall.height), width: current.width };
+    // A new style brings its own sensible proportions (a floor-to-ceiling glazing isn't a sash window resized);
+    // switching to or from a balcony door takes the new style's width too (a door isn't a window resized).
+    if (patch.styleId && patch.styleId !== current.styleId) {
+      const keepWidth = patch.styleId !== 'balcony' && current.styleId !== 'balcony';
+      next = { ...next, ...defaultWindow(patch.styleId, wall.height), ...(keepWidth ? { width: current.width } : {}) };
+    }
     const clamped = clampWindowPlacement(next, wall.length, wall.height) as WindowPlacementData;
-    if (windowCollides(clamped, windows, wall.length)) return false;
+    if (windowCollides(clamped, windows, wall.length) || !fits(clamped, wall)) return false;
     setWindows((prev) => prev.map((w) => (w.id === id ? clamped : w)));
     return true;
   }

@@ -35,7 +35,8 @@ export interface FurniturePlacement {
 
 // Mirrors vea-api's scene-config.dto.ts WindowPlacementDto/OutdoorDto (same shape as components/3d/
 // windowOpenings.ts's WindowPlacement and Exhibition.outdoor — kept structurally identical so they pass straight through).
-export type WindowStyleId = 'modern' | 'classic' | 'panorama';
+/** 'balcony' = a floor-level door onto a balcony platform (components/3d/balcony.ts). */
+export type WindowStyleId = 'modern' | 'classic' | 'panorama' | 'balcony';
 
 export interface WindowPlacementData {
   id: string;
@@ -48,6 +49,9 @@ export interface WindowPlacementData {
   /** 0 = floor-to-ceiling glazing. */
   sillHeight: number;
   styleId: WindowStyleId;
+  /** Balcony door only: platform size along the wall and out from it (m). */
+  balconyWidth?: number;
+  balconyDepth?: number;
 }
 
 export interface OutdoorView {

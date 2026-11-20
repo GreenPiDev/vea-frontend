@@ -24,6 +24,7 @@ import { DAYLIGHT_DESATURATION, DAYLIGHT_WINDOW_GAIN } from "./sceneLighting";
 import { PANORAMA_LIGHT, PANORAMA_LIGHT_GRID_H, PANORAMA_LIGHT_GRID_W } from "./outdoorPanoramaLight";
 import { GLASS_ABSORPTION, WINDOW_SETBACK, buildWindowParts, windowTransmissionMask } from "./windowGeometry";
 import type { WindowOpening } from "./windowOpenings";
+import { OUTDOOR_PANORAMAS } from "./outdoorPanoramas";
 import { bumpDaylightRevision } from "./daylightBake";
 
 /** Area-light slots: the windows themselves, then the sun patches' floor bounce (daylightBounce.ts). */
@@ -102,6 +103,7 @@ export function glassShare(opening: WindowOpening): number {
 }
 
 export function windowLightsFor(openings: WindowOpening[], panoramaId: string, rotationY: number): WindowLight[] {
+  const scale = OUTDOOR_PANORAMAS.find((p) => p.id === panoramaId)?.windowLightScale ?? 1;
   return openings.map((o) => {
     const normal = new THREE.Vector3(o.inward[0], 0, o.inward[1]);
     const along = o.axis === "x" ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
@@ -118,10 +120,11 @@ export function windowLightsFor(openings: WindowOpening[], panoramaId: string, r
 
     const sky = desaturate(hemisphereRadiance(panoramaId, rotationY, normal.clone().negate()), DAYLIGHT_DESATURATION);
     const share = glassShare(o);
+    const gain = DAYLIGHT_WINDOW_GAIN * scale;
     const radiance: [number, number, number] = [
-      sky[0] * share * DAYLIGHT_WINDOW_GAIN * (1 - GLASS_ABSORPTION[0]),
-      sky[1] * share * DAYLIGHT_WINDOW_GAIN * (1 - GLASS_ABSORPTION[1]),
-      sky[2] * share * DAYLIGHT_WINDOW_GAIN * (1 - GLASS_ABSORPTION[2]),
+      sky[0] * share * gain * (1 - GLASS_ABSORPTION[0]),
+      sky[1] * share * gain * (1 - GLASS_ABSORPTION[1]),
+      sky[2] * share * gain * (1 - GLASS_ABSORPTION[2]),
     ];
     return { corners, normal, radiance, area: o.width * o.height, share };
   });

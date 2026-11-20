@@ -11,9 +11,19 @@
 
 import type { WallSegment } from "./galleryLayout";
 
-export type WindowStyleId = "modern" | "classic" | "panorama";
+/** "balcony" = a floor-level door opening onto a balcony platform outside the wall (balcony.ts). */
+export type WindowStyleId = "modern" | "classic" | "panorama" | "balcony";
 
-export const WINDOW_STYLE_IDS: WindowStyleId[] = ["modern", "classic", "panorama"];
+export const WINDOW_STYLE_IDS: WindowStyleId[] = ["modern", "classic", "panorama", "balcony"];
+
+/** Balcony platform limits (m): along the wall, and out from the wall's outer face. */
+export const BALCONY_MIN_WIDTH = 1.2;
+export const BALCONY_MIN_DEPTH = 1;
+export const BALCONY_MAX_DEPTH = 4;
+/** Platform overhang kept on each side of the door. */
+export const BALCONY_DOOR_SIDE = 0.2;
+export const DEFAULT_BALCONY_WIDTH = 3.2;
+export const DEFAULT_BALCONY_DEPTH = 1.8;
 
 /** A curator-placed window, as stored (room-local, relative to its wall). */
 export interface WindowPlacement {
@@ -28,6 +38,18 @@ export interface WindowPlacement {
   /** Bottom of the opening above the floor; 0 = floor-to-ceiling glazing. */
   sillHeight: number;
   styleId: WindowStyleId;
+  /** Balcony door only: platform size along the wall and out from it (m). The door's sill is always 0. */
+  balconyWidth?: number;
+  balconyDepth?: number;
+}
+
+/** A balcony platform, resolved: centred on its door, kept within the wall's length. */
+export interface ResolvedBalcony {
+  /** Platform centre along the wall's axis (world coordinate). */
+  along: number;
+  width: number;
+  /** Out from the wall's outer face. */
+  depth: number;
 }
 
 /** A resolved, world-space window opening. */
@@ -47,6 +69,20 @@ export interface WindowOpening {
   inward: [number, number];
   /** Wall thickness (depth of the reveal). */
   depth: number;
+  /** Set for a balcony door: the platform outside it. The door is walkable (walls are cut there, balcony.ts). */
+  balcony?: ResolvedBalcony;
+}
+
+/** Platform span along the wall for a door centred at `doorAlong` (wall from `start` to `end`), clamped into the wall. */
+export function balconySpan(doorAlong: number, doorWidth: number, requestedWidth: number | undefined, start: number, end: number): [number, number] {
+  const length = end - start;
+  const width = Math.min(Math.max(requestedWidth ?? DEFAULT_BALCONY_WIDTH, doorWidth + 2 * BALCONY_DOOR_SIDE, BALCONY_MIN_WIDTH), length);
+  const lo = Math.min(Math.max(doorAlong - width / 2, start), end - width);
+  return [lo, lo + width];
+}
+
+export function clampBalconyDepth(depth: number | undefined): number {
+  return Math.min(Math.max(depth ?? DEFAULT_BALCONY_DEPTH, BALCONY_MIN_DEPTH), BALCONY_MAX_DEPTH);
 }
 
 /** Solid wall left between an opening and the end of its wall. */
@@ -110,8 +146,9 @@ export function resolveWindowOpenings(
     if (maxWidth < WINDOW_MIN_SIZE) continue;
     const width = Math.min(Math.max(p.width, WINDOW_MIN_SIZE), maxWidth);
 
+    const isBalcony = p.styleId === "balcony";
     const wallHeight = info.top - info.bottom;
-    const sill = Math.min(Math.max(p.sillHeight, 0), wallHeight - WINDOW_HEAD_MARGIN - WINDOW_MIN_SIZE);
+    const sill = isBalcony ? 0 : Math.min(Math.max(p.sillHeight, 0), wallHeight - WINDOW_HEAD_MARGIN - WINDOW_MIN_SIZE);
     if (sill < 0) continue;
     const height = Math.min(Math.max(p.height, WINDOW_MIN_SIZE), wallHeight - WINDOW_HEAD_MARGIN - sill);
 
@@ -127,6 +164,15 @@ export function resolveWindowOpenings(
     });
     if (overlaps) continue;
 
+    let balcony: ResolvedBalcony | undefined;
+    if (isBalcony) {
+      const [b0, b1] = balconySpan(along, width, p.balconyWidth, info.start, info.end);
+      // Two platforms on one wall may not overlap (the door gap rule alone allows it).
+      const clash = result.some((o) => o.wallId === wall.id && o.balcony && b0 < o.balcony.along + o.balcony.width / 2 && b1 > o.balcony.along - o.balcony.width / 2);
+      if (clash) continue;
+      balcony = { along: (b0 + b1) / 2, width: b1 - b0, depth: clampBalconyDepth(p.balconyDepth) };
+    }
+
     const y = info.bottom + sill + height / 2;
     const center: [number, number, number] =
       info.axis === "x" ? [along, y, wall.position[2]] : [wall.position[0], y, along];
@@ -141,6 +187,7 @@ export function resolveWindowOpenings(
       sill: info.bottom + sill,
       inward: inwardOf(wall, info.axis, roomCenter),
       depth: info.axis === "x" ? wall.size[2] : wall.size[0],
+      ...(balcony ? { balcony } : {}),
     });
   }
   return result;
@@ -210,6 +257,8 @@ export const MAX_WINDOWS_PER_ROOM = 8;
 /** A sensible first window of each style for a wall of `wallHeight`. */
 export function defaultWindow(styleId: WindowStyleId, wallHeight: number): Omit<WindowPlacement, "id" | "wallId" | "alongFraction"> {
   const maxTop = wallHeight - WINDOW_HEAD_MARGIN;
+  if (styleId === "balcony")
+    return { styleId, width: 1.4, sillHeight: 0, height: Math.min(2.6, maxTop), balconyWidth: DEFAULT_BALCONY_WIDTH, balconyDepth: DEFAULT_BALCONY_DEPTH };
   if (styleId === "panorama") return { styleId, width: 3, sillHeight: 0, height: maxTop };
   if (styleId === "modern") return { styleId, width: 1.4, sillHeight: 0.6, height: Math.min(2.8, maxTop - 0.6) };
   return { styleId, width: 1.6, sillHeight: 0.85, height: Math.min(2.4, maxTop - 0.85) };
@@ -217,21 +266,37 @@ export function defaultWindow(styleId: WindowStyleId, wallHeight: number): Omit<
 
 /** Clamps a placement into its wall (length × height): margins at both ends and under the ceiling. */
 export function clampWindowPlacement(p: WindowPlacement, wallLength: number, wallHeight: number): WindowPlacement {
+  const isBalcony = p.styleId === "balcony";
   const width = Math.min(Math.max(p.width, WINDOW_MIN_SIZE), Math.max(wallLength - 2 * WINDOW_EDGE_MARGIN, WINDOW_MIN_SIZE));
-  const sillHeight = Math.min(Math.max(p.sillHeight, 0), Math.max(wallHeight - WINDOW_HEAD_MARGIN - WINDOW_MIN_SIZE, 0));
+  const sillHeight = isBalcony ? 0 : Math.min(Math.max(p.sillHeight, 0), Math.max(wallHeight - WINDOW_HEAD_MARGIN - WINDOW_MIN_SIZE, 0));
   const height = Math.min(Math.max(p.height, WINDOW_MIN_SIZE), Math.max(wallHeight - WINDOW_HEAD_MARGIN - sillHeight, WINDOW_MIN_SIZE));
   const lo = (WINDOW_EDGE_MARGIN + width / 2) / wallLength;
   const hi = 1 - lo;
   const alongFraction = lo > hi ? 0.5 : Math.min(Math.max(p.alongFraction, lo), hi);
-  return { ...p, width, height, sillHeight, alongFraction };
+  if (!isBalcony) {
+    const { balconyWidth: _w, balconyDepth: _d, ...rest } = p;
+    return { ...rest, width, height, sillHeight, alongFraction };
+  }
+  const [b0, b1] = balconySpan(alongFraction * wallLength, width, p.balconyWidth, 0, wallLength);
+  return { ...p, width, height, sillHeight, alongFraction, balconyWidth: b1 - b0, balconyDepth: clampBalconyDepth(p.balconyDepth) };
 }
 
-/** True when `p` would overlap (or come closer than WINDOW_MIN_PIER to) another window on the same wall. */
+/** Platform span [from, to] (metres from the wall's start) of a stored balcony placement. */
+function placementBalconySpan(p: WindowPlacement, wallLength: number): [number, number] {
+  return balconySpan(p.alongFraction * wallLength, p.width, p.balconyWidth, 0, wallLength);
+}
+
+/**
+ * True when `p` would overlap (or come closer than WINDOW_MIN_PIER to) another window on the same wall, or when
+ * two balcony platforms on that wall would overlap.
+ */
 export function windowCollides(p: WindowPlacement, others: WindowPlacement[], wallLength: number): boolean {
-  return others.some(
-    (o) =>
-      o.id !== p.id &&
-      o.wallId === p.wallId &&
-      Math.abs(o.alongFraction - p.alongFraction) * wallLength < (o.width + p.width) / 2 + WINDOW_MIN_PIER
-  );
+  return others.some((o) => {
+    if (o.id === p.id || o.wallId !== p.wallId) return false;
+    if (Math.abs(o.alongFraction - p.alongFraction) * wallLength < (o.width + p.width) / 2 + WINDOW_MIN_PIER) return true;
+    if (o.styleId !== "balcony" || p.styleId !== "balcony") return false;
+    const [a0, a1] = placementBalconySpan(o, wallLength);
+    const [b0, b1] = placementBalconySpan(p, wallLength);
+    return b0 < a1 && b1 > a0;
+  });
 }

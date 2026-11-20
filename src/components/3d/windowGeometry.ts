@@ -36,6 +36,8 @@ export const WINDOW_STYLES: Record<WindowStyleId, { joinery: WindowMaterialSpec;
   modern: { joinery: { color: "#232427", roughness: 0.55, metalness: 0.4 }, hardware: { color: "#18181a", roughness: 0.4, metalness: 0.6 } },
   // Anodised aluminium, dark bronze-grey.
   panorama: { joinery: { color: "#4a4c50", roughness: 0.38, metalness: 0.75 }, hardware: null },
+  // Balcony door: the same aluminium, an open doorway (balcony.ts).
+  balcony: { joinery: { color: "#4a4c50", roughness: 0.38, metalness: 0.75 }, hardware: null },
 };
 
 /** Shade of a 2 mm shadow gap / rebate face (multiplies the paint colour). */
@@ -63,6 +65,7 @@ export interface WindowParts {
   /** Frame, sashes, bars, casing, board — vertex-coloured, world space. */
   joinery: THREE.BufferGeometry;
   hardware: THREE.BufferGeometry | null;
+  /** Glass to draw (empty for an open balcony door). */
   panes: GlassPane[];
   /** Glass rectangles and the glazing bars crossing them, in local coordinates (for the sun mask). */
   localPanes: LocalRect[];
@@ -103,6 +106,8 @@ interface Out {
   panes: LocalRect[];
   /** Bars lying across glass (glazing bars) — mullions/transoms sit between panes and need no entry. */
   bars: LocalRect[];
+  /** False for an open doorway: `panes` is then the clear opening (light/sun mask), with no glass drawn. */
+  glazed: boolean;
   color: THREE.Color;
   hardwareColor: THREE.Color;
 }
@@ -336,6 +341,17 @@ function buildPanorama(l: Local, out: Out) {
   for (const [a, b] of cols) for (const [c, d] of rows) out.panes.push({ x: (a + b) / 2, y: (c + d) / 2, w: b - a, h: d - c });
 }
 
+// --- Balcony door: aluminium frame around an open doorway ---------------------------------------------
+
+/** Door frame: the curtain-wall frame profile (its bottom member reads as the threshold). The leaves are slid
+ * away into the wall pocket, so the doorway is open — no glass, nothing to walk into. */
+function buildBalconyDoor(l: Local, out: Out) {
+  const { joinery: j, color } = out;
+  j.sweepRect(0, 0, l.hw - P_FRAME, l.hh - P_FRAME, PANORAMA_FRAME, color);
+  out.glazed = false;
+  out.panes.push({ x: 0, y: 0, w: 2 * (l.hw - P_FRAME), h: 2 * (l.hh - P_FRAME) });
+}
+
 // --- Hardware -------------------------------------------------------------------------------------------
 
 /** A lever handle on a backplate, mounted on the face at depth `z`. "down" = classic espagnolette, "side" = modern lever. */
@@ -366,6 +382,7 @@ const BUILDERS: Record<WindowStyleId, (l: Local, out: Out) => void> = {
   classic: buildClassic,
   modern: buildModern,
   panorama: buildPanorama,
+  balcony: buildBalconyDoor,
 };
 
 export function buildWindowParts(opening: WindowOpening): WindowParts {
@@ -375,6 +392,7 @@ export function buildWindowParts(opening: WindowOpening): WindowParts {
     hardware: new SweepBuilder(),
     panes: [],
     bars: [],
+    glazed: true,
     color: new THREE.Color(style.joinery.color),
     hardwareColor: new THREE.Color(style.hardware?.color ?? "#000000"),
   };
@@ -398,7 +416,7 @@ export function buildWindowParts(opening: WindowOpening): WindowParts {
   return {
     joinery: out.joinery.toGeometry(matrix),
     hardware: out.hardware.empty ? null : out.hardware.toGeometry(matrix),
-    panes: out.panes.map((p) => {
+    panes: (out.glazed ? out.panes : []).map((p) => {
       v.set(p.x, p.y, 0).applyMatrix4(matrix);
       return { center: [v.x, v.y, v.z], width: p.w, height: p.h, rotationY };
     }),

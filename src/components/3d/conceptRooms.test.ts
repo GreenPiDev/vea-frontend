@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { balconyGeometries, railingColliders, solidWallBoxes } from "./balcony";
 import { EXHIBITIONS } from "./exhibitions";
 import { FRAME_BORDER } from "./artworkShadow";
 import { EYE_HEIGHT, PLAYER_RADIUS, WALL_CLEARANCE, minCeilingFor } from "./galleryLayout";
@@ -14,8 +15,18 @@ import { SHOWCASE_ID } from "./showcaseExhibition";
 import { CEILING_TEXTURES, FLOOR_TEXTURES, WALL_TEXTURES, findTexture } from "./surfaceTextures";
 
 describe("concept rooms", () => {
-  it("are vitrin-2 … vitrin-8, registered once each next to vitrin-1", () => {
-    expect(CONCEPT_ROOM_SPECS.map((s) => s.id)).toEqual(["vitrin-2", "vitrin-3", "vitrin-4", "vitrin-5", "vitrin-6", "vitrin-7", "vitrin-8"]);
+  it("are vitrin-2 … vitrin-10, registered once each next to vitrin-1", () => {
+    expect(CONCEPT_ROOM_SPECS.map((s) => s.id)).toEqual([
+      "vitrin-2",
+      "vitrin-3",
+      "vitrin-4",
+      "vitrin-5",
+      "vitrin-6",
+      "vitrin-7",
+      "vitrin-8",
+      "vitrin-9",
+      "vitrin-10",
+    ]);
     expect(SHOWCASE_ID).toBe("vitrin-1");
     const ids = EXHIBITIONS.map((e) => e.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -25,7 +36,7 @@ describe("concept rooms", () => {
   it("differ from each other in floor, wall and ceiling look", () => {
     const keys = CONCEPT_ROOM_SPECS.map((s) => [s.theme.floorTextureId, s.theme.wallTextureId, s.theme.ceilingTextureId, s.theme.wallColor].join("|"));
     expect(new Set(keys).size).toBe(keys.length);
-    expect(new Set(CONCEPT_ROOM_SPECS.map((s) => s.theme.floorTextureId)).size).toBe(CONCEPT_ROOM_SPECS.length);
+    // More rooms than floor scans now: a floor may repeat, the room as a whole (and its wall colour) may not.
     expect(new Set(CONCEPT_ROOM_SPECS.map((s) => s.theme.wallColor)).size).toBe(CONCEPT_ROOM_SPECS.length);
   });
 
@@ -105,7 +116,9 @@ for (const spec of CONCEPT_ROOM_SPECS) {
     });
 
     it("keeps furniture off the walls, colliding and clear of every painting's stand-in-front spot", () => {
-      expect(layout.colliders).toHaveLength(4 + spec.furniture.length);
+      // Walls (cut at balcony doors) and balcony railings come first, then one box per furniture piece.
+      const fixed = solidWallBoxes(layout.walls, layout.windows).length + railingColliders(balconyGeometries(layout.windows)).length;
+      expect(layout.colliders).toHaveLength(fixed + spec.furniture.length);
       for (const f of layout.furniture ?? []) {
         const r = Math.hypot(f.halfWidth, f.halfDepth);
         expect(Math.abs(f.x) + r).toBeLessThan(W / 2 - 0.15);
@@ -114,7 +127,7 @@ for (const spec of CONCEPT_ROOM_SPECS) {
       for (const a of arts) {
         const [x, , z] = a.position;
         const [vx, vz] = [x + Math.sin(a.rotationY) * 2, z + Math.cos(a.rotationY) * 2];
-        for (const c of layout.colliders.slice(4)) {
+        for (const c of layout.colliders.slice(fixed)) {
           const blocked = vx > c.minX - PLAYER_RADIUS && vx < c.maxX + PLAYER_RADIUS && vz > c.minZ - PLAYER_RADIUS && vz < c.maxZ + PLAYER_RADIUS;
           expect(blocked, a.id).toBe(false);
         }

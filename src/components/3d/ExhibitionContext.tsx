@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { Exhibition } from "./exhibitions";
 import type { RoomLayout } from "./galleryLayout";
 
@@ -14,8 +14,10 @@ export function ExhibitionProvider({
   layout,
   children,
 }: ExhibitionContextValue & { children: ReactNode }) {
+  // Stable value: every 3D consumer re-renders when it changes, so it may only change with the room itself.
+  const value = useMemo(() => ({ exhibition, layout }), [exhibition, layout]);
   return (
-    <ExhibitionContext.Provider value={{ exhibition, layout }}>
+    <ExhibitionContext.Provider value={value}>
       {children}
     </ExhibitionContext.Provider>
   );
