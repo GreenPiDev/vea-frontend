@@ -31,7 +31,7 @@ function wallOf(a: (typeof SHOWCASE_ARTWORKS)[number]) {
 const widthOf = (a: (typeof SHOWCASE_ARTWORKS)[number]) => a.height * a.aspect + 2 * FRAME_BORDER;
 
 describe("showcase room", () => {
-  it("is registered and opens by id (/exhibition/vitrin)", () => {
+  it("is registered and opens by id (/exhibition/vitrin-1)", () => {
     expect(EXHIBITIONS.find((e) => e.id === SHOWCASE_ID)).toBe(SHOWCASE_EXHIBITION);
   });
 

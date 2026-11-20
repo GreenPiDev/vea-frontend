@@ -13,14 +13,14 @@
 // - 7 paintings, so every one gets a picture light from the 8-light ArtworkLightPool at once.
 //
 // Static (no backend) on purpose: it always exists, never changes under a screenshot series, and opens at
-// /exhibition/vitrin (static templates aren't listed on the homepage selector).
+// /exhibition/vitrin-1 (static templates aren't listed on the homepage selector).
 
 import { ARTWORKS, type Artwork, type FrameStyle } from "./artworks";
 import type { Exhibition } from "./exhibitions";
 import { WALL_CLEARANCE, buildRoomLayout, type PlacedFurnitureInput } from "./galleryLayout";
 import type { SeatSpot } from "./seating";
 
-export const SHOWCASE_ID = "vitrin";
+export const SHOWCASE_ID = "vitrin-1";
 export const SHOWCASE_ROOM_SIZE: [number, number] = [16, 11];
 export const SHOWCASE_WALL_HEIGHT = 4.2;
 /** Centre line for normal-sized works (plan: 1.45–1.55 m). */

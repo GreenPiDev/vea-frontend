@@ -6,6 +6,7 @@
 import type { Artwork } from "./artworks";
 import type { RoomLayout } from "./galleryLayout";
 import type { SeatSpot } from "./seating";
+import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
 import { SHOWCASE_EXHIBITION } from "./showcaseExhibition";
 
 export interface ExhibitionTheme {
@@ -161,6 +162,8 @@ export const EXHIBITIONS: Exhibition[] = [
       spotIntensity: 20,
     },
   },
-  // Adım 13 showcase room (/exhibition/vitrin) — see showcaseExhibition.ts.
+  // Adım 13 showcase room (/exhibition/vitrin-1) — see showcaseExhibition.ts.
   SHOWCASE_EXHIBITION,
+  // Concept sibling rooms (/exhibition/vitrin-2 … vitrin-5) — see conceptRooms.ts.
+  ...CONCEPT_EXHIBITIONS,
 ];
