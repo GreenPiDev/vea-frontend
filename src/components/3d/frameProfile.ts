@@ -18,12 +18,16 @@
 
 import * as THREE from "three";
 import type { FrameStyle } from "./artworks";
-import { FRAME_BORDER, FRAME_DEPTH } from "./artworkShadow";
+import { ARTWORK_WALL_GAP, FRAME_BORDER, FRAME_DEPTH } from "./artworkShadow";
 
 /** Canvas plane, relative to the frame's front (z = 0): sits in the rebate behind the sight edge. */
 export const CANVAS_RECESS = 0.014;
-/** Unframed works keep their canvas just in front of the hang plane, as before. */
-const UNFRAMED_CANVAS_Z = 0.004;
+/** Depth of an unframed work's stretcher: it hangs as a bare stretched canvas, a shallow block on the wall. */
+export const STRETCHER_DEPTH = 0.03;
+/** Gap between a bare canvas's back and the wall (the hanging hardware). */
+export const STRETCHER_WALL_GAP = 0.005;
+/** Unframed works: the canvas face, STRETCHER_DEPTH in front of its back, which hangs just off the wall. */
+const UNFRAMED_CANVAS_Z = -ARTWORK_WALL_GAP + STRETCHER_WALL_GAP + STRETCHER_DEPTH;
 /** The sight edge overlaps the canvas by this much, so no gap shows around it. */
 export const SIGHT_OVERLAP = 0.004;
 
@@ -231,4 +235,52 @@ export function getFrameGeometry(style: FrameStyle, canvasW: number, canvasH: nu
     frameGeometryCache.set(key, geo);
   }
   return geo;
+}
+
+/**
+ * An unframed work as a stretched canvas: the painted face (uv 0..1) plus four sides STRETCHER_DEPTH deep,
+ * back open (it faces the wall). Two groups: 0 = the face (the painting's material), 1 = the sides, drawn as
+ * bare primed canvas (Artwork.tsx's side material — the photo has nothing to show there; stretching its edge
+ * pixels read as streaks). `uv1` is in metres / `weaveTile` for the linen weave normal map.
+ * Face at z = 0, back at −depth.
+ */
+export function buildStretchedCanvasGeometry(width: number, height: number, weaveTile: number, depth = STRETCHER_DEPTH): THREE.BufferGeometry {
+  const w = width / 2;
+  const h = height / 2;
+  const d = -depth;
+  // Each quad: 4 corners (counter-clockwise seen from outside), its normal, 4 uvs.
+  const quads: { p: [number, number, number][]; n: [number, number, number]; uv: [number, number][] }[] = [
+    { p: [[-w, -h, 0], [w, -h, 0], [w, h, 0], [-w, h, 0]], n: [0, 0, 1], uv: [[0, 0], [1, 0], [1, 1], [0, 1]] },
+    { p: [[-w, h, 0], [w, h, 0], [w, h, d], [-w, h, d]], n: [0, 1, 0], uv: [[0, 1], [1, 1], [1, 1], [0, 1]] },
+    { p: [[-w, -h, d], [w, -h, d], [w, -h, 0], [-w, -h, 0]], n: [0, -1, 0], uv: [[0, 0], [1, 0], [1, 0], [0, 0]] },
+    { p: [[-w, -h, d], [-w, -h, 0], [-w, h, 0], [-w, h, d]], n: [-1, 0, 0], uv: [[0, 0], [0, 0], [0, 1], [0, 1]] },
+    { p: [[w, -h, 0], [w, -h, d], [w, h, d], [w, h, 0]], n: [1, 0, 0], uv: [[1, 0], [1, 0], [1, 1], [1, 1]] },
+  ];
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const uv1: number[] = [];
+  const index: number[] = [];
+  for (const q of quads) {
+    const base = positions.length / 3;
+    q.p.forEach((p, i) => {
+      positions.push(...p);
+      normals.push(...q.n);
+      uvs.push(...q.uv[i]);
+      // Weave runs across the face in x/y and round the sides along their depth.
+      const along = q.n[0] !== 0 ? p[1] : p[0];
+      const across = q.n[2] !== 0 ? p[1] : p[2];
+      uv1.push(along / weaveTile, across / weaveTile);
+    });
+    index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  g.setAttribute("uv1", new THREE.Float32BufferAttribute(uv1, 2));
+  g.setIndex(index);
+  g.addGroup(0, 6, 0);
+  g.addGroup(6, index.length - 6, 1);
+  return g;
 }

@@ -93,9 +93,9 @@ describe("adaptApiExhibition", () => {
     expect(result!.wallHeight).toBe(preset.wallHeight);
     expect(result!.theme).toEqual(preset.theme);
     expect(result!.artworks).toHaveLength(1);
-    // Default makeArtwork() sets framed: false, so backendAdapter should
-    // hang a default frame around the bare canvas.
-    expect(result!.artworks![0].frame).toBe("modernBlack");
+    // Default makeArtwork() sets framed: false: it hangs as a bare canvas, no frame is added.
+    expect(result!.artworks![0].frame).toBeNull();
+    expect(result!.artworks![0].framed).toBe(false);
     expect(result!.artworks![0].artist).toBe("Test Artist");
   });
 

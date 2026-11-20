@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { FRAME_BORDER, FRAME_DEPTH } from "./artworkShadow";
+import { ARTWORK_WALL_GAP, FRAME_BORDER, FRAME_DEPTH } from "./artworkShadow";
 import {
   CANVAS_RECESS,
   FRAME_PROFILES,
   SIGHT_OVERLAP,
+  STRETCHER_DEPTH,
+  STRETCHER_WALL_GAP,
   buildFrameGeometry,
+  buildStretchedCanvasGeometry,
   canvasZ,
   closedProfile,
   getFrameGeometry,
@@ -124,8 +127,38 @@ describe("frame profiles", () => {
     expect(FRAME_PROFILES.gold.length).toBeGreaterThan(FRAME_PROFILES.modernBlack.length);
   });
 
-  it("unframed works keep their canvas just in front of the hang plane", () => {
-    expect(canvasZ(null)).toBeGreaterThan(0);
+  it("hangs an unframed work as a stretched canvas just off the wall", () => {
+    const back = canvasZ(null) - STRETCHER_DEPTH;
+    expect(back + ARTWORK_WALL_GAP).toBeCloseTo(STRETCHER_WALL_GAP, 9);
+    expect(STRETCHER_WALL_GAP).toBeGreaterThan(0);
+    const g = buildStretchedCanvasGeometry(1.2, 0.8, 0.1);
+    const pos = g.getAttribute("position");
+    const nrm = g.getAttribute("normal");
+    const uv = g.getAttribute("uv");
+    expect(pos.count).toBe(20);
+    // Face → the painting's material, sides → the bare canvas material.
+    expect(g.groups).toEqual([
+      { start: 0, count: 6, materialIndex: 0 },
+      { start: 6, count: 24, materialIndex: 1 },
+    ]);
+    for (let i = 0; i < pos.count; i++) {
+      expect(pos.getZ(i)).toBeLessThanOrEqual(0);
+      expect(pos.getZ(i)).toBeGreaterThanOrEqual(-STRETCHER_DEPTH);
+      // Sides take the image's edge: u or v pinned at 0/1 on the side the normal points to.
+      if (nrm.getY(i) === 1) expect(uv.getY(i)).toBe(1);
+      if (nrm.getY(i) === -1) expect(uv.getY(i)).toBe(0);
+      if (nrm.getX(i) === 1) expect(uv.getX(i)).toBe(1);
+      if (nrm.getX(i) === -1) expect(uv.getX(i)).toBe(0);
+    }
+    // Every triangle faces outward along its normal.
+    const idx = g.getIndex()!;
+    for (let t = 0; t < idx.count; t += 3) {
+      const [a, b, c] = [idx.getX(t), idx.getX(t + 1), idx.getX(t + 2)];
+      const p = (k: number) => new THREE.Vector3(pos.getX(k), pos.getY(k), pos.getZ(k));
+      const n = new THREE.Vector3(nrm.getX(a), nrm.getY(a), nrm.getZ(a));
+      const face = p(b).sub(p(a)).cross(p(c).sub(p(a)));
+      expect(face.dot(n)).toBeGreaterThan(0);
+    }
   });
 
   it("caches geometry per style and size", () => {

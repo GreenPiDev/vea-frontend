@@ -21,7 +21,7 @@ export interface Artwork {
   aspect: number;
   /** Physical height of the canvas on the wall, in meters. */
   height: number;
-  /** Static demo ARTWORKS below always set "gold"/"walnut". Backend-sourced artworks derive this from ApiArtwork.framed (see backendAdapter.ts's toRenderableArtwork): `framed: true` (the artist's uploaded image already shows its own frame) -> null, no extra mesh; `framed: false` -> "modernBlack", a default frame is rendered around the canvas. */
+  /** Static demo ARTWORKS below always set "gold"/"walnut". Backend-sourced artworks are always null (backendAdapter.ts's toRenderableArtwork): `framed: true` — the uploaded image already shows its own frame; `framed: false` — it hangs as a bare stretched canvas (frameProfile.ts's buildStretchedCanvasGeometry), we don't add a frame the artist didn't. */
   frame?: FrameStyle | null;
   /** Center position of the canvas face, flush against the wall surface. */
   position: [number, number, number];

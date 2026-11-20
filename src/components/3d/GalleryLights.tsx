@@ -99,7 +99,7 @@ export default function GalleryLights() {
     const wallGap = WALL_CLEARANCE - WALL_THICKNESS / 2;
     const occluders = artworks.map((a) => {
       const border = a.frame ? 2 * FRAME_BORDER : 0;
-      return artworkOccluder(a.position, a.rotationY, a.height * a.aspect + border, a.height + border, wallGap, Math.max(canvasZ(a.frame), 0));
+      return artworkOccluder(a.position, a.rotationY, a.height * a.aspect + border, a.height + border, wallGap, a.frame ? 0 : canvasZ(null));
     });
     setSunOccluderSource("artworks", occluders, 1);
     return () => removeSunOccluderSource("artworks");

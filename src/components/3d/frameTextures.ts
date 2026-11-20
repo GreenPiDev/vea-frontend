@@ -36,8 +36,7 @@ export const FRAME_TEXTURES: Record<"gold" | "walnut" | "modernBlack", FrameText
     metalness: 0.05,
     roughness: 1,
   },
-  // Default frame for a backend artwork whose artist marked their uploaded image as unframed (see
-  // artworks.ts's `frame` doc comment). Reuses the same brushed-metal scan as "gold" — already loaded for
+  // Slim black frame of the static demo rooms (backend works hang without a frame since 2026-11-20). Reuses the same brushed-metal scan as "gold" — already loaded for
   // any gold-framed painting in the room, so this adds no extra texture fetch in the common case — but
   // tinted near-black and tiled finer, with metalness turned down, for a matte anodized-aluminum look
   // instead of a flat solid color.

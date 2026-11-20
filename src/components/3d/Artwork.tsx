@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { useTexture } from "@react-three/drei";
 import type { Artwork as ArtworkData, FrameStyle } from "./artworks";
 import { FRAME_TEXTURES } from "./frameTextures";
-import { canvasZ, getFrameGeometry } from "./frameProfile";
+import { buildStretchedCanvasGeometry, canvasZ, getFrameGeometry } from "./frameProfile";
 import { WEAVE_TILE_METERS, getCanvasWeaveNormalMap } from "./canvasWeave";
 import { cropToUvTransform, measureImageCrop } from "./artworkImageCrop";
 import WallLabel from "./WallLabel";
@@ -18,6 +18,24 @@ import { applyDaylight } from "./ceilingLight";
 // whenever the env map comes from scene.environment, as RoomEnvironment.tsx's does.)
 const CANVAS_ROUGHNESS = 0.5;
 const CANVAS_NORMAL_SCALE = new THREE.Vector2(0.35, 0.35);
+
+// Sides of an unframed (stretched) canvas: bare primed linen, warm off-white, matte, with the weave a bit
+// stronger than on the varnished face. One material for every painting.
+const CANVAS_SIDE_COLOR = "#ddd3bf";
+let canvasSideMaterial: THREE.MeshStandardMaterial | null = null;
+function getCanvasSideMaterial(): THREE.MeshStandardMaterial {
+  if (!canvasSideMaterial) {
+    canvasSideMaterial = new THREE.MeshStandardMaterial({
+      color: CANVAS_SIDE_COLOR,
+      roughness: 0.85,
+      metalness: 0,
+      normalMap: getCanvasWeaveNormalMap(),
+      normalScale: new THREE.Vector2(0.6, 0.6),
+    });
+    applyDaylight(canvasSideMaterial);
+  }
+  return canvasSideMaterial;
+}
 
 // Keyed by frame style — every painting using, say, "modernBlack" gets the exact same frame look, so
 // there's no reason for each one to own its own MeshStandardMaterial (and its own
@@ -51,7 +69,10 @@ export default function Artwork({
   const width = data.height * data.aspect;
 
   // Second UV set in meters/tile for the weave (see canvasWeave.ts) — the color map keeps the 0..1 `uv`.
+  // An unframed work is a stretched canvas with depth (frameProfile.ts), a framed one a plane in the rebate.
+  const framed = Boolean(data.frame);
   const canvasGeometry = useMemo(() => {
+    if (!framed) return buildStretchedCanvasGeometry(width, data.height, WEAVE_TILE_METERS);
     const geometry = new THREE.PlaneGeometry(width, data.height);
     const uv1 = geometry.attributes.uv.clone();
     for (let i = 0; i < uv1.count; i++) {
@@ -59,7 +80,7 @@ export default function Artwork({
     }
     geometry.setAttribute("uv1", uv1);
     return geometry;
-  }, [width, data.height]);
+  }, [width, data.height, framed]);
   useEffect(() => () => canvasGeometry.dispose(), [canvasGeometry]);
 
   // Receives window daylight and sun patches, not the ceiling fixtures (applyDaylight, ceilingLight.ts).
@@ -78,11 +99,15 @@ export default function Artwork({
 
   return (
     <group position={data.position} rotation={[0, data.rotationY, 0]}>
-      {/* Frame — skipped when the artist marked their uploaded image as already framed (see artworks.ts's `frame` doc comment). "modernBlack" is the default for unframed backend artworks, all styles now render as real photo-scanned material. */}
+      {/* Frame — only works that have one (static demo rooms); backend works hang without (artworks.ts's `frame` doc comment). */}
       {data.frame ? <FrameMesh style={data.frame} canvasWidth={width} canvasHeight={data.height} /> : null}
 
-      {/* Canvas — in the frame's rebate, 1.4 cm behind its face (frameProfile.ts) */}
-      <mesh position={[0, 0, canvasZ(data.frame)]} geometry={canvasGeometry} material={canvasMaterial} />
+      {/* Canvas — in the frame's rebate, 1.4 cm behind its face; unframed: a bare stretched canvas just off the wall (frameProfile.ts) */}
+      <mesh
+        position={[0, 0, canvasZ(data.frame)]}
+        geometry={canvasGeometry}
+        material={framed ? canvasMaterial : [canvasMaterial, getCanvasSideMaterial()]}
+      />
 
       {/* Wall label — its back flat on the wall face. */}
       {label ? (

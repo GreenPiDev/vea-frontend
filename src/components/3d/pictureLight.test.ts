@@ -13,10 +13,12 @@ import {
 } from "./pictureLight";
 import { computeFixtureTransform } from "./fixtureGeometry";
 import { ARTWORK_WALL_GAP, FRAME_BORDER, FRAME_DEPTH } from "./artworkShadow";
+import { canvasZ } from "./frameProfile";
 
 /** A painting on a wall whose face is at z = 0, facing +Z, centred at x = 0. */
-function painting(height: number, aspect: number, centerY = 1.6): Artwork {
+function painting(height: number, aspect: number, centerY = 1.6, frame: Artwork["frame"] = null): Artwork {
   return {
+    frame,
     id: "t",
     exhibitionId: "t",
     title: "t",
@@ -38,16 +40,16 @@ const SIZES: [number, number][] = [
   [2.2, 1.4],
 ];
 
-function sampler(height: number, aspect: number) {
-  const art = painting(height, aspect, Math.max(1.6, height / 2 + 0.5));
+function sampler(height: number, aspect: number, frame: Artwork["frame"] = null) {
+  const art = painting(height, aspect, Math.max(1.6, height / 2 + 0.5), frame);
   const light = pictureLightPlacement(art, 8);
   const [cx, cy] = art.position;
   const top = cy + height / 2;
   const bottom = cy - height / 2;
   const half = (height * aspect) / 2;
-  // On the canvas plane / on the wall face behind it.
+  // On the canvas plane (in the frame's rebate, or a bare stretched canvas) / on the wall face behind it.
   const at = (x: number, y: number) =>
-    pictureLightIrradiance({ x: cx + x, y, z: ARTWORK_WALL_GAP + 0.004 }, WALL_N, light);
+    pictureLightIrradiance({ x: cx + x, y, z: ARTWORK_WALL_GAP + canvasZ(frame) }, WALL_N, light);
   const wallAt = (x: number, y: number) => pictureLightIrradiance({ x: cx + x, y, z: 0 }, WALL_N, light);
   return { art, light, at, wallAt, top, bottom, half, cy };
 }
@@ -98,16 +100,17 @@ describe("picture light: around the canvas", () => {
   });
 
   it("lights the frame's top face from above without outshining the canvas", () => {
-    const { light, top, half, at } = sampler(1.2, 1);
+    const { light, top, half, at } = sampler(1.2, 1, "modernBlack");
     let peak = 0;
     for (let z = ARTWORK_WALL_GAP - FRAME_DEPTH / 2; z <= ARTWORK_WALL_GAP + FRAME_DEPTH / 2; z += 0.005)
       for (let x = -half; x <= half; x += 0.1)
         peak = Math.max(peak, pictureLightIrradiance({ x, y: top + FRAME_BORDER, z }, { x: 0, y: 1, z: 0 }, light));
     expect(peak).toBeGreaterThan(0);
     // The up-facing top face sits right under the lamp, so it may slightly out-light the canvas (a real
-    // picture light does the same); it's a thin strip, above eye level for this size. Was 0.95× with the
-    // 7 cm frame, ~1.12× with the slim 4 cm one (closer to the lamp) — guard against it turning into a glare.
-    expect(peak).toBeLessThan(at(0, top - 0.02) * 1.2);
+    // picture light does the same); it's a thin strip, above eye level for this size. ~1.24× with the slim
+    // 4 cm frame measured against its own canvas in the rebate (the ~1.12× noted before compared it with an
+    // unframed canvas plane) — guard against it turning into a glare.
+    expect(peak).toBeLessThan(at(0, top - 0.02) * 1.3);
   });
 
   it("sends nothing into the room or through the wall", () => {
@@ -134,8 +137,9 @@ describe("picture light: consistent with the visible lamp", () => {
     const art = { ...painting(1, 1), position: [3, 1.6, 2] as [number, number, number], rotationY: -Math.PI / 2 };
     const light = pictureLightPlacement(art, 8);
     expect(light.normal.x).toBeCloseTo(-1);
-    expect(light.position.x).toBeCloseTo(3 - light.standoff);
-    const onCanvas = pictureLightIrradiance({ x: 2.996, y: 1.9, z: 2 }, { x: -1, y: 0, z: 0 }, light);
+    // The lamp stands `standoff` in front of the canvas face, which is canvasZ(null) off the hang plane.
+    expect(light.position.x).toBeCloseTo(3 - light.standoff - canvasZ(null));
+    const onCanvas = pictureLightIrradiance({ x: 3 - canvasZ(null), y: 1.9, z: 2 }, { x: -1, y: 0, z: 0 }, light);
     expect(onCanvas).toBeCloseTo(PICTURE_LIGHT_GAIN * 0.9, 1);
   });
 });

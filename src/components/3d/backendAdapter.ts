@@ -137,10 +137,9 @@ function toRenderableArtwork(
     image: artwork.imageUrl,
     aspect: artwork.widthCm / artwork.heightCm,
     height: placement.height,
-    // artwork.framed: true means the artist's uploaded image already shows
-    // its own physical frame (no extra mesh needed); false means we hang a
-    // default modern-black frame around the bare canvas.
-    frame: artwork.framed ? null : "modernBlack",
+    // No frame mesh either way: framed: true means the uploaded image already shows its own frame, and an
+    // unframed work hangs as a bare stretched canvas (user decision 2026-11-20 — no frame the artist didn't add).
+    frame: null,
     position: floorY ? [placement.position[0], placement.position[1] + floorY, placement.position[2]] : placement.position,
     rotationY: placement.rotationY,
     artworkId: link.artworkId,
