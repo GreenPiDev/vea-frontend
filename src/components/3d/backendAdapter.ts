@@ -27,7 +27,12 @@ import {
   type GridCell,
   type PlacedFurnitureInput,
   type WallRunGeometry,
+  type WallSpan,
 } from "./galleryLayout";
+import type { MezzanineData } from "../../lib/api/domains/exhibitionTemplates";
+import { buildableMezzanine, mezzanineGroundRules, mezzanineSpecFor, mezzanineWallRuns, MEZZ_RUN_SUFFIX } from "./mezzanineTemplate";
+import { resolveStair } from "./mezzanine";
+import type { FloorRect } from "./balcony";
 
 /**
  * Resolves a template's stored furniture placements against a fetched
@@ -42,7 +47,9 @@ import {
  */
 function resolveFurniture(
   placements: FurniturePlacement[] | undefined,
-  catalog: FurnitureDef[]
+  catalog: FurnitureDef[],
+  /** The room's mezzanine — level-1 pieces whose centre is on its slab stand on it (else on the floor). */
+  mezzanine?: { top: number; rect: FloorRect }
 ): {
   colliderInputs: PlacedFurnitureInput[];
   renderList: Exhibition["furniture"];
@@ -54,6 +61,9 @@ function resolveFurniture(
   for (const placement of placements ?? []) {
     const def = catalog.find((f) => f.id === placement.furnitureId);
     if (!def) continue;
+    const r = mezzanine?.rect;
+    const onSlab = placement.level === 1 && !!r && placement.x > r.minX && placement.x < r.maxX && placement.z > r.minZ && placement.z < r.maxZ;
+    const y = onSlab ? mezzanine!.top : 0;
     colliderInputs.push({
       x: placement.x,
       z: placement.z,
@@ -61,10 +71,11 @@ function resolveFurniture(
       halfWidth: def.footprint.width / 2,
       halfDepth: def.footprint.depth / 2,
       round: def.round,
+      ...(onSlab ? { level: 1 } : {}),
     });
     renderList.push({
       modelUrl: def.modelUrl,
-      position: [placement.x, 0, placement.z],
+      position: [placement.x, y, placement.z],
       rotationY: placement.rotationY,
       scale: def.scale,
       round: def.round,
@@ -75,6 +86,7 @@ function resolveFurniture(
         x: placement.x,
         z: placement.z,
         rotationY: placement.rotationY,
+        ...(onSlab ? { y } : {}),
       });
     }
   }
@@ -108,9 +120,15 @@ export function groupByWallRun(links: ApiExhibitionArtwork[]): Map<string, ApiEx
   return byWall;
 }
 
-function toRenderableArtwork(link: ApiExhibitionArtwork, exhibitionId: string, placement: ReturnType<typeof placeArtworksAlongWall>[number]): Artwork {
+function toRenderableArtwork(
+  link: ApiExhibitionArtwork,
+  exhibitionId: string,
+  placement: ReturnType<typeof placeArtworksAlongWall>[number],
+  floorY = 0
+): Artwork {
   const { artwork } = link;
   return {
+    ...(floorY ? { floorY } : {}),
     id: link.id,
     title: artwork.title,
     artist: artwork.artistDisplayName || artwork.artistProfile?.displayName || "Bilinmeyen Sanatçı",
@@ -123,7 +141,7 @@ function toRenderableArtwork(link: ApiExhibitionArtwork, exhibitionId: string, p
     // its own physical frame (no extra mesh needed); false means we hang a
     // default modern-black frame around the bare canvas.
     frame: artwork.framed ? null : "modernBlack",
-    position: placement.position,
+    position: floorY ? [placement.position[0], placement.position[1] + floorY, placement.position[2]] : placement.position,
     rotationY: placement.rotationY,
     artworkId: link.artworkId,
     technique: artwork.technique,
@@ -142,30 +160,55 @@ function toRenderableArtwork(link: ApiExhibitionArtwork, exhibitionId: string, p
   };
 }
 
+/** How works hang on one wall run: its own ceiling (m above its floor), its floor height, extra no-go spans. */
+interface RunRule {
+  ceiling?: number;
+  floorY?: number;
+  blocked?: WallSpan[];
+}
+
+/**
+ * Per-run rules of a template with a mezzanine (mezzanineTemplate.ts): the `@mezz` runs hang on the slab
+ * (floor = its top, ceiling = what's left above it); the room-floor walls keep works off the slab's underside,
+ * the stair and the side walls' covered stretch.
+ */
+function mezzanineRunRules(data: MezzanineData, size: [number, number], wallHeight: number): Map<string, RunRule> {
+  const rules = new Map<string, RunRule>();
+  for (const [id, rule] of mezzanineGroundRules(data, size)) rules.set(id, rule);
+  for (const run of mezzanineWallRuns(data, size)) rules.set(run.id, { floorY: data.top, ceiling: wallHeight - data.top });
+  return rules;
+}
+
 function placeAll(
   runs: (WallRunGeometry & { id: string })[],
   wallHeight: number,
   byWall: Map<string, ApiExhibitionArtwork[]>,
   exhibitionId: string,
   /** The room's resolved windows — artworks are kept off them (placeArtworksAlongWall's blocked spans). */
-  openings: WindowOpening[] = []
+  openings: WindowOpening[] = [],
+  rules: Map<string, RunRule> = new Map()
 ): Artwork[] {
   const artworks: Artwork[] = [];
   for (const run of runs) {
     const links = byWall.get(run.id);
     if (!links || links.length === 0) continue;
+    const rule = rules.get(run.id) ?? {};
+    const floorY = rule.floorY ?? 0;
+    // A mezzanine run shares its wall's windows, but only those reaching above the slab.
+    const wallId = run.id.endsWith(MEZZ_RUN_SUFFIX) ? run.id.slice(0, -MEZZ_RUN_SUFFIX.length) : run.id;
+    const wallOpenings = floorY ? openings.filter((o) => o.sill + o.height > floorY) : openings;
     const placements = placeArtworksAlongWall(
       run,
-      wallHeight,
+      rule.ceiling ?? wallHeight,
       links.map((link) => ({
         aspect: link.artwork.widthCm / link.artwork.heightCm,
         height: link.artwork.heightCm / 100,
         heightYOverride: link.positionData?.heightY,
         alongFraction: link.positionData?.alongFraction,
       })),
-      openingSpansOnWall(run.id, openings)
+      [...openingSpansOnWall(wallId, wallOpenings), ...(rule.blocked ?? [])]
     );
-    links.forEach((link, i) => artworks.push(toRenderableArtwork(link, exhibitionId, placements[i])));
+    links.forEach((link, i) => artworks.push(toRenderableArtwork(link, exhibitionId, placements[i], floorY)));
   }
   return artworks;
 }
@@ -216,9 +259,27 @@ export function previewAccentColor(config: ApiSceneConfig | null): string {
  */
 /** A backend ExhibitionTemplate's wall runs, regardless of its roomShape.kind (rectangle or custom-drawn — same grid contract useRoomGridEditor/galleryLayout.ts's buildCustomRoomLayout uses for a custom Exhibition room). */
 function backendTemplateWallRuns(template: ApiExhibitionTemplate): (WallRunGeometry & { id: string })[] {
-  return template.roomShape.kind === "rectangle"
-    ? templateWallRuns([template.roomShape.width, template.roomShape.depth])
-    : buildCustomRoomLayout(template.roomShape.cells, template.wallHeight, template.roomShape.spawn).wallRuns;
+  if (template.roomShape.kind !== "rectangle") {
+    return buildCustomRoomLayout(template.roomShape.cells, template.wallHeight, template.roomShape.spawn).wallRuns;
+  }
+  const size: [number, number] = [template.roomShape.width, template.roomShape.depth];
+  const mezz = templateMezzanine(template);
+  // The mezzanine's own walls come after the room's four, numbered on from them (ExhibitionBlueprint).
+  return [...templateWallRuns(size), ...(mezz ? mezzanineWallRuns(mezz, size) : [])];
+}
+
+/** A rectangle template's mezzanine, when it has one that fits its room (stale data is ignored, never fatal). */
+export function templateMezzanine(template: ApiExhibitionTemplate): MezzanineData | undefined {
+  const { roomShape } = template;
+  if (roomShape.kind !== "rectangle" || !roomShape.mezzanine) return undefined;
+  return buildableMezzanine(roomShape.mezzanine, [roomShape.width, roomShape.depth], template.wallHeight) ? roomShape.mezzanine : undefined;
+}
+
+/** Hanging rules of a backend template's wall runs (empty without a mezzanine). */
+function templateRunRules(template: ApiExhibitionTemplate): Map<string, RunRule> {
+  const mezz = templateMezzanine(template);
+  if (!mezz || template.roomShape.kind !== "rectangle") return new Map();
+  return mezzanineRunRules(mezz, [template.roomShape.width, template.roomShape.depth], template.wallHeight);
 }
 
 export function wallRunsForSceneConfig(
@@ -255,6 +316,29 @@ export interface BlueprintLayout {
   furniture: BlueprintFurniturePiece[];
   /** The room's resolved windows (only their along-wall spans matter on a plan). */
   windows: WindowOpening[];
+  /**
+   * A rectangle template's mezzanine: slab and stair footprints, which way the stair climbs (for its step
+   * lines), and the mezzanine-level wall runs (`<wall>@mezz`, numbered after `wallRuns`).
+   */
+  mezzanine?: BlueprintMezzanine;
+}
+
+export interface BlueprintMezzanine {
+  /** What's stored, and the room it's in (for the room-floor hanging rules, mezzanineGroundRules). */
+  data: MezzanineData;
+  roomSize: [number, number];
+  slab: FloorRect;
+  stair: FloorRect;
+  stairAxis: "x" | "z";
+  risers: number;
+  runs: (WallRunGeometry & { id: string })[];
+}
+
+/** The plan view of a mezzanine (the editor validates it; this just draws what's stored). */
+export function blueprintMezzanine(data: MezzanineData, roomSize: [number, number]): BlueprintMezzanine {
+  const spec = mezzanineSpecFor(data, roomSize);
+  const stair = resolveStair(spec.stair, spec.top, []);
+  return { data, roomSize, slab: spec.rect, stair: stair.rect, stairAxis: stair.axis, risers: stair.risers, runs: mezzanineWallRuns(data, roomSize) };
 }
 
 /** A plan never clamps a window's height, only its along-wall size — any tall-enough wall height will do. */
@@ -304,7 +388,8 @@ function resolveBlueprintFurniture(
 export function rectangleBlueprint(
   roomSize: [number, number],
   furniture: BlueprintFurniturePiece[] = [],
-  windowPlacements?: WindowPlacementData[]
+  windowPlacements?: WindowPlacementData[],
+  mezzanine?: MezzanineData
 ): BlueprintLayout {
   const [W, D] = roomSize;
   const { playerStart, playerStartYaw, windows } = buildRoomLayout(roomSize, BLUEPRINT_WALL_HEIGHT, undefined, undefined, windowPlacements);
@@ -318,6 +403,7 @@ export function rectangleBlueprint(
     spawn: { x: playerStart[0], z: playerStart[2], rotationDeg: -(playerStartYaw * 180) / Math.PI },
     furniture,
     windows: windows ?? [],
+    ...(mezzanine ? { mezzanine: blueprintMezzanine(mezzanine, roomSize) } : {}),
   };
 }
 
@@ -358,7 +444,7 @@ export function blueprintForSceneConfig(
     const furniture = resolveBlueprintFurniture(resolvedTemplate.roomShape.furniture, furnitureCatalog);
     const { roomShape } = resolvedTemplate;
     return roomShape.kind === "rectangle"
-      ? rectangleBlueprint([roomShape.width, roomShape.depth], furniture, roomShape.windows)
+      ? rectangleBlueprint([roomShape.width, roomShape.depth], furniture, roomShape.windows, templateMezzanine(resolvedTemplate))
       : customBlueprint(roomShape.cells, resolvedTemplate.wallHeight, roomShape.spawn, furniture, roomShape.windows);
   }
   return customBlueprint(config.cells, config.wallHeight, config.spawn, [], config.windows);
@@ -398,7 +484,7 @@ export function adaptApiExhibition(exhibition: ApiExhibition, furnitureCatalog: 
     return exhibitionFromBackendTemplate(
       backendTemplate,
       { id: exhibition.id, name: exhibition.title },
-      placeAll(runs, backendTemplate.wallHeight, byWall, exhibition.id, templateOpenings(backendTemplate)),
+      placeAll(runs, backendTemplate.wallHeight, byWall, exhibition.id, templateOpenings(backendTemplate), templateRunRules(backendTemplate)),
       furnitureCatalog
     );
   }
@@ -431,7 +517,12 @@ function exhibitionFromBackendTemplate(
   artworks: Artwork[],
   furnitureCatalog: FurnitureDef[] = []
 ): Exhibition {
-  const { colliderInputs, renderList, seats } = resolveFurniture(backendTemplate.roomShape.furniture, furnitureCatalog);
+  const mezz = templateMezzanine(backendTemplate);
+  const mezzSpec =
+    mezz && backendTemplate.roomShape.kind === "rectangle"
+      ? mezzanineSpecFor(mezz, [backendTemplate.roomShape.width, backendTemplate.roomShape.depth])
+      : undefined;
+  const { colliderInputs, renderList, seats } = resolveFurniture(backendTemplate.roomShape.furniture, furnitureCatalog, mezzSpec);
   const base = {
     id: identity.id,
     name: identity.name,
@@ -453,8 +544,15 @@ function exhibitionFromBackendTemplate(
     // `customLayout` field a custom-shaped room already uses (Scene.tsx's
     // `customLayout ?? buildRoomLayout(...)` fallback picks it up with no further
     // changes needed).
-    if (ceilingLights?.length || colliderInputs.length || windows?.length) {
-      const layout = buildRoomLayout([width, depth], backendTemplate.wallHeight, ceilingLights, colliderInputs, windows);
+    if (ceilingLights?.length || colliderInputs.length || windows?.length || mezz) {
+      const layout = buildRoomLayout(
+        [width, depth],
+        backendTemplate.wallHeight,
+        ceilingLights,
+        colliderInputs,
+        windows,
+        mezzSpec
+      );
       return { ...base, customLayout: layout };
     }
     return { ...base, roomSize: [width, depth] };

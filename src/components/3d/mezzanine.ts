@@ -232,6 +232,20 @@ export function resolveMezzanine(spec: MezzanineSpec, walls: WallSegment[]): Mez
   return { rect, top, underside: top - SLAB_THICKNESS, stair, railings, columns, edgeFaces };
 }
 
+/** Under-slab fixtures: one row along the slab, ≤ 4 m apart, 10 cm under its underside. */
+export function underSlabFixtures(spec: MezzanineSpec): { x: number; y: number; z: number }[] {
+  const r = spec.rect;
+  const alongX = spec.stair.axis === "z"; // the slab runs along x when the stair climbs along z
+  const [a0, a1] = alongX ? [r.minX, r.maxX] : [r.minZ, r.maxZ];
+  const mid = alongX ? (r.minZ + r.maxZ) / 2 : (r.minX + r.maxX) / 2;
+  const n = Math.max(1, Math.ceil((a1 - a0) / 4));
+  const y = spec.top - SLAB_THICKNESS - 0.1;
+  return Array.from({ length: n }, (_, i) => {
+    const a = a0 + ((a1 - a0) * (i + 0.5)) / n;
+    return alongX ? { x: a, y, z: mid } : { x: mid, y, z: a };
+  });
+}
+
 // --- Colliders -----------------------------------------------------------------------------------------
 
 /** The stair's two sides as thin boxes along its length. */

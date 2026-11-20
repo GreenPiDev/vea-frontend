@@ -31,6 +31,20 @@ export interface FurniturePlacement {
   z: number;
   /** Yaw in radians, same convention as spawn.yaw: 0 = north (-Z), PI = south (+Z), PI/2 = west (-X), -PI/2 = east (+X). */
   rotationY: number;
+  /** 1 = stands on the mezzanine (rectangle templates with one), omitted = the room floor. */
+  level?: 1;
+}
+
+// Mirrors vea-api's room-shape.dto.ts MezzanineDto. A slab along one whole wall of a rectangle room, its
+// stair landing at one end of the slab's open edge (components/3d/mezzanineTemplate.ts builds the rest).
+export interface MezzanineData {
+  wallId: 'north' | 'south' | 'east' | 'west';
+  /** How far the slab reaches into the room (m). */
+  depth: number;
+  /** Walk-surface height (m). */
+  top: number;
+  /** Which end of the slab's free edge the stair lands at: 'start' = the wall's low-coordinate end (west / north). */
+  stairEnd: 'start' | 'end';
 }
 
 // Mirrors vea-api's scene-config.dto.ts WindowPlacementDto/OutdoorDto (same shape as components/3d/
@@ -72,6 +86,8 @@ export interface RectangleRoomShape {
   /** Windows (WindowEditor.tsx) and the view through them. Omitted = a closed room. */
   windows?: WindowPlacementData[];
   outdoor?: OutdoorView;
+  /** A mezzanine with its stair (MezzanineEditor.tsx). Omitted = a single-level room. */
+  mezzanine?: MezzanineData;
 }
 
 export interface CustomRoomShape {

@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import MetresField from './MetresField';
 import { useTranslation } from 'react-i18next';
 import type { BlueprintLayout } from '../3d/backendAdapter';
 import type { WindowPlacementData, WindowStyleId } from '../../lib/api/domains/exhibitionTemplates';
 import { OUTDOOR_PANORAMAS } from '../3d/outdoorPanoramas';
 import { PANORAMA_LIGHT } from '../3d/outdoorPanoramaLight';
-import { panoramaToWorld } from '../3d/windowLight';
+import { panoramaToWorld, rotationForSunDirection } from '../3d/windowLight';
 import { MAX_WINDOWS_PER_ROOM, WINDOW_STYLE_IDS, balconySpan, clampBalconyDepth } from '../3d/windowOpenings';
 import { rectOverlapsCells, type FloorRect } from '../3d/balcony';
 import { WALL_THICKNESS } from '../3d/galleryLayout';
 import type { EditorWall, WindowEditorState } from './useWindowEditor';
+import type { MezzanineData } from '../../lib/api/domains/exhibitionTemplates';
+import { windowCrossesSlab } from '../3d/mezzanineTemplate';
 
 const MARGIN = 1.4;
 const WALL_STROKE = 0.15;
@@ -43,6 +46,8 @@ interface WindowEditorProps {
   /** The room's wall height in metres (null while the field is invalid). */
   wallHeight: number | null;
   editor: WindowEditorState;
+  /** A rectangle template's mezzanine — no window may cut through its slab. */
+  mezzanine?: MezzanineData | null;
 }
 
 /**
@@ -51,10 +56,12 @@ interface WindowEditorProps {
  * it. The sun of the chosen panorama is drawn outside the plan, so the curator sees which windows it will
  * shine through before saving (sunLight.ts uses the same direction).
  */
-export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEditorProps) {
+export default function WindowEditor({ blueprint, wallHeight, editor, mezzanine }: WindowEditorProps) {
   const { t } = useTranslation();
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<string | null>(null);
+  // Dragging the sun marker around the plan turns the panorama (and its sun) — see handleSunPointerMove.
+  const draggingSun = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   if (!blueprint || !wallHeight) return null;
@@ -73,7 +80,9 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
     if (!run) return null;
     // A drawn room's balcony may not reach into another part of its own footprint (an L's inner corner).
     const balconyFits = cells ? (p: WindowPlacementData) => !rectOverlapsCells(balconyRect(run, p), cells) : undefined;
-    return { id, length: runLength(run), height: wallHeight, balconyFits };
+    const size: [number, number] = [bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ];
+    const clearOfSlab = mezzanine ? (p: WindowPlacementData) => !windowCrossesSlab(p, mezzanine, size) : undefined;
+    return { id, length: runLength(run), height: wallHeight, balconyFits, clearOfSlab };
   };
 
   function toLocal(e: { clientX: number; clientY: number }) {
@@ -100,7 +109,7 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
       return;
     }
     const ok = editor.addWindow(wallOf(run.id)!, fractionOn(run, p));
-    setNotice(ok ? null : t(editor.newStyle === 'balcony' ? 'windowEditorBalconyBlocked' : 'windowEditorNoRoom'));
+    setNotice(ok ? null : t(editor.newStyle === 'balcony' ? 'windowEditorBalconyBlocked' : mezzanine ? 'windowEditorNoRoomOrSlab' : 'windowEditorNoRoom'));
   }
 
   function handleWindowPointerDown(id: string, e: React.PointerEvent<SVGRectElement>) {
@@ -139,6 +148,27 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
     const hz = (bounds.maxZ - bounds.minZ) / 2;
     const tEdge = Math.min(Math.abs(dx) > 1e-6 ? hx / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? hz / Math.abs(dy) : Infinity);
     sunMarker = { x: cx + dx * (tEdge + 0.75 + balconyReach), y: cz + dy * (tEdge + 0.75 + balconyReach), dx, dy };
+  }
+
+  function handleSunPointerDown(e: React.PointerEvent<SVGGElement>) {
+    e.stopPropagation();
+    draggingSun.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handleSunPointerMove(e: React.PointerEvent<SVGGElement>) {
+    if (!draggingSun.current || !sun) return;
+    const p = toLocal(e);
+    if (!p) return;
+    const dx = p.x - (bounds.minX + bounds.maxX) / 2;
+    const dz = p.y - (bounds.minZ + bounds.maxZ) / 2;
+    if (Math.hypot(dx, dz) < 0.3) return;
+    editor.setOutdoor({ ...editor.outdoor, rotationY: rotationForSunDirection(sun.phi, dx, dz) });
+  }
+
+  function handleSunPointerUp(e: React.PointerEvent<SVGGElement>) {
+    draggingSun.current = false;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   }
 
   const selected = editor.selected;
@@ -256,7 +286,17 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
         })}
 
         {sunMarker && (
-          <g pointerEvents="none">
+          <g
+            className="cursor-grab touch-none"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={handleSunPointerDown}
+            onPointerMove={handleSunPointerMove}
+            onPointerUp={handleSunPointerUp}
+            onPointerCancel={handleSunPointerUp}
+          >
+            <title>{t('outdoorSunDragHint')}</title>
+            {/* Generous invisible hit area — the drawn sun is small at plan scale. */}
+            <circle cx={sunMarker.x} cy={sunMarker.y} r={0.7} fill="transparent" />
             <line
               x1={sunMarker.x - sunMarker.dx * 0.45}
               y1={sunMarker.y - sunMarker.dy * 0.45}
@@ -349,18 +389,18 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
       {editor.windows.length > 0 && (
         <div className="flex flex-col gap-2 text-sm text-brand-800">
           <span className="font-medium">{t('outdoorTitle')}</span>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-wrap gap-2">
             {OUTDOOR_PANORAMAS.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => editor.setOutdoor({ ...editor.outdoor, panoramaId: p.id })}
-                className={`flex flex-col overflow-hidden rounded-md border text-xs ${
+                className={`flex w-28 flex-col overflow-hidden rounded-md border text-xs ${
                   editor.outdoor.panoramaId === p.id ? 'border-brand-700 ring-2 ring-brand-700' : 'border-brand-300 hover:border-brand-500'
                 }`}
               >
                 <img src={p.thumbnailUrl} alt="" className="aspect-[2/1] w-full object-cover" loading="lazy" />
-                <span className="px-1 py-1">{t(p.labelKey)}</span>
+                <span className="truncate px-1 py-0.5">{t(p.labelKey)}</span>
               </button>
             ))}
           </div>
@@ -377,42 +417,9 @@ export default function WindowEditor({ blueprint, wallHeight, editor }: WindowEd
               onChange={(e) => editor.setOutdoor({ ...editor.outdoor, rotationY: (Number(e.target.value) * Math.PI) / 180 })}
             />
           </label>
-          <p className="text-xs text-brand-500">{sun ? t('outdoorSunHint') : t('outdoorOvercast')}</p>
+          <p className="text-xs text-brand-500">{sun ? t('outdoorSunHint') : t(editor.outdoor.panoramaId === 'night' ? 'outdoorNightHint' : 'outdoorOvercast')}</p>
         </div>
       )}
     </div>
-  );
-}
-
-/** A metres input that commits on blur/Enter (so clamping doesn't fight the curator mid-typing). */
-function MetresField({ label, hint, value, onCommit }: { label: string; hint?: string; value: number; onCommit: (v: number) => unknown }) {
-  const [draft, setDraft] = useState(value.toFixed(2));
-  useEffect(() => setDraft(value.toFixed(2)), [value]);
-  const commit = () => {
-    const v = Number(draft.replace(',', '.'));
-    if (Number.isFinite(v)) onCommit(v);
-    setDraft(value.toFixed(2));
-  };
-  return (
-    <label className="flex items-center justify-between gap-2">
-      <span className="flex flex-col">
-        {label}
-        {hint && <span className="text-xs text-brand-500">{hint}</span>}
-      </span>
-      <input
-        type="text"
-        inputMode="decimal"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            commit();
-          }
-        }}
-        className="w-20 rounded-md border border-brand-300 px-2 py-1 text-right"
-      />
-    </label>
   );
 }

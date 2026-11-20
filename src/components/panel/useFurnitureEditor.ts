@@ -32,12 +32,14 @@ export function useFurnitureEditor(initial?: FurniturePlacement[]) {
   // nothing is selected yet).
   const [selectedCatalogId, setSelectedCatalogId] = useState('');
   const [draggingId, setDraggingId] = useState<number | null>(null);
+  // Which level new pieces go on (rectangle templates with a mezzanine): 0 = the room floor, 1 = the mezzanine.
+  const [newLevel, setNewLevel] = useState<0 | 1>(0);
   const nextId = useRef(placed.length);
 
-  function addFurniture(x: number, z: number) {
+  function addFurniture(x: number, z: number, level: 0 | 1 = newLevel) {
     setPlaced((prev) => {
       if (prev.length >= MAX_FURNITURE_PER_ROOM || !selectedCatalogId) return prev;
-      return [...prev, { id: nextId.current++, furnitureId: selectedCatalogId, x, z, rotationY: 0 }];
+      return [...prev, { id: nextId.current++, furnitureId: selectedCatalogId, x, z, rotationY: 0, ...(level === 1 ? { level: 1 as const } : {}) }];
     });
   }
 
@@ -61,6 +63,8 @@ export function useFurnitureEditor(initial?: FurniturePlacement[]) {
     setSelectedCatalogId,
     draggingId,
     setDraggingId,
+    newLevel,
+    setNewLevel,
     addFurniture,
     removeFurniture,
     setRotation,

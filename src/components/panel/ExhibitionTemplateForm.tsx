@@ -17,6 +17,8 @@ import { useCeilingLightEditor } from './useCeilingLightEditor';
 import { useFurnitureEditor } from './useFurnitureEditor';
 import WindowEditor from './WindowEditor';
 import { useWindowEditor } from './useWindowEditor';
+import MezzanineEditor from './MezzanineEditor';
+import { useMezzanineEditor } from './useMezzanineEditor';
 import { roomSizeLabel } from './roomShapeLabel';
 import './ExhibitionForm.css';
 
@@ -76,6 +78,7 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
   const ceilingLights = useCeilingLightEditor(editing?.roomShape.ceilingLights);
   const furniture = useFurnitureEditor(editing?.roomShape.furniture);
   const windows = useWindowEditor(editing?.roomShape.windows, editing?.roomShape.outdoor);
+  const mezzanine = useMezzanineEditor(editing?.roomShape.kind === 'rectangle' ? editing.roomShape.mezzanine : undefined);
   const { data: furnitureAssets } = useMyFurnitureAssets();
 
   // A template already used by at least one Exhibition has its room shape
@@ -101,13 +104,22 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
   // round-tripped API response. Shape-locked templates use the original stored
   // shape (same values handleSubmit echoes back unchanged).
   const lockedShapeForPreview = isShapeLocked ? editing!.roomShape : null;
+  // Rectangle room size as edited (or as stored, when shape-locked) — the mezzanine editor's room.
+  const rectSize: [number, number] | null =
+    lockedShapeForPreview?.kind === 'rectangle'
+      ? [lockedShapeForPreview.width, lockedShapeForPreview.depth]
+      : rectWidthCheck.isValid && rectDepthCheck.isValid
+        ? [rectWidthCheck.value, rectDepthCheck.value]
+        : null;
+  // Mezzanines exist in rectangle rooms only (mezzanineTemplate.ts).
+  const liveMezzanine = shapeKind === 'rectangle' ? (mezzanine.mezzanine ?? undefined) : undefined;
   const liveBlueprint = useMemo(() => {
     if (shapeKind === 'rectangle') {
       if (lockedShapeForPreview?.kind === 'rectangle') {
-        return rectangleBlueprint([lockedShapeForPreview.width, lockedShapeForPreview.depth]);
+        return rectangleBlueprint([lockedShapeForPreview.width, lockedShapeForPreview.depth], [], undefined, liveMezzanine);
       }
       if (!rectWidthCheck.isValid || !rectDepthCheck.isValid) return null;
-      return rectangleBlueprint([rectWidthCheck.value, rectDepthCheck.value]);
+      return rectangleBlueprint([rectWidthCheck.value, rectDepthCheck.value], [], undefined, liveMezzanine);
     }
     if (lockedShapeForPreview?.kind === 'custom') {
       return customBlueprint(lockedShapeForPreview.cells, 1, lockedShapeForPreview.spawn);
@@ -125,6 +137,7 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
     grid.floorCellList,
     grid.spawnCell,
     grid.spawnYaw,
+    liveMezzanine,
   ]);
 
   function handleSubmit(e: FormEvent) {
@@ -136,6 +149,9 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
     // width/depth or cells/spawn unchanged in that case so the server's
     // shape-diff check sees no real shape change, only ceilingLights.
     const lockedShape = isShapeLocked ? editing!.roomShape : null;
+    const hasMezzanine = lockedShape?.kind === 'rectangle' ? !!lockedShape.mezzanine : !!liveMezzanine;
+    // Without a mezzanine, everything stands on the floor.
+    const floorFurniture = furniture.items.map(({ level: _level, ...rest }) => rest);
     const roomShape =
       shapeKind === 'rectangle'
         ? {
@@ -143,8 +159,10 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
             width: lockedShape?.kind === 'rectangle' ? lockedShape.width : rectWidthCheck.value,
             depth: lockedShape?.kind === 'rectangle' ? lockedShape.depth : rectDepthCheck.value,
             ceilingLights: ceilingLights.lights,
-            furniture: furniture.items,
+            furniture: hasMezzanine ? furniture.items : floorFurniture,
             ...windows.payload,
+            // Shape-locked: the mezzanine is echoed as stored (its walls carry artworks).
+            ...(lockedShape?.kind === 'rectangle' ? (lockedShape.mezzanine ? { mezzanine: lockedShape.mezzanine } : {}) : mezzanine.payload),
           }
         : {
             kind: 'custom' as const,
@@ -154,7 +172,8 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
                 ? lockedShape.spawn
                 : { x: grid.spawnCell!.x, z: grid.spawnCell!.z, yaw: grid.spawnYaw },
             ceilingLights: ceilingLights.lights,
-            furniture: furniture.items,
+            // No mezzanine in a drawn room: everything stands on the floor.
+            furniture: floorFurniture,
             ...windows.payload,
           };
 
@@ -316,7 +335,21 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
       <CeilingLightEditor blueprint={liveBlueprint} editor={ceilingLights} />
       <FurnitureEditor blueprint={liveBlueprint} editor={furniture} assets={furnitureAssets ?? []} />
       {/* Windows are cosmetic like the furniture (never a wallRunId), so they stay editable on a shape-locked template too. */}
-      <WindowEditor blueprint={liveBlueprint} wallHeight={wallHeightCheck.isValid ? wallHeightCheck.value : null} editor={windows} />
+      <WindowEditor
+        blueprint={liveBlueprint}
+        wallHeight={wallHeightCheck.isValid ? wallHeightCheck.value : null}
+        editor={windows}
+        mezzanine={liveMezzanine ?? null}
+      />
+      {shapeKind === 'rectangle' && (
+        <MezzanineEditor
+          size={rectSize}
+          wallHeight={wallHeightCheck.isValid ? wallHeightCheck.value : null}
+          windows={windows.windows}
+          editor={mezzanine}
+          locked={isShapeLocked}
+        />
+      )}
 
       <div className="mt-2 flex gap-2">
         <button

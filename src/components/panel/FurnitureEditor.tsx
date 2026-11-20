@@ -14,6 +14,9 @@ import { captureModelThumbnail } from '../../lib/captureModelThumbnail';
 import { ApiError } from '../../lib/api/client';
 import type { FurnitureEditorState } from './useFurnitureEditor';
 
+/** How far inside the slab's edge a mezzanine piece's centre must stay (the railing + half a bench). */
+const SLAB_INSET = 0.5;
+
 const MARGIN = 1;
 const WALL_STROKE = 0.15;
 const HANDLE_RADIUS = 0.18;
@@ -218,6 +221,16 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
   if (!blueprint) return null;
 
   const { bounds, wallRuns, cells } = blueprint;
+  const slab = blueprint.mezzanine?.slab ?? null;
+  /** A mezzanine piece's centre, kept on the slab (null when there's no mezzanine). */
+  const onSlab = (x: number, z: number) =>
+    slab
+      ? {
+          x: Math.min(slab.maxX - SLAB_INSET, Math.max(slab.minX + SLAB_INSET, x)),
+          z: Math.min(slab.maxZ - SLAB_INSET, Math.max(slab.minZ + SLAB_INSET, z)),
+        }
+      : null;
+  const placeLevel: 0 | 1 = slab ? editor.newLevel : 0;
   const fullMinX = bounds.minX - MARGIN;
   const fullMinZ = bounds.minZ - MARGIN;
   const fullWidth = bounds.maxX - bounds.minX + MARGIN * 2;
@@ -287,7 +300,9 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
     // before panning existed: places the selected catalog item there.
     if (drag && !drag.moved && editor.canAddMore) {
       const local = localPoint(e);
-      editor.addFurniture(local.x, local.y);
+      // On the mezzanine: only on its slab (a click beside it lands on its nearest edge).
+      const p = placeLevel === 1 ? onSlab(local.x, local.y)! : { x: local.x, z: local.y };
+      editor.addFurniture(p.x, p.z, placeLevel);
     }
   }
 
@@ -327,7 +342,9 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
       drag.moved = true;
     }
     const local = localPoint(e);
-    editor.setPosition(id, local.x, local.y);
+    const piece = editor.placed.find((p) => p.id === id);
+    const p = piece?.level === 1 && slab ? onSlab(local.x, local.y)! : { x: local.x, z: local.y };
+    editor.setPosition(id, p.x, p.z);
   }
 
   function handleBodyPointerUp(e: React.PointerEvent<SVGRectElement>, id: number) {
@@ -492,6 +509,24 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
       )}
       {uploadError && <p className="text-sm text-red-600">{uploadError}</p>}
 
+      {slab && (
+        <div className="flex items-center gap-2 text-sm text-brand-800">
+          <span>{t('furnitureEditorLevel')}</span>
+          {([0, 1] as const).map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => editor.setNewLevel(level)}
+              className={`rounded-md border px-2 py-1 text-xs ${
+                editor.newLevel === level ? 'border-brand-700 bg-brand-700 text-white' : 'border-brand-300 text-brand-700 hover:bg-brand-100'
+              }`}
+            >
+              {t(level === 1 ? 'furnitureEditorLevelMezzanine' : 'furnitureEditorLevelGround')}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center justify-center gap-2 self-center">
         <button
           type="button"
@@ -539,6 +574,21 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
           />
         )}
 
+        {slab && (
+          <rect
+            x={slab.minX}
+            y={slab.minZ}
+            width={slab.maxX - slab.minX}
+            height={slab.maxZ - slab.minZ}
+            strokeWidth={0.06}
+            strokeDasharray="0.2 0.12"
+            pointerEvents="none"
+            className={editor.newLevel === 1 ? 'fill-brand-300/60 stroke-brand-800' : 'fill-brand-300/25 stroke-brand-600'}
+          >
+            <title>{t('blueprintMezzanine')}</title>
+          </rect>
+        )}
+
         {wallRuns.map((run) => {
           const x1 = run.orientation === 'horizontal' ? run.start : run.fixed;
           const y1 = run.orientation === 'horizontal' ? run.fixed : run.start;
@@ -575,7 +625,8 @@ export default function FurnitureEditor({ blueprint, editor, assets }: Furniture
                 height={fd}
                 rx={0.05}
                 transform={`rotate(${deg} ${piece.x} ${piece.z})`}
-                className="cursor-move fill-amber-700/70 stroke-amber-900"
+                // Mezzanine pieces in the brand colour, room-floor ones amber.
+                className={`cursor-move ${piece.level === 1 && slab ? 'fill-brand-600/80 stroke-brand-900' : 'fill-amber-700/70 stroke-amber-900'}`}
                 strokeWidth={0.05}
                 onPointerDown={(e) => handleBodyPointerDown(e, piece.id)}
                 onPointerMove={(e) => handleBodyPointerMove(e, piece.id)}

@@ -48,6 +48,17 @@ export function panoramaToWorld(phi: number, elevation: number, rotationY: numbe
   return dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotationY);
 }
 
+/**
+ * The background rotation (rotationY, in [0, 2π)) that puts a panorama's sun at azimuth `phi` in the floor-plan
+ * direction (dx, dz) — the inverse of panoramaToWorld's horizontal part (rotating by r turns azimuth phi into
+ * phi − r). Used by the window editor's draggable sun.
+ */
+export function rotationForSunDirection(phi: number, dx: number, dz: number): number {
+  const r = phi - Math.atan2(dz, dx);
+  const tau = Math.PI * 2;
+  return ((r % tau) + tau) % tau;
+}
+
 /** Cosine-weighted mean linear radiance of the panorama over the hemisphere around `outward`. */
 export function hemisphereRadiance(panoramaId: string, rotationY: number, outward: THREE.Vector3): [number, number, number] {
   const light = PANORAMA_LIGHT[panoramaId];

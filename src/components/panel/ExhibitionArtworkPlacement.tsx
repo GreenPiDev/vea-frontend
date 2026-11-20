@@ -11,6 +11,7 @@ import {
 import { useOrganizationArtworks, type ApiArtwork } from '../../lib/api/domains/artworks';
 import { useMyFurnitureAssets } from '../../lib/api/domains/furnitureAssets';
 import { groupByWallRun, wallRunsForSceneConfig } from '../3d/backendAdapter';
+import { isMezzanineRunId } from '../3d/mezzanineTemplate';
 import { toFurnitureDef } from '../3d/furniture';
 import { FLOOR_CLEARANCE } from '../3d/galleryLayout';
 import { ApiError } from '../../lib/api/client';
@@ -236,7 +237,8 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
                 : 'border-brand-300 bg-white text-brand-800 hover:bg-brand-100'
             }`}
           >
-            {t('placementWallNumber', { number: wallNumbers.get(run.id) })} ({byWall.get(run.id)?.length ?? 0})
+            {t(isMezzanineRunId(run.id) ? 'placementWallNumberMezzanine' : 'placementWallNumber', { number: wallNumbers.get(run.id) })} (
+            {byWall.get(run.id)?.length ?? 0})
           </button>
         ))}
       </div>

@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ApiExhibitionArtwork, ApiSceneConfig } from '../../lib/api/domains/exhibitions';
 import type { ApiExhibitionTemplate } from '../../lib/api/domains/exhibitionTemplates';
-import { blueprintForSceneConfig } from '../3d/backendAdapter';
+import { blueprintForSceneConfig, type BlueprintLayout } from '../3d/backendAdapter';
+import { MEZZ_RUN_SUFFIX, isMezzanineRunId, mezzanineGroundRules } from '../3d/mezzanineTemplate';
 import type { FurnitureDef } from '../3d/furniture';
 import { placeArtworksAlongWall, slideClamp } from '../3d/galleryLayout';
 import { openingSpansOnWall } from '../3d/windowOpenings';
@@ -41,6 +42,29 @@ const WALL_NUMBER_INSET = 0.5;
 const WALL_NUMBER_FONT_SIZE = 0.5;
 /** Window strips on the plan (drawn across the wall line). */
 const WINDOW_THICKNESS = 0.42;
+/** Mezzanine-level walls are drawn this far inside their wall line, so they don't hide the room-floor wall. */
+const MEZZ_DRAW_INSET = 0.45;
+
+/** Every wall run of the plan: the room's, then the mezzanine level's (numbered on from them). */
+function allRunsOf(blueprint: BlueprintLayout): WallRunInfo[] {
+  return [...blueprint.wallRuns, ...(blueprint.mezzanine?.runs ?? [])];
+}
+
+/** Spans a work may not cover on a run: its wall's windows (on the mezzanine: only those reaching above the slab), the stair, under the slab. */
+function blockedOn(blueprint: BlueprintLayout, runId: string): [number, number][] {
+  const mezz = blueprint.mezzanine;
+  const upper = isMezzanineRunId(runId);
+  const wallId = upper ? runId.slice(0, -MEZZ_RUN_SUFFIX.length) : runId;
+  const windows = upper && mezz ? blueprint.windows.filter((o) => o.sill + o.height > mezz.data.top) : blueprint.windows;
+  const ground = mezz && !upper ? (mezzanineGroundRules(mezz.data, mezz.roomSize).get(runId)?.blocked ?? []) : [];
+  return [...openingSpansOnWall(wallId, windows), ...ground];
+}
+
+/** Plan offset of a run's drawing (and its thumbnails): mezzanine-level runs sit a little inside the room. */
+function drawInset(run: WallRunInfo): { dx: number; dz: number } {
+  if (!isMezzanineRunId(run.id)) return { dx: 0, dz: 0 };
+  return run.orientation === 'horizontal' ? { dx: 0, dz: -run.outward * MEZZ_DRAW_INSET } : { dx: -run.outward * MEZZ_DRAW_INSET, dz: 0 };
+}
 
 /**
  * Top-down floor-plan sketch of an exhibition room: floor shape, walls,
@@ -71,7 +95,7 @@ export default function ExhibitionBlueprint({
 
   const thumbnails = useMemo(() => {
     if (!blueprint) return [];
-    return blueprint.wallRuns.flatMap((run) => {
+    return allRunsOf(blueprint).flatMap((run) => {
       const links = byWall.get(run.id);
       if (!links || links.length === 0) return [];
       // Only the along-wall spread matters here (a floor-plan has no height
@@ -85,17 +109,18 @@ export default function ExhibitionBlueprint({
           height: link.artwork.heightCm / 100,
           alongFraction: link.id in (alongOverrides ?? {}) ? (alongOverrides![link.id] ?? undefined) : link.positionData?.alongFraction,
         })),
-        // Same window spans the 3D placement keeps artworks off (backendAdapter.ts's placeAll).
-        openingSpansOnWall(run.id, blueprint.windows)
+        // Same spans the 3D placement keeps artworks off (backendAdapter.ts's placeAll).
+        blockedOn(blueprint, run.id)
       );
+      const { dx, dz } = drawInset(run);
       return links.map((link, i) => ({
         key: link.id,
         link,
         runId: run.id,
         orientation: run.orientation,
         index: i,
-        x: placements[i].position[0],
-        z: placements[i].position[2],
+        x: placements[i].position[0] + dx,
+        z: placements[i].position[2] + dz,
         width: placements[i].height * (link.artwork.widthCm / link.artwork.heightCm),
         imageUrl: link.artwork.imageUrl,
         title: link.artwork.title,
@@ -116,13 +141,13 @@ export default function ExhibitionBlueprint({
 
   function handleDrag(thumb: (typeof thumbnails)[number], e: React.PointerEvent<SVGImageElement>) {
     if (draggingId !== thumb.key || !blueprint) return;
-    const run = blueprint.wallRuns.find((r) => r.id === thumb.runId) as WallRunInfo | undefined;
+    const run = allRunsOf(blueprint).find((r) => r.id === thumb.runId);
     const coord = run && alongCoord(run, e);
     if (!run || coord == null) return;
     const onWall = thumbnails.filter((th) => th.runId === thumb.runId);
     const centers = onWall.map((th) => (run.orientation === 'horizontal' ? th.x : th.z));
-    // Between its neighbours and off the windows; dragging past a window hops the work to its other side.
-    const clamped = slideClamp(run, centers, onWall.map((th) => th.width), thumb.index, coord, openingSpansOnWall(run.id, blueprint.windows));
+    // Between its neighbours and off the windows (and the stair); dragging past one hops the work to its other side.
+    const clamped = slideClamp(run, centers, onWall.map((th) => th.width), thumb.index, coord, blockedOn(blueprint, run.id));
     onMoveArtwork?.(thumb.link, (clamped - run.start) / (run.end - run.start));
   }
 
@@ -134,7 +159,8 @@ export default function ExhibitionBlueprint({
 
   if (!blueprint) return null;
 
-  const { bounds, wallRuns, spawn, cells, furniture, windows } = blueprint;
+  const { bounds, spawn, cells, furniture, windows, mezzanine } = blueprint;
+  const wallRuns = allRunsOf(blueprint);
   const minX = bounds.minX - MARGIN;
   const minZ = bounds.minZ - MARGIN;
   const width = bounds.maxX - bounds.minX + MARGIN * 2;
@@ -170,6 +196,32 @@ export default function ExhibitionBlueprint({
           />
         )}
 
+        {mezzanine && (
+          <g pointerEvents="none">
+            <rect
+              x={mezzanine.slab.minX}
+              y={mezzanine.slab.minZ}
+              width={mezzanine.slab.maxX - mezzanine.slab.minX}
+              height={mezzanine.slab.maxZ - mezzanine.slab.minZ}
+              strokeWidth={0.05}
+              strokeDasharray="0.2 0.12"
+              className="fill-brand-300/40 stroke-brand-600"
+            >
+              <title>{t('blueprintMezzanine')}</title>
+            </rect>
+            <rect
+              x={mezzanine.stair.minX}
+              y={mezzanine.stair.minZ}
+              width={mezzanine.stair.maxX - mezzanine.stair.minX}
+              height={mezzanine.stair.maxZ - mezzanine.stair.minZ}
+              strokeWidth={0.05}
+              className="fill-brand-100 stroke-brand-600"
+            >
+              <title>{t('blueprintStair')}</title>
+            </rect>
+          </g>
+        )}
+
         {wallRuns.map((run, i) => {
           // Matches ExhibitionArtworkPlacement.tsx's wallNumbers map 1:1 —
           // both number this same wallRuns array (from the identical
@@ -180,13 +232,17 @@ export default function ExhibitionBlueprint({
           // Nudge the number inward off the wall line (opposite `outward`)
           // so it sits inside the floor area instead of off-canvas past the
           // wall.
-          const numX = run.orientation === 'horizontal' ? mid : run.fixed - run.outward * WALL_NUMBER_INSET;
-          const numZ = run.orientation === 'horizontal' ? run.fixed - run.outward * WALL_NUMBER_INSET : mid;
+          // Mezzanine-level runs: drawn dashed, a little inside the room, their numbers further in.
+          const upper = isMezzanineRunId(run.id);
+          const { dx, dz } = drawInset(run);
+          const numInset = WALL_NUMBER_INSET + (upper ? MEZZ_DRAW_INSET + 0.1 : 0);
+          const numX = run.orientation === 'horizontal' ? mid : run.fixed - run.outward * numInset;
+          const numZ = run.orientation === 'horizontal' ? run.fixed - run.outward * numInset : mid;
           const selected = run.id === selectedWallId;
-          const x1 = run.orientation === 'horizontal' ? run.start : run.fixed;
-          const y1 = run.orientation === 'horizontal' ? run.fixed : run.start;
-          const x2 = run.orientation === 'horizontal' ? run.end : run.fixed;
-          const y2 = run.orientation === 'horizontal' ? run.fixed : run.end;
+          const x1 = (run.orientation === 'horizontal' ? run.start : run.fixed) + dx;
+          const y1 = (run.orientation === 'horizontal' ? run.fixed : run.start) + dz;
+          const x2 = (run.orientation === 'horizontal' ? run.end : run.fixed) + dx;
+          const y2 = (run.orientation === 'horizontal' ? run.fixed : run.end) + dz;
           return (
             <g
               key={run.id}
@@ -209,8 +265,9 @@ export default function ExhibitionBlueprint({
                 y1={y1}
                 x2={x2}
                 y2={y2}
-                strokeWidth={WALL_STROKE}
+                strokeWidth={upper ? WALL_STROKE * 0.6 : WALL_STROKE}
                 strokeLinecap="square"
+                strokeDasharray={upper ? '0.25 0.15' : undefined}
                 className={selected ? 'stroke-green-600' : 'stroke-brand-700'}
               />
               <text
@@ -349,6 +406,7 @@ export default function ExhibitionBlueprint({
       <p className="text-center text-xs text-brand-500">{t('blueprintSpawnHint')}</p>
       {onMoveArtwork && <p className="text-center text-xs text-brand-500">{t('blueprintDragHint')}</p>}
       {windows.length > 0 && <p className="text-center text-xs text-brand-500">{t('blueprintWindowHint')}</p>}
+      {mezzanine && <p className="text-center text-xs text-brand-500">{t('blueprintMezzanineHint')}</p>}
     </div>
   );
 }

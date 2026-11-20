@@ -6,7 +6,7 @@
 
 import { resolveWindowOpenings, type WindowOpening, type WindowPlacement } from "./windowOpenings";
 import { balconyGeometries, railingColliders, rectOverlapsCells, solidWallBoxes } from "./balcony";
-import { mezzanineLevels, onSlab, resolveMezzanine, type Level, type Mezzanine, type MezzanineSpec } from "./mezzanine";
+import { mezzanineLevels, onSlab, resolveMezzanine, underSlabFixtures, type Level, type Mezzanine, type MezzanineSpec } from "./mezzanine";
 
 export const WALL_THICKNESS = 0.3;
 export const EYE_HEIGHT = 1.7;
@@ -141,6 +141,10 @@ export function buildRoomLayout(
         ceilingSpots.push([x, H - 0.1, z]);
       }
     }
+  }
+  // The low gallery under a mezzanine gets its own row of fixtures hung from the slab, unless placed explicitly.
+  if (mezzanine && !ceilingSpots.some(([, y]) => y < mezzanine.top)) {
+    for (const { x, y, z } of underSlabFixtures(mezzanine)) ceilingSpots.push([x, y, z]);
   }
 
   return {

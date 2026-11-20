@@ -134,3 +134,23 @@ describe("window radiance", () => {
     expect(windowLightUniforms.uWindowCount.value).toBe(0);
   });
 });
+
+describe("rotationForSunDirection", () => {
+  it("turns the panorama so its sun lies in the dragged plan direction", async () => {
+    const { panoramaToWorld, rotationForSunDirection } = await import("./windowLight");
+    for (const [phi, dx, dz] of [
+      [0.6413, 1, 0],
+      [0.6413, -2, 3],
+      [-2.1, 0, -1],
+      [3, -1, -1],
+    ]) {
+      const r = rotationForSunDirection(phi, dx, dz);
+      expect(r).toBeGreaterThanOrEqual(0);
+      expect(r).toBeLessThan(Math.PI * 2);
+      const d = panoramaToWorld(phi, 0.4, r);
+      const len = Math.hypot(dx, dz);
+      expect(d.x / Math.hypot(d.x, d.z)).toBeCloseTo(dx / len, 6);
+      expect(d.z / Math.hypot(d.x, d.z)).toBeCloseTo(dz / len, 6);
+    }
+  });
+});

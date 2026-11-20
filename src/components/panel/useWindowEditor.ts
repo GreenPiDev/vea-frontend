@@ -10,9 +10,12 @@ export interface EditorWall {
   height: number;
   /** Custom rooms: false when a balcony placed like this would reach into another part of the footprint. */
   balconyFits?: (placement: WindowPlacementData) => boolean;
+  /** Rooms with a mezzanine: false when the window would cut through its slab. */
+  clearOfSlab?: (placement: WindowPlacementData) => boolean;
 }
 
 function fits(p: WindowPlacementData, wall: EditorWall): boolean {
+  if (wall.clearOfSlab && !wall.clearOfSlab(p)) return false;
   return p.styleId !== 'balcony' || !wall.balconyFits || wall.balconyFits(p);
 }
 
