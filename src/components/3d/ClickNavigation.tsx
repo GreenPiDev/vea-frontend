@@ -3,7 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
 import { FRAME_BORDER } from "./artworkShadow";
-import { applyWallTargetOutline, outlineGeometry, outlineMaterial } from "./artworkOutline";
+import { applyWallTargetOutline, outlineGeometry, outlineMaterial, tickOutline } from "./artworkOutline";
 import { useWallLabels } from "./useWallLabels";
 import {
   LOOK_INERTIA_DECAY,
@@ -119,7 +119,8 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
   // The floor-click target the destination ring marks; the ring hides once Player clears/replaces it.
   const destTarget = useRef<FloorPoint | null>(null);
 
-  useFrame(() => {
+  useFrame(({ clock }, dt) => {
+    if (outlineRef.current) tickOutline(outlineRef.current, dt, clock.elapsedTime);
     const ring = destRingRef.current;
     if (!ring) return;
     const walking = destTarget.current !== null && navigation.target === destTarget.current;
