@@ -16,6 +16,12 @@
   --color-brand-900: #33241a;
   --color-brand-950: #1f1610;
 
+  /* Printed museum wall label (3D WallLabel + ArtworkLabelModal) — mirrors wallLabelLayout.ts's LABEL_PAPER/INK. */
+  --color-label-paper: #f3f1ec;
+  --color-label-ink: #1f1d1a;
+  --color-label-muted: #6a655e;
+  --font-label: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
   --animate-loading-bounce: loading-bounce 2.2s ease-in-out infinite;
   --animate-loading-fade-in: loading-fade-in 0.25s ease-out;
   --animate-artwork-icon-breathe: artwork-icon-breathe 2.8s ease-in-out infinite;

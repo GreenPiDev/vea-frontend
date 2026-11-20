@@ -490,5 +490,9 @@
   "toastLoginSuccess": "Logged in successfully",
   "toastLoginError": "Login failed, please check the code",
   "toastLogoutSuccess": "Logged out",
-  "toastClose": "Close"
+  "toastClose": "Close",
+
+  "artworkLabelDialog": "Wall label: {{title}}",
+  "artworkLabelClose": "Close label",
+  "artworkLabelDetails": "Artwork details"
 }

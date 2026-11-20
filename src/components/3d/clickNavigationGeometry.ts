@@ -288,6 +288,38 @@ export interface ArtworkHit {
 }
 
 /**
+ * Ray against a rectangle hung on a painting's wall plane: centre (`cx`, `cy`) and half size in the
+ * painting's local frame (x to the visitor's right, y up), the plane `planeZ` in front of the painting's
+ * origin. Returns the ray distance, or null when missed, seen from behind, or hidden behind a wall.
+ */
+function rayRectOnWall(
+  origin: { x: number; y: number; z: number },
+  dir: { x: number; y: number; z: number },
+  artwork: ArtworkData,
+  rect: { cx: number; cy: number; halfW: number; halfH: number; planeZ: number },
+  walls: ColliderBox[]
+): number | null {
+  const nx = Math.sin(artwork.rotationY);
+  const nz = Math.cos(artwork.rotationY);
+  const denom = dir.x * nx + dir.z * nz;
+  if (denom >= -1e-6) return null; // looking at it edge-on or from behind
+  const px = artwork.position[0] + nx * rect.planeZ;
+  const pz = artwork.position[2] + nz * rect.planeZ;
+  const t = ((px - origin.x) * nx + (pz - origin.z) * nz) / denom;
+  if (t <= 0) return null;
+  const hx = origin.x + dir.x * t;
+  const hy = origin.y + dir.y * t;
+  const hz = origin.z + dir.z * t;
+  // Painting-local right axis = (cos, 0, -sin) — see ArtworkIconProjector.
+  const u = (hx - px) * nz - (hz - pz) * nx;
+  if (Math.abs(u - rect.cx) > rect.halfW || Math.abs(hy - artwork.position[1] - rect.cy) > rect.halfH) return null;
+  // On the far side of a partition: its plane is reachable, the wall comes first.
+  const inFront = { x: hx + nx * 0.05, z: hz + nz * 0.05 };
+  if (!hasLineOfSight({ x: origin.x, z: origin.z }, inFront, walls)) return null;
+  return t;
+}
+
+/**
  * The painting a view ray points at — the nearest one whose framed rectangle it crosses from the front,
  * with no wall in between. Paintings are flat rectangles on their wall plane, so this is a plane test per
  * painting rather than a scene raycast.
@@ -301,26 +333,63 @@ export function pickArtwork(
 ): ArtworkHit | null {
   let best: ArtworkHit | null = null;
   for (const artwork of artworks) {
-    const nx = Math.sin(artwork.rotationY);
-    const nz = Math.cos(artwork.rotationY);
-    const denom = dir.x * nx + dir.z * nz;
-    if (denom >= -1e-6) continue; // looking at it edge-on or from behind
-    const [px, py, pz] = artwork.position;
-    const t = ((px - origin.x) * nx + (pz - origin.z) * nz) / denom;
-    if (t <= 0 || (best && t >= best.distance)) continue;
-    const hx = origin.x + dir.x * t;
-    const hy = origin.y + dir.y * t;
-    const hz = origin.z + dir.z * t;
-    // Painting-local right axis = (cos, 0, -sin) — see ArtworkIconProjector.
-    const u = (hx - px) * nz - (hz - pz) * nx;
     const border = artwork.frame ? frameBorder : 0;
-    const halfW = (artwork.height * artwork.aspect) / 2 + border;
-    const halfH = artwork.height / 2 + border;
-    if (Math.abs(u) > halfW || Math.abs(hy - py) > halfH) continue;
-    // A painting on the far side of a partition: its plane is reachable, the wall comes first.
-    const inFront = { x: hx + nx * 0.05, z: hz + nz * 0.05 };
-    if (!hasLineOfSight({ x: origin.x, z: origin.z }, inFront, walls)) continue;
-    best = { artwork, distance: t };
+    const t = rayRectOnWall(
+      origin,
+      dir,
+      artwork,
+      { cx: 0, cy: 0, halfW: (artwork.height * artwork.aspect) / 2 + border, halfH: artwork.height / 2 + border, planeZ: 0 },
+      walls
+    );
+    if (t !== null && (!best || t < best.distance)) best = { artwork, distance: t };
   }
   return best;
+}
+
+/** A wall label's rectangle in its painting's local frame: centre, half size and face plane. */
+export interface LabelRect {
+  x: number;
+  y: number;
+  halfW: number;
+  halfH: number;
+  /** Face plane, along the painting's normal from its origin (negative: behind the frame face). */
+  planeZ: number;
+}
+
+/** The wall label (by its artwork) a view ray points at — nearest, from the front, not behind a wall. */
+export function pickWallLabel(
+  origin: { x: number; y: number; z: number },
+  dir: { x: number; y: number; z: number },
+  artworks: ArtworkData[],
+  labels: Map<string, LabelRect>,
+  walls: ColliderBox[]
+): ArtworkHit | null {
+  let best: ArtworkHit | null = null;
+  for (const artwork of artworks) {
+    const r = labels.get(artwork.id);
+    if (!r) continue;
+    const t = rayRectOnWall(origin, dir, artwork, { cx: r.x, cy: r.y, halfW: r.halfW, halfH: r.halfH, planeZ: r.planeZ }, walls);
+    if (t !== null && (!best || t < best.distance)) best = { artwork, distance: t };
+  }
+  return best;
+}
+
+/** Something clickable on a wall: a painting, or its wall label. */
+export interface WallTarget extends ArtworkHit {
+  kind: "artwork" | "label";
+}
+
+/** The nearest painting or wall label under a view ray (either kind can be left out by passing null). */
+export function pickWallTarget(
+  origin: { x: number; y: number; z: number },
+  dir: { x: number; y: number; z: number },
+  artworks: ArtworkData[],
+  labels: Map<string, LabelRect> | null,
+  walls: ColliderBox[],
+  frameBorder: number | null
+): WallTarget | null {
+  const art = frameBorder === null ? null : pickArtwork(origin, dir, artworks, walls, frameBorder);
+  const label = labels ? pickWallLabel(origin, dir, artworks, labels, walls) : null;
+  if (label && (!art || label.distance < art.distance)) return { ...label, kind: "label" };
+  return art ? { ...art, kind: "artwork" } : null;
 }

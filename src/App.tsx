@@ -9,6 +9,7 @@ import { toFurnitureDef } from "./components/3d/furniture";
 import type { SeatSpot } from "./components/3d/seating";
 import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSelect";
 import ArtworkDetailCard from "./components/ArtworkDetailCard";
+import ArtworkLabelModal from "./components/ArtworkLabelModal";
 import GallerySceneCanvas from "./components/common/GallerySceneCanvas";
 import FullscreenToggleButton from "./components/common/FullscreenToggleButton";
 import LoadingScreen from "./components/common/LoadingScreen";
@@ -43,6 +44,9 @@ export default function App() {
   const [locked, setLocked] = useState(false);
   const [iconPositions, setIconPositions] = useState<ArtworkIconPosition[]>([]);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
+  // The wall label opened by clicking it in the scene (ArtworkLabelModal).
+  const [labelArtwork, setLabelArtwork] = useState<Artwork | null>(null);
+  const overlayOpen = Boolean(selectedArtwork || labelArtwork);
   const [nearestSeat, setNearestSeat] = useState<SeatSpot | null>(null);
   const [seatedSpot, setSeatedSpot] = useState<SeatSpot | null>(null);
   // Statik şablon sergiler (EXHIBITIONS) anında bulunduğu için hiçbir ağ
@@ -154,6 +158,25 @@ export default function App() {
     }
   }
 
+  function openArtworkLabel(artwork: Artwork) {
+    pointerWasLockedRef.current = locked;
+    document.exitPointerLock();
+    setLabelArtwork(artwork);
+  }
+
+  function closeArtworkLabel() {
+    setLabelArtwork(null);
+    if (pointerWasLockedRef.current) {
+      canvasElRef.current?.requestPointerLock();
+    }
+  }
+
+  // From the label to the full card: pointer-lock state carries over (closing the card resumes it).
+  function showLabelDetails(artwork: Artwork) {
+    setLabelArtwork(null);
+    setSelectedArtwork(artwork);
+  }
+
   // Enter/Space state machine for sitting down / standing up. Pointer lock is
   // left untouched the whole time sitting: there's no real DOM UI to show a
   // cursor for, and mouse-look needs to stay active ("etrafı izleme serbest
@@ -167,14 +190,14 @@ export default function App() {
         }
         return;
       }
-      if (selectedArtwork || !nearestSeat) return;
+      if (overlayOpen || !nearestSeat) return;
       if (e.code !== "Enter" && e.code !== "Space" && e.code !== "NumpadEnter") return;
       e.preventDefault();
       setSeatedSpot(nearestSeat);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedArtwork, nearestSeat, seatedSpot]);
+  }, [overlayOpen, nearestSeat, seatedSpot]);
 
   // Escape deliberately does NOT close the open detail card — only its own
   // ✕ button does. Browsers disqualify an Escape keypress from ever being
@@ -256,7 +279,7 @@ export default function App() {
       {showExhibitionLoadingScreen && <LoadingScreen />}
       <GallerySceneCanvas
         exhibition={exhibition}
-        overlayHidden={locked || Boolean(selectedArtwork)}
+        overlayHidden={locked || overlayOpen}
         onLockChange={setLocked}
         onIconPositionsChange={setIconPositions}
         onCanvasReady={(el) => (canvasElRef.current = el)}
@@ -266,12 +289,16 @@ export default function App() {
           const artwork = exhibitionArtworks.find((a) => a.id === id);
           if (artwork) openArtworkDetail(artwork);
         }}
+        onLabelClick={(id) => {
+          const artwork = exhibitionArtworks.find((a) => a.id === id);
+          if (artwork) openArtworkLabel(artwork);
+        }}
       />
 
       {/* Rendered for every artwork (not just the currently-visible ones) so
           appearing/disappearing is a CSS opacity/scale transition rather than
           a mount/unmount pop. */}
-      {!selectedArtwork &&
+      {!overlayOpen &&
         iconPositions.map((p) => {
           const artwork = exhibitionArtworks.find((a) => a.id === p.id);
           if (!artwork) return null;
@@ -307,7 +334,7 @@ export default function App() {
           );
         })}
 
-      {!touchDevice && !selectedArtwork && !seatedSpot && nearestSeat && (
+      {!touchDevice && !overlayOpen && !seatedSpot && nearestSeat && (
         <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-brand-200/20 bg-brand-950/80 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-brand-100 shadow-md">
           <span className="rounded-[4px] border border-brand-100/40 px-1 font-sans text-[9px] not-italic tracking-normal text-brand-50">
             ↵
@@ -325,7 +352,7 @@ export default function App() {
         </div>
       )}
 
-      {touchDevice && !selectedArtwork && (seatedSpot || nearestSeat) && (
+      {touchDevice && !overlayOpen && (seatedSpot || nearestSeat) && (
         <button
           type="button"
           onClick={() => setSeatedSpot(seatedSpot ? null : nearestSeat)}
@@ -336,6 +363,14 @@ export default function App() {
           </svg>
           {t(seatedSpot ? "seatStandHint" : "seatInteractHint")}
         </button>
+      )}
+
+      {labelArtwork && (
+        <ArtworkLabelModal
+          artwork={labelArtwork}
+          onClose={closeArtworkLabel}
+          onShowDetails={() => showLabelDetails(labelArtwork)}
+        />
       )}
 
       {selectedArtwork && (

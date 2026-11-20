@@ -1,12 +1,13 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { useTexture, Text } from "@react-three/drei";
+import { useTexture } from "@react-three/drei";
 import type { Artwork as ArtworkData, FrameStyle } from "./artworks";
 import { FRAME_TEXTURES } from "./frameTextures";
-import { FRAME_BORDER } from "./artworkShadow";
 import { canvasZ, getFrameGeometry } from "./frameProfile";
 import { WEAVE_TILE_METERS, getCanvasWeaveNormalMap } from "./canvasWeave";
 import { cropToUvTransform, measureImageCrop } from "./artworkImageCrop";
+import WallLabel from "./WallLabel";
+import { LABEL_WALL_Z, type LabelLayout, type LabelPlacement } from "./wallLabelLayout";
 
 // Paint surface: a painting isn't a matte print. A thin varnish layer gives it a soft sheen the picture
 // light can catch (0.65 read like paper), and the shared linen weave normal map breaks that sheen up the
@@ -23,7 +24,14 @@ const CANVAS_NORMAL_SCALE = new THREE.Vector2(0.35, 0.35);
 const frameMaterialCache = new Map<FrameStyle, THREE.MeshStandardMaterial>();
 
 /** A single framed, lit, labeled painting mounted flush on a gallery wall. */
-export default function Artwork({ data }: { data: ArtworkData }) {
+export default function Artwork({
+  data,
+  label,
+}: {
+  data: ArtworkData;
+  /** Museum wall label, typeset and placed by GalleryArtworks (wallLabel.ts) — it needs the whole wall's layout. */
+  label?: { layout: LabelLayout; placement: LabelPlacement };
+}) {
   const texture = useTexture(data.image);
 
   useMemo(() => {
@@ -69,33 +77,13 @@ export default function Artwork({ data }: { data: ArtworkData }) {
         />
       </mesh>
 
-      {/* Wall label */}
-      <group position={[0, -data.height / 2 - FRAME_BORDER - 0.16, 0.01]}>
-        <mesh>
-          <planeGeometry args={[0.62, 0.18]} />
-          <meshStandardMaterial color="#f7f6f2" roughness={0.9} />
-        </mesh>
-        <Text
-          position={[0, 0.035, 0.001]}
-          fontSize={0.036}
-          color="#1a1a1a"
-          anchorX="center"
-          anchorY="middle"
-          maxWidth={0.56}
-        >
-          {data.title}
-        </Text>
-        <Text
-          position={[0, -0.035, 0.001]}
-          fontSize={0.028}
-          color="#5a5a5a"
-          anchorX="center"
-          anchorY="middle"
-          maxWidth={0.56}
-        >
-          {`${data.artist}, ${data.year}`}
-        </Text>
-      </group>
+      {/* Wall label — its back flat on the wall face. */}
+      {label ? (
+        <WallLabel
+          layout={label.layout}
+          position={[label.placement.x, label.placement.y, LABEL_WALL_Z]}
+        />
+      ) : null}
     </group>
   );
 }

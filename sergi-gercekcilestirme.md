@@ -34,7 +34,7 @@ gezilerek incelendi. Doku kalitesi aslında iyi. Yapaylığın asıl kaynakları
 
 ### Proje kuralları (CLAUDE.md'den, ASLA bozma)
 - **Sis yok.** Kullanıcı açıkça istemiyor.
-- **Süpürgelik / duvar-tavan arası pervaz yok.** Kullanıcı isteğiyle kaldırıldı, geri ekleme.
+- **Duvar-tavan arası pervaz yok** (kullanıcı isteğiyle kaldırıldı). Süpürgelik 2026-11-20'de kullanıcı isteğiyle yeni bir profille geri eklendi (`baseboard.ts`), onu kaldırma.
 - **Görünür armatürü olmayan directional/point light yok.** Parlak zeminler bunları kaynaksız parlama
   olarak yansıtıyor.
 - **SSAO yok.** Bunun yerine `roomAo.ts` (önceden hesaplanan AO) seçildi.

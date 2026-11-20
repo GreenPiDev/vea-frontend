@@ -91,6 +91,8 @@ interface SceneProps {
   navigationMode: NavigationMode;
   /** Click/tap on a painting in click-to-go mode (opens its info card in App.tsx). */
   onArtworkClick?: (artworkId: string) => void;
+  /** Click/tap on a painting's wall label. */
+  onLabelClick?: (artworkId: string) => void;
 }
 
 export default function Scene({
@@ -102,6 +104,7 @@ export default function Scene({
   onNearestSeatChange,
   navigationMode,
   onArtworkClick,
+  onLabelClick,
 }: SceneProps) {
   // Click-to-go request shared by ClickNavigation (writes) and Player (reads every frame).
   const [navigation] = useState(createNavigationRequest);
@@ -157,12 +160,13 @@ export default function Scene({
           navigationMode={navigationMode}
           navigation={navigation}
         />
-        {navigationMode === "walk" && onArtworkClick && <WalkArtworkPicker onArtworkClick={onArtworkClick} />}
+        {navigationMode === "walk" && onArtworkClick && <WalkArtworkPicker onArtworkClick={onArtworkClick} onLabelClick={onLabelClick} />}
         {navigationMode === "click" && (
           <ClickNavigation
             navigation={navigation}
             movementLocked={Boolean(seatedSpot)}
             onArtworkClick={onArtworkClick}
+            onLabelClick={onLabelClick}
             cameraZoom={cameraZoom}
           />
         )}

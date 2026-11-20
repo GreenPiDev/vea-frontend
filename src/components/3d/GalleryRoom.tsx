@@ -16,6 +16,7 @@ import {
 } from "./surfaceTextures";
 import type { WallSegment } from "./galleryLayout";
 import { buildTexturedBoxGeometry } from "./textureUv";
+import { BASEBOARD_ROUGHNESS, baseboardColor, buildBaseboardGeometry } from "./baseboard";
 import { DEFAULT_AO_FIELD_OPTIONS, buildRoomAoField } from "./roomAo";
 import {
   applyRoomAo,
@@ -100,8 +101,35 @@ export default function GalleryRoom() {
         roughness={theme.wallTextureId ? undefined : theme.wallRoughness}
         aoUniforms={aoUniforms}
       />
+
+      <Baseboards walls={walls} wallColor={theme.wallColor} aoUniforms={aoUniforms} />
     </group>
   );
+}
+
+/** Skirting boards along every wall base, lit through the walls' own room-AO patch (see baseboard.ts). */
+function Baseboards({
+  walls,
+  wallColor,
+  aoUniforms,
+}: {
+  walls: WallSegment[];
+  wallColor: string;
+  aoUniforms: RoomAoUniforms;
+}) {
+  const geometry = useMemo(() => buildBaseboardGeometry(walls), [walls]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  const material = useMemo(() => {
+    const m = new THREE.MeshStandardMaterial({
+      color: baseboardColor(wallColor),
+      roughness: BASEBOARD_ROUGHNESS,
+      metalness: 0,
+    });
+    applyRoomAo(m, "wall", aoUniforms);
+    return m;
+  }, [wallColor, aoUniforms]);
+  useEffect(() => () => material.dispose(), [material]);
+  return <mesh geometry={geometry} material={material} />;
 }
 
 // --- Textured surfaces ------------------------------------------------------

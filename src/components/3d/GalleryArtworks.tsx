@@ -1,19 +1,15 @@
-import { Suspense, useMemo } from "react";
+import { Suspense } from "react";
 import Artwork from "./Artwork";
 import ArtworkFixtures from "./ArtworkFixtures";
 import ArtworkLightPool from "./ArtworkLightPool";
 import ArtworkWallShadows from "./ArtworkWallShadows";
-import { ARTWORKS } from "./artworks";
-import { useExhibition } from "./ExhibitionContext";
 import { ArtworkErrorBoundary } from "./ArtworkErrorBoundary";
+import { useWallLabels } from "./useWallLabels";
 
 /** All framed, lit, labeled paintings hung in the current exhibition room. */
 export default function GalleryArtworks() {
-  const { exhibition } = useExhibition();
-  const artworks = useMemo(
-    () => exhibition.artworks ?? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id),
-    [exhibition]
-  );
+  // The collection and its wall labels, typeset and placed together (shared with the click pickers).
+  const { artworks, labels } = useWallLabels();
 
   return (
     <>
@@ -32,7 +28,7 @@ export default function GalleryArtworks() {
       {artworks.map((data) => (
         <ArtworkErrorBoundary key={data.id} artworkId={data.id}>
           <Suspense fallback={null}>
-            <Artwork data={data} />
+            <Artwork data={data} label={labels.get(data.id)} />
           </Suspense>
         </ArtworkErrorBoundary>
       ))}

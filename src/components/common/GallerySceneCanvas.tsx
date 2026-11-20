@@ -28,6 +28,8 @@ interface GallerySceneCanvasProps {
   onNearestSeatChange?: (seat: SeatSpot | null) => void;
   /** Click/tap on a painting (click-to-go mode). Omitted → paintings aren't clickable/highlighted. */
   onArtworkClick?: (artworkId: string) => void;
+  /** Click/tap on a painting's wall label. */
+  onLabelClick?: (artworkId: string) => void;
 }
 
 // The `#gallery-canvas-wrapper` + Suspense + <Scene> + instructions-card
@@ -47,6 +49,7 @@ export default function GallerySceneCanvas({
   seatedSpot,
   onNearestSeatChange,
   onArtworkClick,
+  onLabelClick,
 }: GallerySceneCanvasProps) {
   const [touchDevice] = useState(isTouchPrimaryDevice);
   const [navigationMode, setNavigationMode] = useState<NavigationMode>(loadNavigationMode);
@@ -94,6 +97,7 @@ export default function GallerySceneCanvas({
             onNearestSeatChange={onNearestSeatChange}
             navigationMode={navigationMode}
             onArtworkClick={onArtworkClick}
+            onLabelClick={onLabelClick}
           />
         </Suspense>
 

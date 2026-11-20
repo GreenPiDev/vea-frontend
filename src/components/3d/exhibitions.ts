@@ -6,6 +6,7 @@
 import type { Artwork } from "./artworks";
 import type { RoomLayout } from "./galleryLayout";
 import type { SeatSpot } from "./seating";
+import { SHOWCASE_EXHIBITION } from "./showcaseExhibition";
 
 export interface ExhibitionTheme {
   wallColor: string;
@@ -160,4 +161,6 @@ export const EXHIBITIONS: Exhibition[] = [
       spotIntensity: 20,
     },
   },
+  // Adım 13 showcase room (/exhibition/vitrin) — see showcaseExhibition.ts.
+  SHOWCASE_EXHIBITION,
 ];

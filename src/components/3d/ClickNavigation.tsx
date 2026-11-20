@@ -1,11 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { ARTWORKS } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
 import { FRAME_BORDER } from "./artworkShadow";
-import { applyArtworkOutline, outlineGeometry, outlineMaterial } from "./artworkOutline";
-import type { Artwork as ArtworkData } from "./artworks";
+import { applyWallTargetOutline, outlineGeometry, outlineMaterial } from "./artworkOutline";
+import { useWallLabels } from "./useWallLabels";
 import {
   LOOK_INERTIA_DECAY,
   LOOK_SAMPLE_WINDOW_MS,
@@ -13,14 +12,15 @@ import {
   estimateLookVelocity,
   computeArtworkViewpoint,
   floorPointFromRay,
-  pickArtwork,
   pickViewpoint,
+  pickWallTarget,
   walkableFloorPoint,
   wallBoxes,
   type ArtworkViewpoint,
   type FloorPoint,
   type LookSample,
   type NavigationRequest,
+  type WallTarget,
 } from "./clickNavigationGeometry";
 import { clampZoom, fovForAspect, type CameraZoom } from "./cameraFov";
 
@@ -86,6 +86,8 @@ interface ClickNavigationProps {
   movementLocked: boolean;
   /** Click/tap on a painting. When set, paintings also get a hover outline + pointer cursor. */
   onArtworkClick?: (artworkId: string) => void;
+  /** Click/tap on a painting's wall label (same hover outline + pointer cursor). */
+  onLabelClick?: (artworkId: string) => void;
   /** Pinch / wheel magnification, applied to the camera by CameraFov (Scene.tsx). */
   cameraZoom: CameraZoom;
 }
@@ -97,15 +99,11 @@ interface ClickNavigationProps {
  * than R3F's per-object raycasting: the scene's walls aren't event targets, so R3F would happily report
  * a floor hit behind a wall.
  */
-export default function ClickNavigation({ navigation, movementLocked, onArtworkClick, cameraZoom }: ClickNavigationProps) {
+export default function ClickNavigation({ navigation, movementLocked, onArtworkClick, onLabelClick, cameraZoom }: ClickNavigationProps) {
   const { camera, gl } = useThree();
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
-  const { exhibition, layout } = useExhibition();
-
-  const artworks = useMemo(
-    () => exhibition.artworks ?? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id),
-    [exhibition]
-  );
+  const { layout } = useExhibition();
+  const { artworks, rects: labelRects } = useWallLabels();
   const viewpoints = useMemo(
     // Fitted to the unzoomed view: the standing spot shouldn't depend on a transient pinch.
     () => artworks.map((a) => computeArtworkViewpoint(a, layout.colliders, { verticalFovDeg: fovForAspect(aspect), aspect })),
@@ -159,8 +157,8 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
   });
 
   // Latest values for the long-lived DOM listeners below, without re-binding them on every change.
-  const live = useRef({ viewpoints, walls, colliders: layout.colliders, movementLocked, artworks, onArtworkClick });
-  live.current = { viewpoints, walls, colliders: layout.colliders, movementLocked, artworks, onArtworkClick };
+  const live = useRef({ viewpoints, walls, colliders: layout.colliders, movementLocked, artworks, labelRects, onArtworkClick, onLabelClick });
+  live.current = { viewpoints, walls, colliders: layout.colliders, movementLocked, artworks, labelRects, onArtworkClick, onLabelClick };
 
   useEffect(() => {
     const canvas = gl.domElement;
@@ -188,27 +186,34 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
       ndc.set((e.offsetX / canvas.clientWidth) * 2 - 1, -(e.offsetY / canvas.clientHeight) * 2 + 1);
       raycaster.setFromCamera(ndc, camera);
       const { origin, direction } = raycaster.ray;
-      const { viewpoints, walls, colliders, artworks, onArtworkClick } = live.current;
-      // A painting under the pointer wins over everything else — it's on a wall, so there's no floor
-      // target behind it anyway.
-      const artwork = onArtworkClick ? (pickArtwork(origin, direction, artworks, walls, FRAME_BORDER)?.artwork ?? null) : null;
-      if (artwork) return { artwork, marker: null, walkable: null };
+      const { viewpoints, walls, colliders, artworks, labelRects, onArtworkClick, onLabelClick } = live.current;
+      // A painting or wall label under the pointer wins over everything else — it's on a wall, so there's
+      // no floor target behind it anyway.
+      const target = pickWallTarget(
+        origin,
+        direction,
+        artworks,
+        onLabelClick ? labelRects : null,
+        walls,
+        onArtworkClick ? FRAME_BORDER : null
+      );
+      if (target) return { target, marker: null, walkable: null };
       const floor = floorPointFromRay(origin, direction);
       // Markers sit right at the wall's foot, so they're tested against the raw floor hit (with their own
       // wall line-of-sight check), not the stricter walkable point below.
       const marker = floor ? pickViewpoint({ x: origin.x, z: origin.z }, floor, viewpoints, MARKER_RADIUS, walls) : null;
       // Null when pointing at a wall, the ceiling or furniture — no walking there, no preview ring.
       const walkable = walkableFloorPoint(origin, direction, walls, colliders);
-      return { artwork: null, marker, walkable };
+      return { target: null, marker, walkable };
     }
 
-    function showOutline(artwork: ArtworkData | null) {
-      if (outlineRef.current) applyArtworkOutline(outlineRef.current, artwork);
+    function showOutline(target: WallTarget | null) {
+      if (outlineRef.current) applyWallTargetOutline(outlineRef.current, target, live.current.labelRects);
     }
 
-    function showHover(hit: { artwork: ArtworkData | null; marker: ArtworkViewpoint | null; walkable: FloorPoint | null } | null) {
-      const artwork = hit?.artwork ?? null;
-      showOutline(artwork);
+    function showHover(hit: { target: WallTarget | null; marker: ArtworkViewpoint | null; walkable: FloorPoint | null } | null) {
+      const target = hit?.target ?? null;
+      showOutline(target);
       const marker = hit?.marker ?? null;
       const hover = hoverRef.current;
       if (hover) {
@@ -221,7 +226,7 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
         ring.visible = point !== null;
         if (point) ring.position.set(point.x, MARKER_LIFT, point.z);
       }
-      canvas.style.cursor = marker || artwork ? "pointer" : "";
+      canvas.style.cursor = marker || target ? "pointer" : "";
     }
 
     function onPointerDown(e: PointerEvent) {
@@ -292,10 +297,11 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
       }
 
       const hit = aim(e);
-      if (hit.artwork) {
-        // Opening the info card works seated too — it doesn't move the visitor.
+      if (hit.target) {
+        // Opening the info card / label works seated too — it doesn't move the visitor.
         showHover(null);
-        live.current.onArtworkClick?.(hit.artwork.id);
+        if (hit.target.kind === "label") live.current.onLabelClick?.(hit.target.artwork.id);
+        else live.current.onArtworkClick?.(hit.target.artwork.id);
         return;
       }
       if (live.current.movementLocked) return;

@@ -490,5 +490,9 @@
   "toastLoginSuccess": "Giriş başarılı",
   "toastLoginError": "Giriş başarısız, kodu kontrol edin",
   "toastLogoutSuccess": "Çıkış yapıldı",
-  "toastClose": "Kapat"
+  "toastClose": "Kapat",
+
+  "artworkLabelDialog": "{{title}} eser etiketi",
+  "artworkLabelClose": "Etiketi kapat",
+  "artworkLabelDetails": "Eser detayları"
 }
