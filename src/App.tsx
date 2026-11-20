@@ -10,6 +10,8 @@ import type { SeatSpot } from "./components/3d/seating";
 import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSelect";
 import ArtworkDetailCard from "./components/ArtworkDetailCard";
 import ArtworkLabelModal from "./components/ArtworkLabelModal";
+import ArtworkThumbnailRail from "./components/ArtworkThumbnailRail";
+import type { ArtworkGoToRequest } from "./components/3d/ArtworkGoTo";
 import GallerySceneCanvas from "./components/common/GallerySceneCanvas";
 import FullscreenToggleButton from "./components/common/FullscreenToggleButton";
 import LoadingScreen from "./components/common/LoadingScreen";
@@ -49,6 +51,8 @@ export default function App() {
   const overlayOpen = Boolean(selectedArtwork || labelArtwork);
   const [nearestSeat, setNearestSeat] = useState<SeatSpot | null>(null);
   const [seatedSpot, setSeatedSpot] = useState<SeatSpot | null>(null);
+  // Thumbnail-rail click → teleport in front of that painting (ArtworkGoTo.tsx inside the Canvas).
+  const [goToArtwork, setGoToArtwork] = useState<ArtworkGoToRequest | null>(null);
   // Statik şablon sergiler (EXHIBITIONS) anında bulunduğu için hiçbir ağ
   // isteği beklemiyor — kart tıklamasıyla hemen `exhibition` dolduğundan,
   // sadece `backendId && backendLoading`'e bağlı eski kontrol bu sergiler
@@ -169,6 +173,13 @@ export default function App() {
     if (pointerWasLockedRef.current) {
       canvasElRef.current?.requestPointerLock();
     }
+  }
+
+  // Thumbnail rail: stand up if seated, then teleport in front of the painting (ArtworkGoTo.tsx).
+  // `seq` makes clicking the same thumbnail again a fresh request (e.g. after wandering off).
+  function walkToArtwork(artwork: Artwork) {
+    if (seatedSpot) setSeatedSpot(null);
+    setGoToArtwork((prev) => ({ artworkId: artwork.id, seq: (prev?.seq ?? 0) + 1 }));
   }
 
   // From the label to the full card: pointer-lock state carries over (closing the card resumes it).
@@ -293,7 +304,17 @@ export default function App() {
           const artwork = exhibitionArtworks.find((a) => a.id === id);
           if (artwork) openArtworkLabel(artwork);
         }}
+        goToArtwork={goToArtwork}
       />
+
+      {/* Hidden while pointer-locked (the cursor is captured — nothing to click) and while a card is open. */}
+      {!overlayOpen && !locked && (
+        <ArtworkThumbnailRail
+          artworks={exhibitionArtworks}
+          activeId={nearestArtwork?.id ?? null}
+          onSelect={walkToArtwork}
+        />
+      )}
 
       {/* Rendered for every artwork (not just the currently-visible ones) so
           appearing/disappearing is a CSS opacity/scale transition rather than

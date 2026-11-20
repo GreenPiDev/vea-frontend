@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ApiExhibitionArtwork, ApiSceneConfig } from '../../lib/api/domains/exhibitions';
 import type { ApiExhibitionTemplate } from '../../lib/api/domains/exhibitionTemplates';
 import { blueprintForSceneConfig } from '../3d/backendAdapter';
 import type { FurnitureDef } from '../3d/furniture';
-import { placeArtworksAlongWall } from '../3d/galleryLayout';
+import { placeArtworksAlongWall, slideClamp } from '../3d/galleryLayout';
+import { openingSpansOnWall } from '../3d/windowOpenings';
 
 interface ExhibitionBlueprintProps {
   sceneConfig: ApiSceneConfig | null;
@@ -17,6 +18,19 @@ interface ExhibitionBlueprintProps {
   onSelectWall?: (wallId: string) => void;
   /** Catalog to resolve resolvedTemplate's roomShape.furniture against (see useMyFurnitureAssets/useFurnitureAssetsByOrganization + toFurnitureDef) — defaults to none, so callers that don't care about furniture don't need to fetch it. */
   furnitureCatalog?: FurnitureDef[];
+  /** Turns the selected wall's thumbnails into drag handles (slide along the wall only). Called on every drag step with the new 0..1 position along the wall — nothing is persisted here, the caller keeps the pending value. */
+  onMoveArtwork?: (link: ApiExhibitionArtwork, alongFraction: number) => void;
+  /** Pending (unsaved) along-wall position per link id, owned by the caller: a number overrides the saved position, null means "back to the even slot". */
+  alongOverrides?: Record<string, number | null>;
+}
+
+interface WallRunInfo {
+  id: string;
+  orientation: 'horizontal' | 'vertical';
+  start: number;
+  end: number;
+  fixed: number;
+  outward: -1 | 1;
 }
 
 const MARGIN = 1;
@@ -25,6 +39,8 @@ const WALL_HIT_STROKE = 0.6;
 const THUMB_SIZE = 0.7;
 const WALL_NUMBER_INSET = 0.5;
 const WALL_NUMBER_FONT_SIZE = 0.5;
+/** Window strips on the plan (drawn across the wall line). */
+const WINDOW_THICKNESS = 0.42;
 
 /**
  * Top-down floor-plan sketch of an exhibition room: floor shape, walls,
@@ -41,6 +57,8 @@ export default function ExhibitionBlueprint({
   selectedWallId,
   onSelectWall,
   furnitureCatalog = [],
+  onMoveArtwork,
+  alongOverrides,
 }: ExhibitionBlueprintProps) {
   const { t } = useTranslation();
   const blueprint = useMemo(
@@ -48,32 +66,75 @@ export default function ExhibitionBlueprint({
     [sceneConfig, resolvedTemplate, furnitureCatalog]
   );
 
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
   const thumbnails = useMemo(() => {
     if (!blueprint) return [];
     return blueprint.wallRuns.flatMap((run) => {
       const links = byWall.get(run.id);
       if (!links || links.length === 0) return [];
-      // Only x/z matter here (a floor-plan has no height axis) — aspect/
-      // height are irrelevant to placeArtworksAlongWall's x/z spread, only
-      // to its vertical hang math, so dummy values are fine.
+      // Only the along-wall spread matters here (a floor-plan has no height
+      // axis) — real aspect/height give the artwork's true width, which the
+      // drag limits need; the wall height is dummy (never clamps the width).
       const placements = placeArtworksAlongWall(
         run,
         100,
-        links.map(() => ({ aspect: 1, height: 1 }))
+        links.map((link) => ({
+          aspect: link.artwork.widthCm / link.artwork.heightCm,
+          height: link.artwork.heightCm / 100,
+          alongFraction: link.id in (alongOverrides ?? {}) ? (alongOverrides![link.id] ?? undefined) : link.positionData?.alongFraction,
+        })),
+        // Same window spans the 3D placement keeps artworks off (backendAdapter.ts's placeAll).
+        openingSpansOnWall(run.id, blueprint.windows)
       );
       return links.map((link, i) => ({
         key: link.id,
+        link,
+        runId: run.id,
+        orientation: run.orientation,
+        index: i,
         x: placements[i].position[0],
         z: placements[i].position[2],
+        width: placements[i].height * (link.artwork.widthCm / link.artwork.heightCm),
         imageUrl: link.artwork.imageUrl,
         title: link.artwork.title,
       }));
     });
-  }, [blueprint, byWall]);
+  }, [blueprint, byWall, alongOverrides]);
+
+  function alongCoord(run: WallRunInfo, e: React.PointerEvent<SVGImageElement>): number | null {
+    const svg = svgRef.current;
+    const ctm = svg?.getScreenCTM();
+    if (!svg || !ctm) return null;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const local = pt.matrixTransform(ctm.inverse());
+    return run.orientation === 'horizontal' ? local.x : local.y;
+  }
+
+  function handleDrag(thumb: (typeof thumbnails)[number], e: React.PointerEvent<SVGImageElement>) {
+    if (draggingId !== thumb.key || !blueprint) return;
+    const run = blueprint.wallRuns.find((r) => r.id === thumb.runId) as WallRunInfo | undefined;
+    const coord = run && alongCoord(run, e);
+    if (!run || coord == null) return;
+    const onWall = thumbnails.filter((th) => th.runId === thumb.runId);
+    const centers = onWall.map((th) => (run.orientation === 'horizontal' ? th.x : th.z));
+    // Between its neighbours and off the windows; dragging past a window hops the work to its other side.
+    const clamped = slideClamp(run, centers, onWall.map((th) => th.width), thumb.index, coord, openingSpansOnWall(run.id, blueprint.windows));
+    onMoveArtwork?.(thumb.link, (clamped - run.start) / (run.end - run.start));
+  }
+
+  function handleDrop(thumb: (typeof thumbnails)[number], e: React.PointerEvent<SVGImageElement>) {
+    if (draggingId !== thumb.key) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    setDraggingId(null);
+  }
 
   if (!blueprint) return null;
 
-  const { bounds, wallRuns, spawn, cells, furniture } = blueprint;
+  const { bounds, wallRuns, spawn, cells, furniture, windows } = blueprint;
   const minX = bounds.minX - MARGIN;
   const minZ = bounds.minZ - MARGIN;
   const width = bounds.maxX - bounds.minX + MARGIN * 2;
@@ -83,6 +144,7 @@ export default function ExhibitionBlueprint({
     <div className="flex flex-col gap-2 rounded-lg bg-brand-50 p-4 shadow-sm">
       <p className="text-sm font-medium text-brand-800">{t('blueprintTitle')}</p>
       <svg
+        ref={svgRef}
         viewBox={`${minX} ${minZ} ${width} ${depth}`}
         className="w-full max-w-md self-center"
         style={{ aspectRatio: `${width} / ${depth}` }}
@@ -165,6 +227,27 @@ export default function ExhibitionBlueprint({
           );
         })}
 
+        {windows.map((o) => {
+          const horizontal = o.axis === 'x';
+          const along = horizontal ? o.center[0] : o.center[2];
+          const fixed = horizontal ? o.center[2] : o.center[0];
+          return (
+            <rect
+              key={o.id}
+              x={horizontal ? along - o.width / 2 : fixed - WINDOW_THICKNESS / 2}
+              y={horizontal ? fixed - WINDOW_THICKNESS / 2 : along - o.width / 2}
+              width={horizontal ? o.width : WINDOW_THICKNESS}
+              height={horizontal ? WINDOW_THICKNESS : o.width}
+              rx={0.05}
+              pointerEvents="none"
+              className="fill-sky-200 stroke-sky-600"
+              strokeWidth={0.06}
+            >
+              <title>{t('blueprintWindow')}</title>
+            </rect>
+          );
+        })}
+
         {furniture.map((piece, i) => {
           const { width: fw, depth: fd } = piece.footprint;
           const deg = -(piece.rotationY * 180) / Math.PI;
@@ -222,19 +305,41 @@ export default function ExhibitionBlueprint({
           );
         })}
 
-        {thumbnails.map((thumb) => (
-          <image
-            key={thumb.key}
-            href={thumb.imageUrl}
-            x={thumb.x - THUMB_SIZE / 2}
-            y={thumb.z - THUMB_SIZE / 2}
-            width={THUMB_SIZE}
-            height={THUMB_SIZE}
-            preserveAspectRatio="xMidYMid slice"
-          >
-            <title>{thumb.title}</title>
-          </image>
-        ))}
+        {thumbnails.map((thumb) => {
+          const draggable = !!onMoveArtwork && thumb.runId === selectedWallId;
+          // Drawn at the artwork's real width along its wall, so the gaps on
+          // the plan match what slideClamp() enforces while dragging (a
+          // fixed square made works look far apart yet refuse to get closer).
+          const alongSize = thumb.width;
+          const w = thumb.orientation === 'horizontal' ? alongSize : THUMB_SIZE;
+          const h = thumb.orientation === 'horizontal' ? THUMB_SIZE : alongSize;
+          return (
+            <image
+              key={thumb.key}
+              href={thumb.imageUrl}
+              x={thumb.x - w / 2}
+              y={thumb.z - h / 2}
+              width={w}
+              height={h}
+              preserveAspectRatio="xMidYMid slice"
+              style={draggable ? { touchAction: 'none', cursor: draggingId === thumb.key ? 'grabbing' : 'grab' } : undefined}
+              className={draggable ? 'drop-shadow-md' : undefined}
+              onPointerDown={
+                draggable
+                  ? (e) => {
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      setDraggingId(thumb.key);
+                    }
+                  : undefined
+              }
+              onPointerMove={draggable ? (e) => handleDrag(thumb, e) : undefined}
+              onPointerUp={draggable ? (e) => handleDrop(thumb, e) : undefined}
+              onPointerCancel={draggable ? (e) => handleDrop(thumb, e) : undefined}
+            >
+              <title>{thumb.title}</title>
+            </image>
+          );
+        })}
 
         <g transform={`translate(${spawn.x} ${spawn.z}) rotate(${spawn.rotationDeg})`}>
           <circle r={0.35} className="fill-brand-900" />
@@ -242,6 +347,8 @@ export default function ExhibitionBlueprint({
         </g>
       </svg>
       <p className="text-center text-xs text-brand-500">{t('blueprintSpawnHint')}</p>
+      {onMoveArtwork && <p className="text-center text-xs text-brand-500">{t('blueprintDragHint')}</p>}
+      {windows.length > 0 && <p className="text-center text-xs text-brand-500">{t('blueprintWindowHint')}</p>}
     </div>
   );
 }

@@ -20,6 +20,18 @@ function geometry(style: FrameStyle) {
   return buildFrameGeometry(W, H, FRAME_PROFILES[style], 0.6);
 }
 
+describe("frame width", () => {
+  it("is slim and the same on every painting size and style (user request, 2026-11-20)", () => {
+    expect(FRAME_BORDER).toBeLessThanOrEqual(0.045);
+    for (const style of STYLES)
+      for (const [w, h] of [[0.3, 0.4], [1.2, 0.9], [2.5, 1.8]]) {
+        const box = buildFrameGeometry(w, h, FRAME_PROFILES[style], 0.6).boundingBox!;
+        expect(box.max.x - w / 2).toBeCloseTo(FRAME_BORDER, 5);
+        expect(box.max.y - h / 2).toBeCloseTo(FRAME_BORDER, 5);
+      }
+  });
+});
+
 describe.each(STYLES)("%s frame", (style) => {
   const geo = geometry(style);
   const pos = geo.attributes.position;

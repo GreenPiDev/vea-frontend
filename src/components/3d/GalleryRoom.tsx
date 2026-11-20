@@ -15,7 +15,9 @@ import {
   type SurfaceTexture,
 } from "./surfaceTextures";
 import type { WallSegment } from "./galleryLayout";
-import { buildTexturedBoxGeometry } from "./textureUv";
+import { buildTexturedBoxGeometry, buildWorldUvBoxGeometry } from "./textureUv";
+import { splitWallsAroundOpenings } from "./windowOpenings";
+import WindowFixtures from "./WindowFixtures";
 import { BASEBOARD_ROUGHNESS, baseboardColor, buildBaseboardGeometry } from "./baseboard";
 import { DEFAULT_AO_FIELD_OPTIONS, buildRoomAoField } from "./roomAo";
 import {
@@ -45,7 +47,9 @@ const CEILING_NORMAL_SCALE: [number, number] = [1, 1];
 export default function GalleryRoom() {
   const { layout, exhibition } = useExhibition();
   const { theme } = exhibition;
-  const { room, walls, wallHeight, furniture } = layout;
+  const { room, walls, wallHeight, furniture, windows } = layout;
+  // Walls with windows are drawn as solid pieces around the openings (colliders/AO keep the whole wall).
+  const renderWalls = useMemo(() => splitWallsAroundOpenings(walls, windows ?? []), [walls, windows]);
 
   const floorTexture = findTexture(FLOOR_TEXTURES, theme.floorTextureId) ?? DEFAULT_FLOOR_TEXTURE;
   const wallTexture = findTexture(WALL_TEXTURES, theme.wallTextureId) ?? DEFAULT_WALL_TEXTURE;
@@ -95,14 +99,16 @@ export default function GalleryRoom() {
       />
 
       <TexturedWalls
-        walls={walls}
+        walls={renderWalls}
         texture={wallTexture}
         color={theme.wallTextureId ? undefined : theme.wallColor}
         roughness={theme.wallTextureId ? undefined : theme.wallRoughness}
         aoUniforms={aoUniforms}
       />
 
-      <Baseboards walls={walls} wallColor={theme.wallColor} aoUniforms={aoUniforms} />
+      <Baseboards walls={renderWalls} wallColor={theme.wallColor} aoUniforms={aoUniforms} />
+
+      {windows && windows.length > 0 && <WindowFixtures windows={windows} />}
     </group>
   );
 }
@@ -264,7 +270,14 @@ function TexturedWalls({
   }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, texture.macroVariation, aoUniforms]);
 
   const geometries = useMemo(
-    () => walls.map((w) => buildTexturedBoxGeometry(w.size, texture.tileSize)),
+    () =>
+      walls.map((w) =>
+        // Pieces of a wall cut around a window (id "wall:n") share world-anchored UVs so the scan runs on
+        // across the cut; whole walls keep their own UVs (unchanged look in rooms without windows).
+        w.id.includes(":")
+          ? buildWorldUvBoxGeometry(w.size, w.position, texture.tileSize)
+          : buildTexturedBoxGeometry(w.size, texture.tileSize)
+      ),
     [walls, texture.tileSize]
   );
 

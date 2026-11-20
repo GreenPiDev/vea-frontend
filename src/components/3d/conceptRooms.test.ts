@@ -14,8 +14,8 @@ import { SHOWCASE_ID } from "./showcaseExhibition";
 import { CEILING_TEXTURES, FLOOR_TEXTURES, WALL_TEXTURES, findTexture } from "./surfaceTextures";
 
 describe("concept rooms", () => {
-  it("are vitrin-2 … vitrin-5, registered once each next to vitrin-1", () => {
-    expect(CONCEPT_ROOM_SPECS.map((s) => s.id)).toEqual(["vitrin-2", "vitrin-3", "vitrin-4", "vitrin-5"]);
+  it("are vitrin-2 … vitrin-8, registered once each next to vitrin-1", () => {
+    expect(CONCEPT_ROOM_SPECS.map((s) => s.id)).toEqual(["vitrin-2", "vitrin-3", "vitrin-4", "vitrin-5", "vitrin-6", "vitrin-7", "vitrin-8"]);
     expect(SHOWCASE_ID).toBe("vitrin-1");
     const ids = EXHIBITIONS.map((e) => e.id);
     expect(new Set(ids).size).toBe(ids.length);

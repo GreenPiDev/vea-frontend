@@ -50,7 +50,7 @@ export const PICTURE_LIGHT_GAIN = 0.26;
 export const BOTTOM_LEVEL = 0.6;
 /** Relative irradiance at the canvas's side edges (centre = 1). */
 export const EDGE_LEVEL = 0.8;
-/** Width of the soft wall wash around the canvas (m). Covers the 7 cm frame border at ~90 %. */
+/** Width of the soft wall wash around the canvas (m). Covers the frame border (FRAME_BORDER) comfortably. */
 export const SPILL = 0.3;
 /**
  * Light stops this far past the painting's plane: the wall face is ARTWORK_WALL_GAP behind it, plus margin.

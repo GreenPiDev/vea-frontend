@@ -3,7 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
 import { FRAME_BORDER } from "./artworkShadow";
-import { applyWallTargetOutline, outlineGeometry, outlineMaterial, tickOutline } from "./artworkOutline";
+import { applyWallTargetOutline, outlineGeometry, outlineMaterial, setOutlineWallColor, tickOutline } from "./artworkOutline";
 import { pickWallTarget, wallBoxes, type WallTarget } from "./clickNavigationGeometry";
 import { useWallLabels } from "./useWallLabels";
 
@@ -24,7 +24,7 @@ export default function WalkArtworkPicker({
   onLabelClick?: (artworkId: string) => void;
 }) {
   const { camera, gl } = useThree();
-  const { layout } = useExhibition();
+  const { layout, exhibition } = useExhibition();
   const { artworks, rects: labelRects } = useWallLabels();
   const walls = useMemo(() => wallBoxes(layout), [layout]);
   const outlineRef = useRef<THREE.Mesh>(null);
@@ -32,6 +32,9 @@ export default function WalkArtworkPicker({
   const lastUpdate = useRef(0);
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const hasLabelClick = Boolean(onLabelClick);
+
+  const wallColor = exhibition.theme.wallColor;
+  useEffect(() => setOutlineWallColor(wallColor), [wallColor]);
 
   useFrame(({ clock }, dt) => {
     if (outlineRef.current) tickOutline(outlineRef.current, dt, clock.elapsedTime);

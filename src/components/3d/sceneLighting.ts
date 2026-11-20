@@ -60,3 +60,30 @@ export const CEILING_FILL_SCALE = 0.55;
  * ceiling the visitor actually sees.
  */
 export const ENV_CEILING_COLOR_SCALE = 0.4;
+
+// Daylight through windows (windowLight.ts). The panoramas are tonemapped LDR photos (sky ≈ 0.2–0.5 linear),
+// far darker than real daylight next to the room's lamps, so this gain brings a window's radiance up to it.
+// Calibrated against the ceiling fixtures (CEILING_LIGHT_FLOOR_IRRADIANCE = 1.1 under a lamp), vitrin-6
+// (three 1.6 × 2.4 m classic windows): floor 1 m from the windows ≈ 1.1, room centre ≈ 0.2, the wall facing
+// them ≈ 0.25; the reveals (right at the glass, ~π/2 × radiance) stay just under the bloom threshold.
+// Independent of the theme's ambient level — daylight doesn't care how dark the walls are painted.
+export const DAYLIGHT_WINDOW_GAIN = 20;
+/** Pulls the window light's colour toward grey (0 = the panorama's own sky/grass tint, 1 = neutral). */
+export const DAYLIGHT_DESATURATION = 0.4;
+/**
+ * Direct sun through a window at normal incidence (sunLight.ts). Real sun is ~5–10× the sky light; here a
+ * sunlit patch on a light floor lands around ~1.0 output (the ceiling fixtures' pool is ~0.35), and on a
+ * pale wall hit square-on just past the bloom threshold, so the brightest patches glow faintly like real ones.
+ */
+export const SUN_IRRADIANCE = 8;
+/** Average reflectance of a gallery room's surfaces for the daylight fill (daylightBounce.ts, split-flux). */
+export const DAYLIGHT_AVG_REFLECTANCE = 0.5;
+/** Share of the split-flux estimate actually added (furniture, frames and dark floors absorb more than ρ says). */
+export const DAYLIGHT_FILL_SCALE = 0.7;
+/**
+ * Cap on the daylight fill (luminance of the added ambient irradiance). A glass-walled room would otherwise
+ * flatten everything: with this cap the picture-lit canvases stay ~2.5–3× their wall even in vitrin-7.
+ */
+export const DAYLIGHT_FILL_MAX = 0.45;
+/** Window panels in the environment map: × the visible view's brightness, so reflections of a window read like the window. */
+export const ENV_WINDOW_INTENSITY = 1;

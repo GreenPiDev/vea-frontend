@@ -15,7 +15,7 @@ function groupByModel(furniture: NonNullable<Exhibition["furniture"]>): Furnitur
   const groups = new Map<string, FurnitureGroup>();
   for (const piece of furniture) {
     const group = groups.get(piece.modelUrl);
-    const placement = { position: piece.position, rotationY: piece.rotationY };
+    const placement = { position: piece.position, rotationY: piece.rotationY, round: piece.round };
     if (group) group.placements.push(placement);
     else groups.set(piece.modelUrl, { modelUrl: piece.modelUrl, scale: piece.scale, placements: [placement] });
   }

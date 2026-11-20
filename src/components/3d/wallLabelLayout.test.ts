@@ -127,6 +127,20 @@ describe("label placement", () => {
     expect(placeLabels([wide], room.walls, heights([wide])).get("a")!.side).toBe("below");
   });
 
+  it("moves to the other side of the frame when a window is on its right", () => {
+    const north = { ...base, position: [0, 1.5, -4 + WALL_CLEARANCE] as [number, number, number] };
+    const withWindow = buildRoomLayout([10, 8], 3.5, undefined, undefined, [
+      // Opening starts 20 cm right of the frame: no room for a 31 cm label.
+      { id: "w", wallId: "north", alongFraction: (frameHalf(north) + 0.2 + 0.5 + 5) / 10, width: 1, height: 2, sillHeight: 0.8, styleId: "modern" },
+    ]);
+    expect(placeLabels([north], withWindow.walls, heights([north]), withWindow.windows).get("a")!.side).toBe("left");
+    // A high clerestory above the painting doesn't count.
+    const high = buildRoomLayout([10, 8], 3.5, undefined, undefined, [
+      { id: "w", wallId: "north", alongFraction: (frameHalf(north) + 0.2 + 0.5 + 5) / 10, width: 1, height: 0.6, sillHeight: 2.6, styleId: "modern" },
+    ]);
+    expect(placeLabels([north], high.walls, heights([north]), high.windows).get("a")!.side).toBe("right");
+  });
+
   it("respects the visitor's right on every wall orientation", () => {
     const east = { ...base, position: [5 - WALL_CLEARANCE, 1.5, 3.6 - frameHalf(base)] as [number, number, number], rotationY: -Math.PI / 2 };
     // Facing the east wall (looking +x) the visitor's right is +z, toward the corner at z = 4: no room there.

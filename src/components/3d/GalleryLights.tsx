@@ -1,8 +1,17 @@
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
 import { ceilingLightsForLayout, setCeilingLights } from "./ceilingLight";
 import { HEMISPHERE_INTENSITY, ROOM_FILL_SCALE } from "./sceneLighting";
+import { setWindowLights, windowLightsFor } from "./windowLight";
+import { setSunLight, sunSetupFor } from "./sunLight";
+import { daylightFill, linearAlbedo, sunBounceLights } from "./daylightBounce";
+import { DEFAULT_OUTDOOR_PANORAMA } from "./outdoorPanoramas";
+import { artworkOccluder, removeSunOccluderSource, setSunOccluderSource } from "./sunOccluders";
+import { useWallLabels } from "./useWallLabels";
+import { FRAME_BORDER } from "./artworkShadow";
+import { canvasZ } from "./frameProfile";
+import { WALL_CLEARANCE, WALL_THICKNESS } from "./galleryLayout";
 
 // Fill strength is set in sceneLighting.ts (the scene's single exposure dial), not here.
 
@@ -63,6 +72,37 @@ export default function GalleryLights() {
     setCeilingLights(ceilingLightsForLayout(layout.ceilingSpots, theme.ambientIntensity), theme.spotColor);
   }, [layout.ceilingSpots, theme.ambientIntensity, theme.spotColor]);
 
+  // Daylight through the windows (windowLight.ts), coloured by the view outside. Always written — a room
+  // without windows clears the previous room's.
+  const panoramaId = exhibition.outdoor?.panoramaId ?? DEFAULT_OUTDOOR_PANORAMA.id;
+  const panoramaRotation = exhibition.outdoor?.rotationY ?? 0;
+  const daylight = useMemo(() => {
+    const windows = windowLightsFor(layout.windows ?? [], panoramaId, panoramaRotation);
+    // Sun patches through the same windows, from the panorama's sun (none when overcast).
+    const sun = sunSetupFor(layout.windows ?? [], panoramaId, panoramaRotation);
+    // The patches' floor bounce rides in the same area-light arrays, after the windows (daylightBounce.ts).
+    const bounce = sunBounceLights(windows, sun, layout, linearAlbedo(theme.floorColor));
+    const fill = daylightFill(windows, sun, layout);
+    return { areaLights: [...windows, ...bounce], sun, fill: new THREE.Color(...fill) };
+  }, [layout, panoramaId, panoramaRotation, theme.floorColor]);
+  useLayoutEffect(() => {
+    setWindowLights(daylight.areaLights);
+    setSunLight(daylight.sun);
+  }, [daylight]);
+
+  // Paintings throw sun shadows on their wall (sunOccluders.ts; furniture registers its own in
+  // FurnitureInstances.tsx). Packed after the furniture, and only those the sun can reach.
+  const { artworks } = useWallLabels();
+  useLayoutEffect(() => {
+    const wallGap = WALL_CLEARANCE - WALL_THICKNESS / 2;
+    const occluders = artworks.map((a) => {
+      const border = a.frame ? 2 * FRAME_BORDER : 0;
+      return artworkOccluder(a.position, a.rotationY, a.height * a.aspect + border, a.height + border, wallGap, Math.max(canvasZ(a.frame), 0));
+    });
+    setSunOccluderSource("artworks", occluders, 1);
+    return () => removeSunOccluderSource("artworks");
+  }, [artworks]);
+
   return (
     <>
       {/* Room's own default lighting — the only real light source besides each painting's spot */}
@@ -70,6 +110,8 @@ export default function GalleryLights() {
       <hemisphereLight
         args={[theme.hemisphereSkyColor, theme.hemisphereGroundColor, HEMISPHERE_INTENSITY * ROOM_FILL_SCALE]}
       />
+      {/* Daylight inter-reflected around the room (split-flux estimate, daylightBounce.ts) — zero without windows. */}
+      {daylight.fill.r + daylight.fill.g + daylight.fill.b > 0 && <ambientLight color={daylight.fill} intensity={1} />}
 
       {/* Emissive fixture discs — the visible source of the analytic ceiling light (ceilingLight.ts) */}
       {layout.ceilingSpots.map(([x, , z], i) => (

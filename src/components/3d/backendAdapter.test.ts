@@ -324,3 +324,87 @@ describe("groupByWallRun", () => {
     expect(groupByWallRun(links).size).toBe(0);
   });
 });
+
+describe("windows + outdoor view from the backend", () => {
+  const windows = [
+    { id: "w1", wallId: "north", alongFraction: 0.5, width: 2, height: 2, sillHeight: 1, styleId: "classic" as const },
+  ];
+  const template: ApiExhibitionTemplate = {
+    id: "template-w",
+    organizationId: "org-1",
+    name: "Pencereli",
+    roomShape: { kind: "rectangle", width: 10, depth: 8, windows, outdoor: { panoramaId: "seaside", rotationY: 1 } },
+    wallHeight: 4,
+    wallColor: "#112233",
+    floorColor: "#445566",
+    ceilingColor: "#778899",
+    theme: EXHIBITIONS[0].theme,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  it("builds a rectangle template's layout with its windows and passes the view through", () => {
+    const ex = adaptExhibitionTemplate(template);
+    expect(ex.customLayout?.windows).toHaveLength(1);
+    expect(ex.customLayout?.windows?.[0].wallId).toBe("north");
+    expect(ex.outdoor).toEqual({ panoramaId: "seaside", rotationY: 1 });
+  });
+
+  it("resolves a custom room's windows against its own wall runs", () => {
+    const cells = [0, 1, 2, 3].flatMap((x) => [0, 1, 2].map((z) => ({ x, z })));
+    const sceneConfig = {
+      kind: "custom" as const,
+      cells,
+      wallHeight: 3,
+      wallColor: "#ffffff",
+      floorColor: "#888888",
+      ceilingColor: "#ffffff",
+      spawn: { x: 1, z: 1, yaw: 0 },
+    };
+    const runs = wallRunsForSceneConfig(sceneConfig)!;
+    const result = adaptApiExhibition(
+      makeExhibition({
+        sceneConfig: { ...sceneConfig, windows: [{ ...windows[0], wallId: runs[0].id }], outdoor: { panoramaId: "city" } },
+      })
+    );
+    expect(result?.customLayout?.windows).toHaveLength(1);
+    expect(result?.outdoor?.panoramaId).toBe("city");
+  });
+
+  it("leaves rooms without windows closed", () => {
+    const ex = adaptExhibitionTemplate({ ...template, roomShape: { kind: "rectangle", width: 10, depth: 8 } });
+    expect(ex.customLayout?.windows ?? []).toHaveLength(0);
+    expect(ex.outdoor).toBeUndefined();
+  });
+});
+
+describe("artwork placement around windows", () => {
+  it("hangs a template room's artworks off its windows", () => {
+    const template: ApiExhibitionTemplate = {
+      id: "template-aw",
+      organizationId: "org-1",
+      name: "Pencereli",
+      roomShape: {
+        kind: "rectangle",
+        width: 10,
+        depth: 8,
+        windows: [{ id: "w1", wallId: "north", alongFraction: 0.5, width: 3, height: 2, sillHeight: 1, styleId: "modern" }],
+      },
+      wallHeight: 4,
+      wallColor: "#112233",
+      floorColor: "#445566",
+      ceilingColor: "#778899",
+      theme: EXHIBITIONS[0].theme,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    const result = adaptApiExhibition(
+      makeExhibition({
+        sceneConfig: { kind: "template", templateId: "template-aw" },
+        exhibitionTemplate: template,
+        // One work on the north wall: alone it would be centred — right on the window.
+        artworkLinks: [makeLink({ artwork: makeArtwork({ heightCm: 60, widthCm: 60 }) })],
+      })
+    );
+    const [art] = result!.artworks!;
+    expect(Math.abs(art.position[0])).toBeGreaterThan(1.5 + 0.3);
+  });
+});

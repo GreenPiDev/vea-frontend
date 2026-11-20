@@ -1,11 +1,14 @@
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import * as THREE from "three";
 import { useGLTF, Instance, Instances } from "@react-three/drei";
 import { applyCeilingLight } from "./ceilingLight";
+import { furnitureOccluder, removeSunOccluderSource, setSunOccluderSource } from "./sunOccluders";
 
 export interface FurniturePlacementTransform {
   position: [number, number, number];
   rotationY: number;
+  /** Round base — its sun shadow volume is a cylinder instead of a box (sunOccluders.ts). */
+  round?: boolean;
 }
 
 interface SubMeshPart {
@@ -87,6 +90,22 @@ interface FurnitureInstancesProps {
 export default function FurnitureInstances({ modelUrl, scale = 1, placements }: FurnitureInstancesProps) {
   const { scene } = useGLTF(modelUrl);
   const parts = useMemo(() => extractParts(scene), [scene]);
+
+  // Each placed copy casts a sun shadow from its model's real bounding box (sunOccluders.ts).
+  const localBox = useMemo(() => {
+    const box = new THREE.Box3();
+    for (const part of parts) {
+      part.geometry.computeBoundingBox();
+      if (part.geometry.boundingBox) box.union(part.geometry.boundingBox);
+    }
+    return box.applyMatrix4(new THREE.Matrix4().makeScale(scale, scale, scale));
+  }, [parts, scale]);
+  useLayoutEffect(() => {
+    if (localBox.isEmpty()) return;
+    const key = `furniture:${modelUrl}`;
+    setSunOccluderSource(key, placements.map((p) => furnitureOccluder(localBox, p.position, p.rotationY, p.round)), 0);
+    return () => removeSunOccluderSource(key);
+  }, [localBox, modelUrl, placements]);
 
   if (placements.length === 0) return null;
 

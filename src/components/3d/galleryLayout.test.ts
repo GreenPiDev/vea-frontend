@@ -5,6 +5,14 @@ import {
   EYE_HEIGHT,
   WALL_THICKNESS,
   placeArtworksAlongWall,
+  slideRange,
+  slideClamp,
+  clampAlongCenter,
+  freeWallIntervals,
+  itemsPerInterval,
+  WINDOW_ARTWORK_GAP,
+  ALONG_EDGE_MARGIN,
+  ALONG_NEIGHBOUR_GAP,
   minCeilingFor,
   MIN_CEILING_MARGIN,
   type WallRunGeometry,
@@ -228,5 +236,111 @@ describe('furniture colliders', () => {
 
     expect(collider.minX).toBeCloseTo(-0.9);
     expect(collider.maxX).toBeCloseTo(0.9);
+  });
+});
+
+describe('alongFraction (curator-dragged position)', () => {
+  const northWall: WallRunGeometry = { orientation: 'horizontal', start: -5, end: 5, fixed: -4, outward: -1 };
+  const eastWall: WallRunGeometry = { orientation: 'vertical', start: -4, end: 4, fixed: 5, outward: 1 };
+
+  it('places the artwork center at the fraction of the run, instead of its even slot', () => {
+    const [p] = placeArtworksAlongWall(northWall, 4, [{ aspect: 1, height: 1, alongFraction: 0.25 }]);
+    expect(p.position[0]).toBeCloseTo(-2.5);
+  });
+
+  it('uses the z axis on a vertical wall', () => {
+    const [p] = placeArtworksAlongWall(eastWall, 4, [{ aspect: 1, height: 1, alongFraction: 0.75 }]);
+    expect(p.position[2]).toBeCloseTo(2);
+  });
+
+  it('keeps unset items on their even slots next to a custom one', () => {
+    const [a, b] = placeArtworksAlongWall(northWall, 4, [
+      { aspect: 1, height: 1, alongFraction: 0.1 },
+      { aspect: 1, height: 1 },
+    ]);
+    expect(a.position[0]).toBeCloseTo(-4);
+    expect(b.position[0]).toBeCloseTo(2.5); // slot 1 of 2, untouched
+  });
+
+  it('never lets a wide artwork hang off the wall end', () => {
+    const [p] = placeArtworksAlongWall(northWall, 4, [{ aspect: 2, height: 1, alongFraction: 1 }]);
+    expect(p.position[0] + 1).toBeLessThanOrEqual(5 - ALONG_EDGE_MARGIN + 1e-9);
+  });
+
+  it('clampAlongCenter collapses to the midpoint when the artwork cannot fit', () => {
+    expect(clampAlongCenter(northWall, 20, 4)).toBe(0);
+  });
+});
+
+describe('slideRange', () => {
+  const wall: WallRunGeometry = { orientation: 'horizontal', start: 0, end: 10, fixed: 0, outward: -1 };
+  const widths = [1, 1, 1];
+  const centers = [2, 5, 8];
+
+  it('bounds a middle artwork by both neighbours plus the gap', () => {
+    const [lo, hi] = slideRange(wall, centers, widths, 1);
+    expect(lo).toBeCloseTo(2 + 0.5 + ALONG_NEIGHBOUR_GAP + 0.5);
+    expect(hi).toBeCloseTo(8 - 0.5 - ALONG_NEIGHBOUR_GAP - 0.5);
+  });
+
+  it('bounds the first/last artwork by the wall ends', () => {
+    expect(slideRange(wall, centers, widths, 0)[0]).toBeCloseTo(ALONG_EDGE_MARGIN + 0.5);
+    expect(slideRange(wall, centers, widths, 2)[1]).toBeCloseTo(10 - ALONG_EDGE_MARGIN - 0.5);
+  });
+
+  it('pins an already-squeezed artwork in place instead of returning an inverted range', () => {
+    expect(slideRange(wall, [2, 2.8, 8], widths, 1)[0]).toBeLessThanOrEqual(slideRange(wall, [2, 2.8, 8], widths, 1)[1]);
+  });
+});
+
+describe('artworks and windows', () => {
+  // 10 m wall along x (start −5 … end 5), room on the +z side.
+  const run: WallRunGeometry = { orientation: 'horizontal', start: -5, end: 5, fixed: -4, outward: -1 };
+  const windowSpan: [number, number] = [-1, 1]; // a 2 m window in the middle
+  const square = (n: number) => Array.from({ length: n }, () => ({ aspect: 1, height: 0.8 }));
+  const overlapsWindow = (center: number, width: number) =>
+    center + width / 2 > windowSpan[0] - WINDOW_ARTWORK_GAP + 1e-9 && center - width / 2 < windowSpan[1] + WINDOW_ARTWORK_GAP - 1e-9;
+
+  it('leaves the free wall on each side of a window', () => {
+    expect(freeWallIntervals(run)).toEqual([[-5, 5]]);
+    expect(freeWallIntervals(run, [windowSpan])).toEqual([
+      [-5, -1 - WINDOW_ARTWORK_GAP],
+      [1 + WINDOW_ARTWORK_GAP, 5],
+    ]);
+    // A window flush against the end leaves nothing there.
+    expect(freeWallIntervals(run, [[4, 5]])).toEqual([[-5, 4 - WINDOW_ARTWORK_GAP]]);
+  });
+
+  it('shares items out by free length, in wall order', () => {
+    expect(itemsPerInterval([[0, 3], [3, 4]], 4)).toEqual([3, 1]);
+    expect(itemsPerInterval([[0, 1], [1, 2]], 3).reduce((s, c) => s + c, 0)).toBe(3);
+  });
+
+  it.each([1, 2, 3, 4, 5])('keeps %i evenly placed artworks off the window', (n) => {
+    const placed = placeArtworksAlongWall(run, 4, square(n), [windowSpan]);
+    expect(placed).toHaveLength(n);
+    const xs = placed.map((p) => p.position[0]);
+    expect([...xs].sort((a, b) => a - b)).toEqual(xs); // wall order kept
+    for (const p of placed) expect(overlapsWindow(p.position[0], p.height)).toBe(false);
+  });
+
+  it('nudges a dragged artwork off the window to the nearest free side', () => {
+    const [onLeftHalf] = placeArtworksAlongWall(run, 4, [{ aspect: 1, height: 0.8, alongFraction: 0.47 }], [windowSpan]);
+    expect(onLeftHalf.position[0]).toBeCloseTo(-1 - WINDOW_ARTWORK_GAP - 0.4);
+    expect(clampAlongCenter(run, 0.8, 0.6, [windowSpan])).toBeCloseTo(1 + WINDOW_ARTWORK_GAP + 0.4);
+  });
+
+  it('hops a dragged artwork over the window, but never past a neighbour', () => {
+    const widths = [0.8, 0.8];
+    // Work 0 on the left of the window, work 1 far right: dragging work 0 to x = 2 lands it right of the window.
+    expect(slideClamp(run, [-3, 4], widths, 0, 2, [windowSpan])).toBeCloseTo(2);
+    // Pointer over the glass: the nearer free edge.
+    expect(slideClamp(run, [-3, 4], widths, 0, 0.2, [windowSpan])).toBeCloseTo(1 + WINDOW_ARTWORK_GAP + 0.4);
+    // A neighbour right after the window leaves no room there: it stays on the left side.
+    expect(slideClamp(run, [-3, 2], widths, 0, 2, [windowSpan])).toBeCloseTo(-1 - WINDOW_ARTWORK_GAP - 0.4);
+  });
+
+  it('keeps every artwork when the wall is all glass', () => {
+    expect(placeArtworksAlongWall(run, 4, square(2), [[-5, 5]])).toHaveLength(2);
   });
 });

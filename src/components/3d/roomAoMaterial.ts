@@ -13,6 +13,8 @@ import { CEILING_AO, DEFAULT_AO_FIELD_OPTIONS, FURNITURE_CONTACT, FURNITURE_FIEL
 import { EYE_HEIGHT, WALL_THICKNESS } from "./galleryLayout";
 import { CEILING_FILL_SCALE } from "./sceneLighting";
 import { CEILING_LIGHT_FRAGMENT_DECL, ceilingLightApply, ceilingLightUniforms } from "./ceilingLight";
+import { windowLightUniforms } from "./windowLight";
+import { sunLightUniforms } from "./sunLight";
 import {
   CEILING_MACRO_VARIATION,
   DEFAULT_MACRO_VARIATION,
@@ -167,7 +169,7 @@ export const ENVMAP_PHYSICAL_PARS = THREE.ShaderChunk.envmap_physical_pars_fragm
 
 function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramParametersWithUniforms) {
   const data = this.userData as { roomAoUniforms: RoomAoUniforms; macroVariation: { value: number } };
-  Object.assign(shader.uniforms, data.roomAoUniforms, ceilingLightUniforms, { uMacroVariation: data.macroVariation });
+  Object.assign(shader.uniforms, data.roomAoUniforms, ceilingLightUniforms, windowLightUniforms, sunLightUniforms, { uMacroVariation: data.macroVariation });
   shader.vertexShader = shader.vertexShader
     .replace("#include <common>", `#include <common>\n${VERTEX_DECL}`)
     .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}`);

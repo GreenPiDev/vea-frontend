@@ -8,6 +8,7 @@ import { WEAVE_TILE_METERS, getCanvasWeaveNormalMap } from "./canvasWeave";
 import { cropToUvTransform, measureImageCrop } from "./artworkImageCrop";
 import WallLabel from "./WallLabel";
 import { LABEL_WALL_Z, type LabelLayout, type LabelPlacement } from "./wallLabelLayout";
+import { applyDaylight } from "./ceilingLight";
 
 // Paint surface: a painting isn't a matte print. A thin varnish layer gives it a soft sheen the picture
 // light can catch (0.65 read like paper), and the shared linen weave normal map breaks that sheen up the
@@ -61,21 +62,27 @@ export default function Artwork({
   }, [width, data.height]);
   useEffect(() => () => canvasGeometry.dispose(), [canvasGeometry]);
 
+  // Receives window daylight and sun patches, not the ceiling fixtures (applyDaylight, ceilingLight.ts).
+  const canvasMaterial = useMemo(() => {
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      roughness: CANVAS_ROUGHNESS,
+      metalness: 0,
+      normalMap: getCanvasWeaveNormalMap(),
+      normalScale: CANVAS_NORMAL_SCALE,
+    });
+    applyDaylight(material);
+    return material;
+  }, [texture]);
+  useEffect(() => () => canvasMaterial.dispose(), [canvasMaterial]);
+
   return (
     <group position={data.position} rotation={[0, data.rotationY, 0]}>
       {/* Frame — skipped when the artist marked their uploaded image as already framed (see artworks.ts's `frame` doc comment). "modernBlack" is the default for unframed backend artworks, all styles now render as real photo-scanned material. */}
       {data.frame ? <FrameMesh style={data.frame} canvasWidth={width} canvasHeight={data.height} /> : null}
 
       {/* Canvas — in the frame's rebate, 1.4 cm behind its face (frameProfile.ts) */}
-      <mesh position={[0, 0, canvasZ(data.frame)]} geometry={canvasGeometry}>
-        <meshStandardMaterial
-          map={texture}
-          roughness={CANVAS_ROUGHNESS}
-          metalness={0}
-          normalMap={getCanvasWeaveNormalMap()}
-          normalScale={CANVAS_NORMAL_SCALE}
-        />
-      </mesh>
+      <mesh position={[0, 0, canvasZ(data.frame)]} geometry={canvasGeometry} material={canvasMaterial} />
 
       {/* Wall label — its back flat on the wall face. */}
       {label ? (
@@ -121,6 +128,7 @@ function FrameMesh({ style, canvasWidth, canvasHeight }: { style: FrameStyle; ca
       roughness: frameStyle.roughness,
       color: frameStyle.color ?? "#ffffff",
     });
+    applyDaylight(created);
     frameMaterialCache.set(style, created);
     return created;
   }, [style, map, roughnessMap, metalnessMap, frameStyle.metalness, frameStyle.roughness, frameStyle.color]);

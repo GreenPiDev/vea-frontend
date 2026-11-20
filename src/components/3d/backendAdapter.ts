@@ -14,7 +14,8 @@ import type {
   ApiSceneConfig,
   CustomSceneConfig,
 } from "../../lib/api/domains/exhibitions";
-import type { ApiExhibitionTemplate, FurniturePlacement } from "../../lib/api/domains/exhibitionTemplates";
+import type { ApiExhibitionTemplate, FurniturePlacement, WindowPlacementData } from "../../lib/api/domains/exhibitionTemplates";
+import { openingSpansOnWall, type WindowOpening } from "./windowOpenings";
 import type { Artwork } from "./artworks";
 import { EXHIBITIONS, type Exhibition, type ExhibitionTheme } from "./exhibitions";
 import type { FurnitureDef } from "./furniture";
@@ -66,6 +67,7 @@ function resolveFurniture(
       position: [placement.x, 0, placement.z],
       rotationY: placement.rotationY,
       scale: def.scale,
+      round: def.round,
     });
     if (def.isSeating) {
       seats.push({
@@ -144,7 +146,9 @@ function placeAll(
   runs: (WallRunGeometry & { id: string })[],
   wallHeight: number,
   byWall: Map<string, ApiExhibitionArtwork[]>,
-  exhibitionId: string
+  exhibitionId: string,
+  /** The room's resolved windows — artworks are kept off them (placeArtworksAlongWall's blocked spans). */
+  openings: WindowOpening[] = []
 ): Artwork[] {
   const artworks: Artwork[] = [];
   for (const run of runs) {
@@ -157,7 +161,9 @@ function placeAll(
         aspect: link.artwork.widthCm / link.artwork.heightCm,
         height: link.artwork.heightCm / 100,
         heightYOverride: link.positionData?.heightY,
-      }))
+        alongFraction: link.positionData?.alongFraction,
+      })),
+      openingSpansOnWall(run.id, openings)
     );
     links.forEach((link, i) => artworks.push(toRenderableArtwork(link, exhibitionId, placements[i])));
   }
@@ -247,6 +253,20 @@ export interface BlueprintLayout {
   spawn: { x: number; z: number; rotationDeg: number };
   /** Curator-placed furniture (template-only, same "furniture?" field as roomShape — see TemplateRoomShape), already resolved against a furniture catalog. Empty when the room has none or the catalog hasn't loaded yet. */
   furniture: BlueprintFurniturePiece[];
+  /** The room's resolved windows (only their along-wall spans matter on a plan). */
+  windows: WindowOpening[];
+}
+
+/** A plan never clamps a window's height, only its along-wall size — any tall-enough wall height will do. */
+const BLUEPRINT_WALL_HEIGHT = 20;
+
+/** Resolved window openings of a backend template (artworks are placed around them). */
+export function templateOpenings(template: ApiExhibitionTemplate): WindowOpening[] {
+  const { roomShape } = template;
+  if (!roomShape.windows?.length) return [];
+  return roomShape.kind === "rectangle"
+    ? buildRoomLayout([roomShape.width, roomShape.depth], template.wallHeight, undefined, undefined, roomShape.windows).windows ?? []
+    : buildCustomRoomLayout(roomShape.cells, template.wallHeight, roomShape.spawn, undefined, undefined, roomShape.windows).layout.windows ?? [];
 }
 
 /** Resolves a template's stored furniture placements against a fetched catalog into just enough to draw a top-down icon — the floor-plan-sketch counterpart to resolveFurniture's collider/render-ready output above. An unknown furnitureId is silently dropped, same as resolveFurniture. */
@@ -281,9 +301,13 @@ function resolveBlueprintFurniture(
 // floor-plan preview of the *in-progress*, not-yet-saved room shape the curator
 // is currently editing — there's no ApiSceneConfig/ApiExhibitionTemplate to feed
 // blueprintForSceneConfig until that first save round-trips.
-export function rectangleBlueprint(roomSize: [number, number], furniture: BlueprintFurniturePiece[] = []): BlueprintLayout {
+export function rectangleBlueprint(
+  roomSize: [number, number],
+  furniture: BlueprintFurniturePiece[] = [],
+  windowPlacements?: WindowPlacementData[]
+): BlueprintLayout {
   const [W, D] = roomSize;
-  const { playerStart, playerStartYaw } = buildRoomLayout(roomSize, 1);
+  const { playerStart, playerStartYaw, windows } = buildRoomLayout(roomSize, BLUEPRINT_WALL_HEIGHT, undefined, undefined, windowPlacements);
   return {
     cells: null,
     bounds: { minX: -W / 2, maxX: W / 2, minZ: -D / 2, maxZ: D / 2 },
@@ -293,6 +317,7 @@ export function rectangleBlueprint(roomSize: [number, number], furniture: Bluepr
     // sense, hence the negation — see SpawnOverride's yaw doc comment.
     spawn: { x: playerStart[0], z: playerStart[2], rotationDeg: -(playerStartYaw * 180) / Math.PI },
     furniture,
+    windows: windows ?? [],
   };
 }
 
@@ -300,9 +325,10 @@ export function customBlueprint(
   cells: GridCell[],
   wallHeight: number,
   spawn: { x: number; z: number; yaw: number },
-  furniture: BlueprintFurniturePiece[] = []
+  furniture: BlueprintFurniturePiece[] = [],
+  windowPlacements?: WindowPlacementData[]
 ): BlueprintLayout {
-  const { layout, wallRuns } = buildCustomRoomLayout(cells, wallHeight, spawn);
+  const { layout, wallRuns } = buildCustomRoomLayout(cells, Math.max(wallHeight, BLUEPRINT_WALL_HEIGHT), spawn, undefined, undefined, windowPlacements);
   const [cx, cz] = layout.room.center;
   const [W, D] = layout.room.size;
   return {
@@ -315,6 +341,7 @@ export function customBlueprint(
       rotationDeg: -(layout.playerStartYaw * 180) / Math.PI,
     },
     furniture,
+    windows: layout.windows ?? [],
   };
 }
 
@@ -329,11 +356,12 @@ export function blueprintForSceneConfig(
     if (staticTemplate?.roomSize) return rectangleBlueprint(staticTemplate.roomSize);
     if (!resolvedTemplate) return null;
     const furniture = resolveBlueprintFurniture(resolvedTemplate.roomShape.furniture, furnitureCatalog);
-    return resolvedTemplate.roomShape.kind === "rectangle"
-      ? rectangleBlueprint([resolvedTemplate.roomShape.width, resolvedTemplate.roomShape.depth], furniture)
-      : customBlueprint(resolvedTemplate.roomShape.cells, resolvedTemplate.wallHeight, resolvedTemplate.roomShape.spawn, furniture);
+    const { roomShape } = resolvedTemplate;
+    return roomShape.kind === "rectangle"
+      ? rectangleBlueprint([roomShape.width, roomShape.depth], furniture, roomShape.windows)
+      : customBlueprint(roomShape.cells, resolvedTemplate.wallHeight, roomShape.spawn, furniture, roomShape.windows);
   }
-  return customBlueprint(config.cells, config.wallHeight, config.spawn);
+  return customBlueprint(config.cells, config.wallHeight, config.spawn, [], config.windows);
 }
 
 /**
@@ -370,7 +398,7 @@ export function adaptApiExhibition(exhibition: ApiExhibition, furnitureCatalog: 
     return exhibitionFromBackendTemplate(
       backendTemplate,
       { id: exhibition.id, name: exhibition.title },
-      placeAll(runs, backendTemplate.wallHeight, byWall, exhibition.id),
+      placeAll(runs, backendTemplate.wallHeight, byWall, exhibition.id, templateOpenings(backendTemplate)),
       furnitureCatalog
     );
   }
@@ -379,7 +407,9 @@ export function adaptApiExhibition(exhibition: ApiExhibition, furnitureCatalog: 
     config.cells,
     config.wallHeight,
     config.spawn,
-    config.ceilingLights
+    config.ceilingLights,
+    undefined,
+    config.windows
   );
   return {
     id: exhibition.id,
@@ -388,7 +418,8 @@ export function adaptApiExhibition(exhibition: ApiExhibition, furnitureCatalog: 
     wallHeight: config.wallHeight,
     custom: true,
     customLayout: layout,
-    artworks: placeAll(wallRuns, config.wallHeight, byWall, exhibition.id),
+    outdoor: config.outdoor,
+    artworks: placeAll(wallRuns, config.wallHeight, byWall, exhibition.id, layout.windows),
     theme: buildCustomTheme(config),
   };
 }
@@ -410,7 +441,9 @@ function exhibitionFromBackendTemplate(
     artworks,
     furniture: renderList,
     seats,
+    outdoor: backendTemplate.roomShape.outdoor,
   };
+  const windows = backendTemplate.roomShape.windows;
   if (backendTemplate.roomShape.kind === "rectangle") {
     const { width, depth, ceilingLights } = backendTemplate.roomShape;
     // Rectangle templates normally render via roomSize alone (Scene.tsx computes
@@ -420,8 +453,8 @@ function exhibitionFromBackendTemplate(
     // `customLayout` field a custom-shaped room already uses (Scene.tsx's
     // `customLayout ?? buildRoomLayout(...)` fallback picks it up with no further
     // changes needed).
-    if (ceilingLights?.length || colliderInputs.length) {
-      const layout = buildRoomLayout([width, depth], backendTemplate.wallHeight, ceilingLights, colliderInputs);
+    if (ceilingLights?.length || colliderInputs.length || windows?.length) {
+      const layout = buildRoomLayout([width, depth], backendTemplate.wallHeight, ceilingLights, colliderInputs, windows);
       return { ...base, customLayout: layout };
     }
     return { ...base, roomSize: [width, depth] };
@@ -431,7 +464,8 @@ function exhibitionFromBackendTemplate(
     backendTemplate.wallHeight,
     backendTemplate.roomShape.spawn,
     backendTemplate.roomShape.ceilingLights,
-    colliderInputs
+    colliderInputs,
+    windows
   );
   return { ...base, custom: true, customLayout: layout };
 }

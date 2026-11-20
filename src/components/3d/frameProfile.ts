@@ -35,8 +35,17 @@ export function canvasZ(frame: FrameStyle | null | undefined): number {
 /** Profile points (r, z), from the sight edge across the face to the outer edge (front part only). */
 export type ProfilePoints = [number, number][];
 
-const B = FRAME_BORDER;
+/** The moulding profiles below are drawn at this face width; `scaleProfile` fits them to FRAME_BORDER, so
+ * the frame width can be changed in one place (artworkShadow.ts) without redrawing every profile. */
+const PROFILE_DESIGN_BORDER = 0.07;
+const B = PROFILE_DESIGN_BORDER;
 const D = FRAME_DEPTH;
+
+/** Scales a profile's across-the-face coordinate (r) from the design width to FRAME_BORDER; depth (z) is kept. */
+function scaleProfile(points: ProfilePoints): ProfilePoints {
+  const k = FRAME_BORDER / PROFILE_DESIGN_BORDER;
+  return points.map(([r, z]) => [r * k, z]);
+}
 
 /** Samples a circular arc (centre cr,cz, radius rad) from angle a0 to a1, `n` segments, excluding the start. */
 function arc(cr: number, cz: number, rad: number, a0: number, a1: number, n: number): ProfilePoints {
@@ -80,9 +89,9 @@ const MODERN_PROFILE: ProfilePoints = [
 ];
 
 export const FRAME_PROFILES: Record<FrameStyle, ProfilePoints> = {
-  gold: GOLD_PROFILE,
-  walnut: WALNUT_PROFILE,
-  modernBlack: MODERN_PROFILE,
+  gold: scaleProfile(GOLD_PROFILE),
+  walnut: scaleProfile(WALNUT_PROFILE),
+  modernBlack: scaleProfile(MODERN_PROFILE),
 };
 
 /** Full closed loop: front profile, outer side down to the back, back across, inner rebate wall up. */
@@ -90,7 +99,7 @@ export function closedProfile(front: ProfilePoints): ProfilePoints {
   const last = front[front.length - 1];
   const first = front[0];
   const loop: ProfilePoints = front.map(([r, z]) => [r, z]);
-  if (last[0] !== B || last[1] !== -D) loop.push([B, -D]);
+  if (last[0] !== FRAME_BORDER || last[1] !== -D) loop.push([FRAME_BORDER, -D]);
   loop.push([0, -D]);
   if (first[1] !== -D) loop.push([0, first[1]]); // closes back onto the first point
   return loop;
@@ -117,10 +126,10 @@ export function buildFrameGeometry(
   front: ProfilePoints,
   tileSize: number
 ): THREE.BufferGeometry {
-  // Profile r is measured from the outer edge inward-shifted so the outer edge lands at canvas + B.
+  // Profile r is measured from the outer edge inward-shifted so the outer edge lands at canvas + FRAME_BORDER.
   const hw = canvasW / 2 - SIGHT_OVERLAP;
   const hh = canvasH / 2 - SIGHT_OVERLAP;
-  const rScale = (B + SIGHT_OVERLAP) / B; // stretch the profile over the slightly wider band
+  const rScale = (FRAME_BORDER + SIGHT_OVERLAP) / FRAME_BORDER; // stretch the profile over the slightly wider band
   const loop = closedProfile(front).map(([r, z]) => [r * rScale, z] as [number, number]);
   const n = loop.length;
 

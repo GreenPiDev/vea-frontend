@@ -32,3 +32,31 @@ export function buildTexturedBoxGeometry(
   uv.needsUpdate = true;
   return geo;
 }
+
+/**
+ * BoxGeometry whose UVs come from world coordinates (u/v = world metres / tileSize, projected along each
+ * face's axis) — for the pieces a wall is cut into around a window: neighbouring pieces then continue the
+ * same texture across the cut instead of each restarting at 0, so the scan doesn't jump at the opening.
+ */
+export function buildWorldUvBoxGeometry(
+  size: [number, number, number],
+  center: [number, number, number],
+  tileSize: number
+): THREE.BoxGeometry {
+  const geo = new THREE.BoxGeometry(...size);
+  const pos = geo.attributes.position;
+  const nrm = geo.attributes.normal;
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) + center[0];
+    const y = pos.getY(i) + center[1];
+    const z = pos.getZ(i) + center[2];
+    const nx = Math.abs(nrm.getX(i));
+    const ny = Math.abs(nrm.getY(i));
+    if (nx > 0.5) uv.setXY(i, z / tileSize, y / tileSize);
+    else if (ny > 0.5) uv.setXY(i, x / tileSize, z / tileSize);
+    else uv.setXY(i, x / tileSize, y / tileSize);
+  }
+  uv.needsUpdate = true;
+  return geo;
+}

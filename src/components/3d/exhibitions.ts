@@ -62,9 +62,11 @@ export interface Exhibition {
   /** Explicit hung collection for a custom exhibition; overrides the ARTWORKS-by-id lookup. */
   artworks?: Artwork[];
   /** Curator-placed furniture (template-only for now, see backendAdapter.ts's exhibitionFromBackendTemplate) — rendered by GalleryFurniture.tsx, already resolved against 3d/furniture.ts's FURNITURE_CATALOG. */
-  furniture?: { modelUrl: string; position: [number, number, number]; rotationY: number; scale?: number }[];
+  furniture?: { modelUrl: string; position: [number, number, number]; rotationY: number; scale?: number; round?: boolean }[];
   /** Sittable furniture spots (isSeating furniture pieces), see seating.ts. */
   seats?: SeatSpot[];
+  /** View through the windows (outdoorPanoramas.ts id). Only used when the layout has windows; defaults to the garden. */
+  outdoor?: { panoramaId: string; /** Turns the view (and its sun) around the vertical axis, radians. */ rotationY?: number };
   /** Original builder inputs, kept so the exhibition can be reopened and edited. */
   builderSource?: CustomExhibitionSource;
 }
@@ -164,6 +166,6 @@ export const EXHIBITIONS: Exhibition[] = [
   },
   // Adım 13 showcase room (/exhibition/vitrin-1) — see showcaseExhibition.ts.
   SHOWCASE_EXHIBITION,
-  // Concept sibling rooms (/exhibition/vitrin-2 … vitrin-5) — see conceptRooms.ts.
+  // Concept sibling rooms (/exhibition/vitrin-2 … vitrin-7, 6 and 7 have windows) — see conceptRooms.ts.
   ...CONCEPT_EXHIBITIONS,
 ];

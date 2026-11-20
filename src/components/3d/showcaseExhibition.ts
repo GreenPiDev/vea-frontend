@@ -147,6 +147,6 @@ export const SHOWCASE_EXHIBITION: Exhibition = {
     SHOWCASE_FURNITURE_FOOTPRINTS
   ),
   artworks: SHOWCASE_ARTWORKS,
-  furniture: FURNITURE.map((f) => ({ modelUrl: f.modelUrl, position: [f.x, 0, f.z], rotationY: f.rotationY, scale: 1 })),
+  furniture: FURNITURE.map((f) => ({ modelUrl: f.modelUrl, position: [f.x, 0, f.z], rotationY: f.rotationY, scale: 1, round: f.round })),
   seats: SEATS,
 };

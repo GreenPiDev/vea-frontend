@@ -4,6 +4,8 @@
 // collision and ceiling lighting all stay derived from one place instead of
 // being hand-authored per room.
 
+import { resolveWindowOpenings, type WindowOpening, type WindowPlacement } from "./windowOpenings";
+
 export const WALL_THICKNESS = 0.3;
 export const EYE_HEIGHT = 1.7;
 export const PLAYER_RADIUS = 0.4;
@@ -46,6 +48,8 @@ export interface RoomLayout {
   playerStartYaw: number;
   /** Exact (rotated) furniture footprints — `colliders` only has their conservative AABBs. Used for floor contact shadows (roomAo.ts). */
   furniture?: PlacedFurnitureInput[];
+  /** Resolved window openings (windowOpenings.ts). `walls`/`colliders` stay uncut — GalleryRoom cuts the rendered walls. */
+  windows?: WindowOpening[];
 }
 
 /** A curator-placed ceiling fixture position, room-local meters — same coordinate space as GridCell/SpawnOverride. */
@@ -84,7 +88,8 @@ export function buildRoomLayout(
   size: [number, number],
   wallHeight: number,
   ceilingLights?: CeilingLightPoint[],
-  furniture?: PlacedFurnitureInput[]
+  furniture?: PlacedFurnitureInput[],
+  windows?: WindowPlacement[]
 ): RoomLayout {
   const [W, D] = size;
   const H = wallHeight;
@@ -134,6 +139,7 @@ export function buildRoomLayout(
     playerStart: [0, EYE_HEIGHT, D / 2 - 2],
     playerStartYaw: 0,
     furniture,
+    windows: resolveWindowOpenings(walls, windows, [0, 0]),
   };
 }
 
@@ -215,7 +221,8 @@ export function buildCustomRoomLayout(
   wallHeight: number,
   spawnOverride?: SpawnOverride,
   ceilingLights?: CeilingLightPoint[],
-  furniture?: PlacedFurnitureInput[]
+  furniture?: PlacedFurnitureInput[],
+  windows?: WindowPlacement[]
 ): { layout: RoomLayout; wallRuns: CustomWallRun[] } {
   const occupied = new Set(cells.map((c) => `${c.x},${c.z}`));
   const edges: RawEdge[] = [];
@@ -325,6 +332,8 @@ export function buildCustomRoomLayout(
     playerStart: [start.x + 0.5, EYE_HEIGHT, start.z + 0.5],
     playerStartYaw: spawnOverride?.yaw ?? 0,
     furniture,
+    // Resolved against the runs (not `walls`): they carry the `outward` side the windows face away from.
+    windows: resolveWindowOpenings(wallRuns, windows, [centerX, centerZ]),
   };
 
   return { layout, wallRuns };
@@ -363,6 +372,8 @@ export interface WallPlacementInput {
   height: number;
   /** Curator-set hang-center height override, in meters from the floor — replaces the FLOOR_CLEARANCE formula below when set (still clamped to the ceiling margin). */
   heightYOverride?: number;
+  /** Curator-set position along the wall run, 0..1 of the run's length, for the artwork's *center* — replaces its even-slot center when set (still kept clear of the wall's ends). */
+  alongFraction?: number;
 }
 
 export interface WallPlacement {
@@ -374,30 +385,160 @@ export interface WallPlacement {
   height: number;
 }
 
+/** Minimum free wall between a run's end and an artwork's edge (matches the room the even-slot layout always leaves). */
+export const ALONG_EDGE_MARGIN = WALL_CLEARANCE + 0.2;
+/** Minimum free wall between two neighbouring artworks when the curator slides them. */
+export const ALONG_NEIGHBOUR_GAP = 0.3;
+
+/** Free wall kept between a window opening and an artwork's edge (the window's casing + breathing room). */
+export const WINDOW_ARTWORK_GAP = 0.35;
+
+/** A blocked [from, to] span along a run (same axis as run.start/end) — a window opening, see windowOpenings.ts. */
+export type WallSpan = [number, number];
+
 /**
- * Places N artworks evenly spaced along one wall run: the run is split into
- * N equal-length slots and each artwork is centered within its own slot,
- * width-fit (aspect preserved) to that slot's available space. With a single
- * item this reduces exactly to "centered on the whole run" — the original
- * one-artwork-per-wall behavior.
+ * The stretches of a run left free for artworks once window openings (each grown by WINDOW_ARTWORK_GAP) are
+ * taken out, in wall order. Without windows it's the whole run, unchanged.
+ */
+export function freeWallIntervals(run: WallRunGeometry, blocked: WallSpan[] = []): WallSpan[] {
+  if (!blocked.length) return [[run.start, run.end]];
+  const out: WallSpan[] = [];
+  let cursor = run.start;
+  for (const [a, b] of [...blocked].sort((p, q) => p[0] - q[0])) {
+    const from = a - WINDOW_ARTWORK_GAP;
+    if (from > cursor) out.push([cursor, from]);
+    cursor = Math.max(cursor, b + WINDOW_ARTWORK_GAP);
+  }
+  if (run.end > cursor) out.push([cursor, run.end]);
+  return out;
+}
+
+/**
+ * Where the centre of an artwork of `width` may sit: per free interval, kept ALONG_EDGE_MARGIN off the run's
+ * real ends (window sides already carry WINDOW_ARTWORK_GAP). Intervals too short for it are left out.
+ */
+function centerRanges(run: WallRunGeometry, width: number, blocked: WallSpan[]): WallSpan[] {
+  const out: WallSpan[] = [];
+  for (const [a, b] of freeWallIntervals(run, blocked)) {
+    const lo = a + (a <= run.start ? ALONG_EDGE_MARGIN : 0) + width / 2;
+    const hi = b - (b >= run.end ? ALONG_EDGE_MARGIN : 0) - width / 2;
+    if (lo <= hi) out.push([lo, hi]);
+  }
+  return out;
+}
+
+/** The point of `ranges` nearest to `value` (null when there are none). */
+function nearestIn(ranges: WallSpan[], value: number): number | null {
+  let best: number | null = null;
+  for (const [lo, hi] of ranges) {
+    const v = Math.min(hi, Math.max(lo, value));
+    if (best === null || Math.abs(v - value) < Math.abs(best - value)) best = v;
+  }
+  return best;
+}
+
+/**
+ * Keeps an artwork of `width` fully on the run (with edge margin) and off any window: the nearest free spot.
+ * A run with no room for it at all collapses to its midpoint.
+ */
+export function clampAlongCenter(run: WallRunGeometry, width: number, center: number, blocked: WallSpan[] = []): number {
+  return nearestIn(centerRanges(run, width, blocked), center) ?? (run.start + run.end) / 2;
+}
+
+/**
+ * The [min, max] coordinate (same axis as run.start/end) the artwork at
+ * `index` may be centered on while sliding: it can't leave the wall or
+ * cross/touch its neighbours, so a drag never reorders or overlaps works.
+ * `centers`/`widths` are in wall order (the `order` column).
+ */
+export function slideRange(
+  run: WallRunGeometry,
+  centers: number[],
+  widths: number[],
+  index: number
+): [number, number] {
+  const w = widths[index];
+  let lo = run.start + ALONG_EDGE_MARGIN + w / 2;
+  let hi = run.end - ALONG_EDGE_MARGIN - w / 2;
+  if (index > 0) lo = Math.max(lo, centers[index - 1] + widths[index - 1] / 2 + ALONG_NEIGHBOUR_GAP + w / 2);
+  if (index < centers.length - 1) hi = Math.min(hi, centers[index + 1] - widths[index + 1] / 2 - ALONG_NEIGHBOUR_GAP - w / 2);
+  if (lo > hi) return [centers[index], centers[index]];
+  return [lo, hi];
+}
+
+/**
+ * Where a dragged artwork lands for a pointer at `desired`: between its neighbours (slideRange) and off every
+ * window — the nearest allowed spot, so dragging past a window jumps the work to its other side (when it fits
+ * there before the next neighbour) instead of letting it cover the glass.
+ */
+export function slideClamp(
+  run: WallRunGeometry,
+  centers: number[],
+  widths: number[],
+  index: number,
+  desired: number,
+  blocked: WallSpan[] = []
+): number {
+  const [nlo, nhi] = slideRange(run, centers, widths, index);
+  const ranges = centerRanges(run, widths[index], blocked)
+    .map(([lo, hi]): WallSpan => [Math.max(lo, nlo), Math.min(hi, nhi)])
+    .filter(([lo, hi]) => lo <= hi);
+  return nearestIn(ranges, desired) ?? centers[index];
+}
+
+/** How many of `count` items each interval gets: proportional to its length (largest remainder), in wall order. */
+export function itemsPerInterval(intervals: WallSpan[], count: number): number[] {
+  const lengths = intervals.map(([a, b]) => b - a);
+  const total = lengths.reduce((s, l) => s + l, 0);
+  if (total <= 0) return intervals.map(() => 0);
+  const raw = lengths.map((l) => (count * l) / total);
+  const counts = raw.map(Math.floor);
+  let left = count - counts.reduce((s, c) => s + c, 0);
+  const order = raw.map((r, i) => [r - Math.floor(r), i] as const).sort((p, q) => q[0] - p[0]);
+  for (const [, i] of order) {
+    if (left <= 0) break;
+    counts[i]++;
+    left--;
+  }
+  return counts;
+}
+
+/**
+ * Places N artworks along one wall run. Without windows: the run is split into N equal-length slots and each
+ * artwork is centered within its own slot, width-fit (aspect preserved) to that slot's available space — with
+ * a single item this reduces exactly to "centered on the whole run". With windows (`blocked` spans), the same
+ * even split happens per free stretch of wall (freeWallIntervals), the items shared out by stretch length, so
+ * no artwork lands on a window. Curator-dragged items (alongFraction) keep their spot, nudged off windows.
  */
 export function placeArtworksAlongWall(
   run: WallRunGeometry,
   wallHeight: number,
-  items: WallPlacementInput[]
+  items: WallPlacementInput[],
+  blocked: WallSpan[] = []
 ): WallPlacement[] {
   if (items.length === 0) return [];
 
   const runLength = run.end - run.start;
-  const slotLength = runLength / items.length;
   const interior = -run.outward;
+  let intervals = freeWallIntervals(run, blocked);
+  // A wall that is nearly all glass: fall back to the whole run rather than dropping its artworks.
+  if (!intervals.length) intervals = [[run.start, run.end]];
+  const counts = itemsPerInterval(intervals, items.length);
+  const slots: { center: number; length: number }[] = [];
+  intervals.forEach(([a, b], k) => {
+    const slot = (b - a) / Math.max(counts[k], 1);
+    for (let j = 0; j < counts[k]; j++) slots.push({ center: a + slot * (j + 0.5), length: slot });
+  });
 
   return items.map((item, i) => {
-    const slotCenter = run.start + slotLength * (i + 0.5);
-    const maxWidth = Math.max(0.6, slotLength - 2 * WALL_CLEARANCE - 0.4);
+    const maxWidth = Math.max(0.6, slots[i].length - 2 * WALL_CLEARANCE - 0.4);
     let height = item.height;
     if (height * item.aspect > maxWidth) height = maxWidth / item.aspect;
     height = Math.min(height, wallHeight - MIN_CEILING_MARGIN);
+    const slotCenter =
+      item.alongFraction != null
+        ? clampAlongCenter(run, height * item.aspect, run.start + item.alongFraction * runLength, blocked)
+        : slots[i].center;
     const hangCenterY =
       item.heightYOverride != null
         ? Math.max(height / 2, Math.min(item.heightYOverride, wallHeight - height / 2 - CEILING_HEADROOM))

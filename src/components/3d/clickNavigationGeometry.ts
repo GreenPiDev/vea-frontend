@@ -28,12 +28,40 @@ export interface ArtworkViewpoint extends FloorPoint {
  * mover (Player.tsx). A plain object read every frame — no React state, no re-renders while walking.
  */
 export interface NavigationRequest {
+  /** Final destination; null = not walking. */
   target: FloorPoint | null;
   look: { yaw: number; pitch: number } | null;
+  /** Planned corners to pass before `target` (routePlanner.ts), consumed front to back. Empty = straight to target. */
+  waypoints: FloorPoint[];
+  /** View to turn to once the last corner is passed (the painting); applied as `look` on the final leg. */
+  arrivalLook: { yaw: number; pitch: number } | null;
+  /** Walking pace override (m/s) for long routed walks; null = the normal click-walk pace. */
+  speed: number | null;
+  /** Routed walk: when something still blocks the way, pass through it instead of giving up. */
+  mustArrive: boolean;
+  /** Turn the view along the walking direction on intermediate legs (cleared when the visitor drags to look). */
+  faceHeading: boolean;
 }
 
 export function createNavigationRequest(): NavigationRequest {
-  return { target: null, look: null };
+  return { target: null, look: null, waypoints: [], arrivalLook: null, speed: null, mustArrive: false, faceHeading: false };
+}
+
+/** Stop any walk/turn in progress. */
+export function clearNavigation(nav: NavigationRequest): void {
+  nav.target = null;
+  nav.look = null;
+  nav.waypoints = [];
+  nav.arrivalLook = null;
+  nav.speed = null;
+  nav.mustArrive = false;
+  nav.faceHeading = false;
+}
+
+/** Plain straight walk (free floor click): stops at the first obstacle, like before routing existed. */
+export function startDirectWalk(nav: NavigationRequest, target: FloorPoint): void {
+  clearNavigation(nav);
+  nav.target = target;
 }
 
 /**

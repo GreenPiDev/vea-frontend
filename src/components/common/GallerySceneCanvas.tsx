@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Scene from "../3d/Scene";
 import type { ArtworkIconPosition } from "../3d/ArtworkIconProjector";
+import type { ArtworkGoToRequest } from "../3d/ArtworkGoTo";
 import type { Exhibition } from "../3d/exhibitions";
 import type { SeatSpot } from "../3d/seating";
 import {
@@ -30,6 +31,8 @@ interface GallerySceneCanvasProps {
   onArtworkClick?: (artworkId: string) => void;
   /** Click/tap on a painting's wall label. */
   onLabelClick?: (artworkId: string) => void;
+  /** Walk to a painting chosen outside the Canvas (the thumbnail rail). */
+  goToArtwork?: ArtworkGoToRequest | null;
 }
 
 // The `#gallery-canvas-wrapper` + Suspense + <Scene> + instructions-card
@@ -50,6 +53,7 @@ export default function GallerySceneCanvas({
   onNearestSeatChange,
   onArtworkClick,
   onLabelClick,
+  goToArtwork,
 }: GallerySceneCanvasProps) {
   const [touchDevice] = useState(isTouchPrimaryDevice);
   const [navigationMode, setNavigationMode] = useState<NavigationMode>(loadNavigationMode);
@@ -98,6 +102,7 @@ export default function GallerySceneCanvas({
             navigationMode={navigationMode}
             onArtworkClick={onArtworkClick}
             onLabelClick={onLabelClick}
+            goToArtwork={goToArtwork}
           />
         </Suspense>
 

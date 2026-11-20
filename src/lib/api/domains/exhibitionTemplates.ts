@@ -33,6 +33,30 @@ export interface FurniturePlacement {
   rotationY: number;
 }
 
+// Mirrors vea-api's scene-config.dto.ts WindowPlacementDto/OutdoorDto (same shape as components/3d/
+// windowOpenings.ts's WindowPlacement and Exhibition.outdoor — kept structurally identical so they pass straight through).
+export type WindowStyleId = 'modern' | 'classic' | 'panorama';
+
+export interface WindowPlacementData {
+  id: string;
+  /** Wall id: "north"…"west" in a rectangle room, a custom wall run's id otherwise. */
+  wallId: string;
+  /** Opening centre along the wall, 0..1 of its length. */
+  alongFraction: number;
+  width: number;
+  height: number;
+  /** 0 = floor-to-ceiling glazing. */
+  sillHeight: number;
+  styleId: WindowStyleId;
+}
+
+export interface OutdoorView {
+  /** components/3d/outdoorPanoramas.ts id. */
+  panoramaId: string;
+  /** Turns the view and its sun, radians. */
+  rotationY?: number;
+}
+
 export interface RectangleRoomShape {
   kind: 'rectangle';
   width: number;
@@ -41,6 +65,9 @@ export interface RectangleRoomShape {
   ceilingLights?: CeilingLightPoint[];
   /** Curator-placed furniture (FurnitureEditor.tsx). Omitted/empty means no furniture in the room. */
   furniture?: FurniturePlacement[];
+  /** Windows (WindowEditor.tsx) and the view through them. Omitted = a closed room. */
+  windows?: WindowPlacementData[];
+  outdoor?: OutdoorView;
 }
 
 export interface CustomRoomShape {
@@ -51,6 +78,9 @@ export interface CustomRoomShape {
   ceilingLights?: CeilingLightPoint[];
   /** Curator-placed furniture (FurnitureEditor.tsx). Omitted/empty means no furniture in the room. */
   furniture?: FurniturePlacement[];
+  /** Windows (WindowEditor.tsx) and the view through them. Omitted = a closed room. */
+  windows?: WindowPlacementData[];
+  outdoor?: OutdoorView;
 }
 
 export type TemplateRoomShape = RectangleRoomShape | CustomRoomShape;

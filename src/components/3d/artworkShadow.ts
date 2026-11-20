@@ -8,7 +8,9 @@
 import type { Artwork as ArtworkData } from "./artworks";
 import { WALL_CLEARANCE, WALL_THICKNESS } from "./galleryLayout";
 
-export const FRAME_BORDER = 0.07;
+/** Frame face width, the same on every painting regardless of its size. Slim on purpose (user request,
+ * 2026-11-20 — 7 cm read as heavy on small works); frameProfile.ts scales the mouldings to it. */
+export const FRAME_BORDER = 0.04;
 export const FRAME_DEPTH = 0.05;
 
 /** Width of the shadow's soft edge beyond the painting's silhouette (m). */

@@ -3,12 +3,14 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
 import { FRAME_BORDER } from "./artworkShadow";
-import { applyWallTargetOutline, outlineGeometry, outlineMaterial, tickOutline } from "./artworkOutline";
+import { applyWallTargetOutline, outlineGeometry, outlineMaterial, setOutlineWallColor, tickOutline } from "./artworkOutline";
 import { useWallLabels } from "./useWallLabels";
 import {
   LOOK_INERTIA_DECAY,
   LOOK_SAMPLE_WINDOW_MS,
   PITCH_LIMIT,
+  clearNavigation,
+  startDirectWalk,
   estimateLookVelocity,
   computeArtworkViewpoint,
   floorPointFromRay,
@@ -23,6 +25,7 @@ import {
   type WallTarget,
 } from "./clickNavigationGeometry";
 import { clampZoom, fovForAspect, type CameraZoom } from "./cameraFov";
+import { startRouteWalk } from "./routePlanner";
 
 /** Floor marker radius (m) — also the click/hover hit radius. */
 const MARKER_RADIUS = 0.3;
@@ -102,7 +105,7 @@ interface ClickNavigationProps {
 export default function ClickNavigation({ navigation, movementLocked, onArtworkClick, onLabelClick, cameraZoom }: ClickNavigationProps) {
   const { camera, gl } = useThree();
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
-  const { layout } = useExhibition();
+  const { layout, exhibition } = useExhibition();
   const { artworks, rects: labelRects } = useWallLabels();
   const viewpoints = useMemo(
     // Fitted to the unzoomed view: the standing spot shouldn't depend on a transient pinch.
@@ -118,6 +121,9 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
   const destRingRef = useRef<THREE.Mesh>(null);
   // The floor-click target the destination ring marks; the ring hides once Player clears/replaces it.
   const destTarget = useRef<FloorPoint | null>(null);
+
+  const wallColor = exhibition.theme.wallColor;
+  useEffect(() => setOutlineWallColor(wallColor), [wallColor]);
 
   useFrame(({ clock }, dt) => {
     if (outlineRef.current) tickOutline(outlineRef.current, dt, clock.elapsedTime);
@@ -267,6 +273,9 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
       if (!press.dragging) {
         press.dragging = true;
         navigation.look = null;
+        // A routed walk keeps going, but the visitor now owns the view.
+        navigation.arrivalLook = null;
+        navigation.faceHeading = false;
         showHover(null);
         canvas.style.cursor = "grabbing";
       }
@@ -307,10 +316,11 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
       }
       if (live.current.movementLocked) return;
       if (hit.marker) {
-        navigation.target = { x: hit.marker.x, z: hit.marker.z };
-        navigation.look = { yaw: hit.marker.yaw, pitch: hit.marker.pitch };
+        // Around furniture/partitions in the way (routePlanner.ts), facing the work on arrival.
+        const { colliders, walls } = live.current;
+        startRouteWalk(navigation, { x: camera.position.x, z: camera.position.z }, hit.marker, colliders, walls);
       } else if (hit.walkable) {
-        navigation.target = hit.walkable;
+        startDirectWalk(navigation, hit.walkable);
         destTarget.current = hit.walkable;
         destRingRef.current?.position.set(hit.walkable.x, MARKER_LIFT, hit.walkable.z);
       }
@@ -352,8 +362,7 @@ export default function ClickNavigation({ navigation, movementLocked, onArtworkC
       canvas.removeEventListener("pointercancel", onPointerCancel);
       canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.style.cursor = "";
-      navigation.target = null;
-      navigation.look = null;
+      clearNavigation(navigation);
     };
   }, [camera, gl, navigation, cameraZoom]);
 

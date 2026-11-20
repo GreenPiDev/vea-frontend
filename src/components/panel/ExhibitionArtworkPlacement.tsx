@@ -6,6 +6,7 @@ import {
   useRemoveExhibitionArtwork,
   useSetExhibitionCoverArtwork,
   useUpdateExhibitionArtworkLink,
+  type ApiExhibitionArtwork,
 } from '../../lib/api/domains/exhibitions';
 import { useOrganizationArtworks, type ApiArtwork } from '../../lib/api/domains/artworks';
 import { useMyFurnitureAssets } from '../../lib/api/domains/furnitureAssets';
@@ -59,6 +60,9 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
   // ConfirmModal's message can interpolate its title without a second lookup.
   const [confirmRemove, setConfirmRemove] = useState<{ artworkId: string; title: string } | null>(null);
   const [isFinishing, setIsFinishing] = useState(false);
+  // Unsaved floor-plan positions per ExhibitionArtwork id: number = dragged
+  // along-wall fraction, null = reset to the even slot.
+  const [pendingAlong, setPendingAlong] = useState<Record<string, number | null>>({});
 
   const runs = useMemo(
     () => (exhibition ? wallRunsForSceneConfig(exhibition.sceneConfig, exhibition.exhibitionTemplate) : null),
@@ -76,6 +80,9 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
     return <p className="text-sm text-brand-200">{t('placementUnavailable')}</p>;
   }
 
+  const hasCustomSpacing = (byWall.get(selectedWallId ?? '') ?? []).some((link) =>
+    link.id in pendingAlong ? pendingAlong[link.id] != null : link.positionData?.alongFraction != null
+  );
   const placedCount = placedArtworkIds.size;
   const isFull = exhibition.maxArtworks != null && placedCount >= exhibition.maxArtworks;
 
@@ -144,15 +151,32 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
     });
   }
 
-  // Flushes every typed-but-unsaved height draft for already-placed artworks
-  // (favoriting/cover already saves immediately on click, see
-  // handleToggleCover — only the height input is deferred), then leaves the
-  // screen. No per-row save button needed anymore; "Bitti" is the one save
-  // action for all pending height edits.
+  // Floor-plan drags (and "space evenly") only stage a pending position
+  // here — nothing hits the backend until "Bitti" (handleDone), which saves
+  // every pending move in one go.
+  function handleMove(link: ApiExhibitionArtwork, alongFraction: number) {
+    setPendingAlong((prev) => ({ ...prev, [link.id]: alongFraction }));
+  }
+
+  // Back to the even-slot layout for the selected wall (staged as null;
+  // handleDone omits alongFraction from the replaced positionData).
+  function handleResetSpacing() {
+    setPendingAlong((prev) => {
+      const next = { ...prev };
+      for (const link of byWall.get(selectedWallId!) ?? []) next[link.id] = null;
+      return next;
+    });
+  }
+
+  // The one save action: flushes every unsaved height draft and every staged
+  // floor-plan position (one PATCH per artwork, both fields merged — PATCH
+  // replaces the whole positionData blob), then leaves the screen.
+  // Favoriting/cover and add/remove still save immediately on click.
   async function handleDone() {
     setError(null);
     const pendingLinks = (exhibition!.artworkLinks ?? []).filter(
-      (link) => heightDrafts[link.artworkId] !== undefined && link.positionData?.wallRunId
+      (link) =>
+        link.positionData?.wallRunId && (heightDrafts[link.artworkId] !== undefined || link.id in pendingAlong)
     );
     if (pendingLinks.length === 0) {
       onDone();
@@ -161,15 +185,18 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
     setIsFinishing(true);
     try {
       await Promise.all(
-        pendingLinks.map((link) =>
-          updateArtworkLink.mutateAsync({
+        pendingLinks.map((link) => {
+          const { alongFraction: _saved, ...rest } = link.positionData!;
+          const along = link.id in pendingAlong ? pendingAlong[link.id] : _saved;
+          return updateArtworkLink.mutateAsync({
             artworkId: link.artworkId,
             positionData: {
-              wallRunId: link.positionData!.wallRunId,
-              heightY: Number(heightDrafts[link.artworkId]),
+              ...rest,
+              ...(heightDrafts[link.artworkId] !== undefined ? { heightY: Number(heightDrafts[link.artworkId]) } : {}),
+              ...(along != null ? { alongFraction: along } : {}),
             },
-          })
-        )
+          });
+        })
       );
       onDone();
     } catch (err) {
@@ -377,7 +404,17 @@ export default function ExhibitionArtworkPlacement({ exhibitionId, onDone }: Exh
         selectedWallId={selectedWallId}
         onSelectWall={setSelectedWallId}
         furnitureCatalog={furnitureCatalog}
+        onMoveArtwork={handleMove}
+        alongOverrides={pendingAlong}
       />
+      {hasCustomSpacing && (
+        <button
+          onClick={handleResetSpacing}
+          className="self-start rounded-md border border-brand-300 px-3 py-1.5 text-sm text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+        >
+          {t('placementResetSpacing')}
+        </button>
+      )}
     </div>
   );
 }

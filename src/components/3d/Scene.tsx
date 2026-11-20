@@ -21,6 +21,7 @@ import ArtworkIconProjector, { type ArtworkIconPosition } from "./ArtworkIconPro
 import SeatProximityTracker from "./SeatProximityTracker";
 import ClickNavigation from "./ClickNavigation";
 import WalkArtworkPicker from "./WalkArtworkPicker";
+import ArtworkGoTo, { type ArtworkGoToRequest } from "./ArtworkGoTo";
 import { createNavigationRequest } from "./clickNavigationGeometry";
 import { fovAtZoom, fovForAspect, type CameraZoom } from "./cameraFov";
 import type { NavigationMode } from "../../lib/navigationMode";
@@ -93,6 +94,8 @@ interface SceneProps {
   onArtworkClick?: (artworkId: string) => void;
   /** Click/tap on a painting's wall label. */
   onLabelClick?: (artworkId: string) => void;
+  /** Walk to a painting chosen outside the Canvas (the thumbnail rail). */
+  goToArtwork?: ArtworkGoToRequest | null;
 }
 
 export default function Scene({
@@ -105,6 +108,7 @@ export default function Scene({
   navigationMode,
   onArtworkClick,
   onLabelClick,
+  goToArtwork = null,
 }: SceneProps) {
   // Click-to-go request shared by ClickNavigation (writes) and Player (reads every frame).
   const [navigation] = useState(createNavigationRequest);
@@ -160,6 +164,7 @@ export default function Scene({
           navigationMode={navigationMode}
           navigation={navigation}
         />
+        <ArtworkGoTo request={goToArtwork} navigation={navigation} />
         {navigationMode === "walk" && onArtworkClick && <WalkArtworkPicker onArtworkClick={onArtworkClick} onLabelClick={onLabelClick} />}
         {navigationMode === "click" && (
           <ClickNavigation

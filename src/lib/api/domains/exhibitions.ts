@@ -9,7 +9,7 @@ import { Paths } from '../paths';
 import { useApiGet, useApiGetList, useApiMutations } from '../factory';
 import { patch, post, remove } from '../client';
 import type { ApiArtwork } from './artworks';
-import type { ApiExhibitionTemplate, CeilingLightPoint } from './exhibitionTemplates';
+import type { ApiExhibitionTemplate, CeilingLightPoint, OutdoorView, WindowPlacementData } from './exhibitionTemplates';
 
 // Mirrors vea-api's src/exhibitions/dto/scene-config.dto.ts discriminated
 // union (keep the two in sync by hand, same cross-repo caveat as
@@ -31,6 +31,9 @@ export interface CustomSceneConfig {
   spawn: { x: number; z: number; yaw: number };
   /** Curator-placed ceiling fixtures (CeilingLightEditor.tsx). Omitted/empty falls back to galleryLayout.ts's auto-generated grid. */
   ceilingLights?: CeilingLightPoint[];
+  /** Windows (WindowEditor.tsx) and the view through them. Omitted = a closed room. */
+  windows?: WindowPlacementData[];
+  outdoor?: OutdoorView;
 }
 
 export type ApiSceneConfig = TemplateSceneConfig | CustomSceneConfig;
@@ -42,6 +45,8 @@ export interface ArtworkPositionData {
   wallRunId: string;
   /** Curator-set hang-center height override, in meters from the floor. Falls back to placeArtworksAlongWall()'s fixed floor-clearance formula when unset. */
   heightY?: number;
+  /** Curator-set position along the wall run (0..1 of its length, artwork center) — set by dragging in the floor plan. Unset = evenly spaced slot. */
+  alongFraction?: number;
 }
 
 export interface ApiExhibitionArtwork {

@@ -17,6 +17,8 @@ import CeilingLightEditor from './CeilingLightEditor';
 import DateField from './DateField';
 import { useRoomGridEditor } from './useRoomGridEditor';
 import { useCeilingLightEditor } from './useCeilingLightEditor';
+import WindowEditor from './WindowEditor';
+import { useWindowEditor } from './useWindowEditor';
 import './ExhibitionForm.css';
 
 type RoomType = 'template' | 'custom';
@@ -95,6 +97,7 @@ export default function ExhibitionForm({ editing, onDone }: ExhibitionFormProps)
   const grid = useRoomGridEditor(customConfig ? { cells: customConfig.cells, spawn: customConfig.spawn } : undefined);
   const { spawnCell, spawnYaw, floorCellList } = grid;
   const ceilingLights = useCeilingLightEditor(customConfig?.ceilingLights);
+  const windows = useWindowEditor(customConfig?.windows, customConfig?.outdoor);
 
   // Locked once the exhibition has at least one placed artwork — see this
   // component's doc comment above. Enforced here only (UI convenience); the
@@ -141,6 +144,7 @@ export default function ExhibitionForm({ editing, onDone }: ExhibitionFormProps)
             textureIds: { floor: floorTextureId, wall: wallTextureId, ceiling: ceilingTextureId },
             spawn: isRoomLocked ? customConfig!.spawn : { x: spawnCell!.x, z: spawnCell!.z, yaw: spawnYaw },
             ceilingLights: ceilingLights.lights,
+            ...windows.payload,
           };
 
     const payload = {
@@ -305,6 +309,8 @@ export default function ExhibitionForm({ editing, onDone }: ExhibitionFormProps)
 
           {!isRoomLocked && <RoomGrid editor={grid} wallColor={wallColor} />}
           <CeilingLightEditor blueprint={liveBlueprint} editor={ceilingLights} />
+          {/* Cosmetic like the ceiling lights — editable even when the room shape is locked. */}
+          <WindowEditor blueprint={liveBlueprint} wallHeight={wallHeight} editor={windows} />
         </div>
       )}
 

@@ -15,6 +15,8 @@ import FurnitureEditor from './FurnitureEditor';
 import { useRoomGridEditor } from './useRoomGridEditor';
 import { useCeilingLightEditor } from './useCeilingLightEditor';
 import { useFurnitureEditor } from './useFurnitureEditor';
+import WindowEditor from './WindowEditor';
+import { useWindowEditor } from './useWindowEditor';
 import { roomSizeLabel } from './roomShapeLabel';
 import './ExhibitionForm.css';
 
@@ -73,6 +75,7 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
   );
   const ceilingLights = useCeilingLightEditor(editing?.roomShape.ceilingLights);
   const furniture = useFurnitureEditor(editing?.roomShape.furniture);
+  const windows = useWindowEditor(editing?.roomShape.windows, editing?.roomShape.outdoor);
   const { data: furnitureAssets } = useMyFurnitureAssets();
 
   // A template already used by at least one Exhibition has its room shape
@@ -141,6 +144,7 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
             depth: lockedShape?.kind === 'rectangle' ? lockedShape.depth : rectDepthCheck.value,
             ceilingLights: ceilingLights.lights,
             furniture: furniture.items,
+            ...windows.payload,
           }
         : {
             kind: 'custom' as const,
@@ -151,6 +155,7 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
                 : { x: grid.spawnCell!.x, z: grid.spawnCell!.z, yaw: grid.spawnYaw },
             ceilingLights: ceilingLights.lights,
             furniture: furniture.items,
+            ...windows.payload,
           };
 
     const payload = {
@@ -310,6 +315,8 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
           derive a wallRunId, so they stay editable even on a template already used by an exhibition. */}
       <CeilingLightEditor blueprint={liveBlueprint} editor={ceilingLights} />
       <FurnitureEditor blueprint={liveBlueprint} editor={furniture} assets={furnitureAssets ?? []} />
+      {/* Windows are cosmetic like the furniture (never a wallRunId), so they stay editable on a shape-locked template too. */}
+      <WindowEditor blueprint={liveBlueprint} wallHeight={wallHeightCheck.isValid ? wallHeightCheck.value : null} editor={windows} />
 
       <div className="mt-2 flex gap-2">
         <button

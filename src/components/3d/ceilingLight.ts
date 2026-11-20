@@ -24,6 +24,8 @@ import * as THREE from "three";
 import type { RoomLayout } from "./galleryLayout";
 import { isTouchPrimaryDevice } from "../../lib/navigationMode";
 import { CEILING_LIGHT_FLOOR_IRRADIANCE } from "./sceneLighting";
+import { WINDOW_LIGHT_FRAGMENT_DECL, windowLightUniforms } from "./windowLight";
+import { SUN_LIGHT_FRAGMENT_DECL, sunLightUniforms } from "./sunLight";
 
 /** Uniform array size. Phones get fewer slots — the loop runs per fragment on every room surface. */
 export const MAX_CEILING_LIGHTS = isTouchPrimaryDevice() ? 12 : 24;
@@ -149,8 +151,10 @@ export function setCeilingLights(lights: CeilingLight[], color: THREE.ColorRepre
   ceilingLightUniforms.uCeilingLightColor.value.set(color);
 }
 
-/** Declarations + irradiance function. Needs a world-space position/normal from the caller. */
+/** Declarations + irradiance functions (ceiling fixtures + window daylight, windowLight.ts). Needs a world-space position/normal from the caller. */
 export const CEILING_LIGHT_FRAGMENT_DECL = /* glsl */ `
+${WINDOW_LIGHT_FRAGMENT_DECL}
+${SUN_LIGHT_FRAGMENT_DECL}
 #define MAX_CEILING_LIGHTS ${MAX_CEILING_LIGHTS}
 uniform vec4 uCeilingLights[MAX_CEILING_LIGHTS];
 uniform int uCeilingLightCount;
@@ -173,7 +177,9 @@ vec3 ceilingLightIrradiance(vec3 p, vec3 n) {
 `;
 
 /**
- * Inserted after three's `lights_fragment_end` (where direct lights have been summed). `normal` is the
+ * Inserted after three's `lights_fragment_end` (where direct lights have been summed). Adds the ceiling
+ * fixtures, the windows' daylight (windowLight.ts) and the sun patches (sunLight.ts) — all direct, diffuse-only,
+ * with visible sources. `normal` is the
  * view-space shading normal *with* the normal map applied, so the room's surface relief catches this
  * light too; it's brought to world space to match the light positions. `worldPos` is the caller's varying;
  * `occlusion` an optional GLSL float expression scaling the term (the floor's furniture contact shadow).
@@ -182,7 +188,9 @@ export function ceilingLightApply(worldPos: string, occlusion = "1.0"): string {
   return /* glsl */ `
 {
   vec3 ceilingN = normalize(inverseTransformDirection(normal, viewMatrix));
-  reflectedLight.directDiffuse += ceilingLightIrradiance(${worldPos}, ceilingN) * BRDF_Lambert(material.diffuseColor) * (${occlusion});
+  reflectedLight.directDiffuse += (ceilingLightIrradiance(${worldPos}, ceilingN) + windowLightIrradiance(${worldPos}, ceilingN)
+      + sunLightIrradiance(${worldPos}, ceilingN))
+    * BRDF_Lambert(material.diffuseColor) * (${occlusion});
 }
 `;
 }
@@ -204,14 +212,33 @@ const FURNITURE_VERTEX_BODY = /* glsl */ `
 }
 `;
 
-function furnitureOnBeforeCompile(shader: THREE.WebGLProgramParametersWithUniforms) {
-  Object.assign(shader.uniforms, ceilingLightUniforms);
+function patchLitShader(shader: THREE.WebGLProgramParametersWithUniforms, apply: string) {
+  Object.assign(shader.uniforms, ceilingLightUniforms, windowLightUniforms, sunLightUniforms);
   shader.vertexShader = shader.vertexShader
     .replace("#include <common>", `#include <common>\n${FURNITURE_VERTEX_DECL}`)
     .replace("#include <project_vertex>", `#include <project_vertex>\n${FURNITURE_VERTEX_BODY}`);
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <common>", `#include <common>\nvarying vec3 vCeilingLightWorldPos;\n${CEILING_LIGHT_FRAGMENT_DECL}`)
-    .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>\n${ceilingLightApply("vCeilingLightWorldPos")}`);
+    .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>\n${apply}`);
+}
+
+function furnitureOnBeforeCompile(shader: THREE.WebGLProgramParametersWithUniforms) {
+  patchLitShader(shader, ceilingLightApply("vCeilingLightWorldPos"));
+}
+
+/** Daylight only (windows + sun), no ceiling fixtures — for paintings and frames, see applyDaylight. */
+function daylightApply(worldPos: string): string {
+  return /* glsl */ `
+{
+  vec3 ceilingN = normalize(inverseTransformDirection(normal, viewMatrix));
+  reflectedLight.directDiffuse += (windowLightIrradiance(${worldPos}, ceilingN) + sunLightIrradiance(${worldPos}, ceilingN))
+    * BRDF_Lambert(material.diffuseColor);
+}
+`;
+}
+
+function daylightOnBeforeCompile(shader: THREE.WebGLProgramParametersWithUniforms) {
+  patchLitShader(shader, daylightApply("vCeilingLightWorldPos"));
 }
 
 /**
@@ -225,5 +252,21 @@ export function applyCeilingLight(material: THREE.Material): void {
   if (material.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile) return;
   material.userData.ceilingLight = true;
   material.onBeforeCompile = furnitureOnBeforeCompile;
+  material.needsUpdate = true;
+}
+
+/**
+ * Lets a painting's canvas or frame material receive the window daylight and the sun patches (a work hit by
+ * low sun lights up like the wall around it), but *not* the ceiling fixtures — the picture lights already
+ * set the works' exposure (sceneLighting.ts). Same rules as applyCeilingLight; its own program cache key,
+ * since three keys programs by onBeforeCompile's source.
+ */
+export function applyDaylight(material: THREE.Material): void {
+  if (!(material instanceof THREE.MeshStandardMaterial)) return;
+  if (material.userData.daylight) return;
+  if (material.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile) return;
+  material.userData.daylight = true;
+  material.onBeforeCompile = daylightOnBeforeCompile;
+  material.customProgramCacheKey = () => "vea-daylight";
   material.needsUpdate = true;
 }

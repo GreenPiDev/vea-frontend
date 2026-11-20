@@ -36,9 +36,39 @@ export const OUTLINE_FADE_RATE = 15;
 export const OUTLINE_BREATH_PERIOD = 2.8;
 export const OUTLINE_BREATH_DEPTH = 0.12;
 
-/** Champagne gold hairline, warm-white halo (linear-ish working values, tone-mapped by the composer). */
-const LINE_COLOR = new THREE.Color("#ecd3a0");
-const GLOW_COLOR = new THREE.Color("#ffe2b0");
+/** Champagne gold hairline, warm-white halo — for dark walls (tone-mapped by the composer). */
+const LINE_ON_DARK = new THREE.Color("#ecd3a0");
+const GLOW_ON_DARK = new THREE.Color("#ffe2b0");
+/** Deep bronze hairline, amber halo — for light walls, where the champagne tones would vanish. */
+const LINE_ON_LIGHT = new THREE.Color("#7a4d12");
+const GLOW_ON_LIGHT = new THREE.Color("#a8721f");
+/** Wall lightness (0..1, perceptual) range over which the palette crossfades from "dark" to "light". */
+export const OUTLINE_PALETTE_DARK_BELOW = 0.35;
+export const OUTLINE_PALETTE_LIGHT_ABOVE = 0.6;
+
+/** Perceptual lightness of a wall colour in [0, 1] (Rec. 709 luma of the sRGB values). */
+export function wallLightness(wallColor: string): number {
+  const c = new THREE.Color(wallColor).getRGB({ r: 0, g: 0, b: 0 }, THREE.SRGBColorSpace);
+  return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+}
+
+/** Hairline + halo colours that stay visible against `wallColor`: light on dark walls, dark bronze on light ones. */
+export function outlineColorsForWall(wallColor: string): { line: THREE.Color; glow: THREE.Color } {
+  const x = (wallLightness(wallColor) - OUTLINE_PALETTE_DARK_BELOW) / (OUTLINE_PALETTE_LIGHT_ABOVE - OUTLINE_PALETTE_DARK_BELOW);
+  const t = Math.min(1, Math.max(0, x));
+  const k = t * t * (3 - 2 * t);
+  return {
+    line: LINE_ON_DARK.clone().lerp(LINE_ON_LIGHT, k),
+    glow: GLOW_ON_DARK.clone().lerp(GLOW_ON_LIGHT, k),
+  };
+}
+
+/** Retints the shared highlight for the current room's wall colour (call when the room/theme changes). */
+export function setOutlineWallColor(wallColor: string): void {
+  const { line, glow } = outlineColorsForWall(wallColor);
+  outlineMaterial.uniforms.uLineColor.value.copy(line);
+  outlineMaterial.uniforms.uGlowColor.value.copy(glow);
+}
 
 const f = (n: number) => n.toFixed(5);
 
@@ -98,8 +128,8 @@ export const outlineMaterial = new THREE.ShaderMaterial({
     uGap: { value: OUTLINE_GAP },
     uOpacity: { value: 0 },
     uBreath: { value: 1 },
-    uLineColor: { value: LINE_COLOR },
-    uGlowColor: { value: GLOW_COLOR },
+    uLineColor: { value: LINE_ON_DARK.clone() },
+    uGlowColor: { value: GLOW_ON_DARK.clone() },
   },
   transparent: true,
   depthWrite: false,

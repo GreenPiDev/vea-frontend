@@ -104,7 +104,10 @@ describe("picture light: around the canvas", () => {
       for (let x = -half; x <= half; x += 0.1)
         peak = Math.max(peak, pictureLightIrradiance({ x, y: top + FRAME_BORDER, z }, { x: 0, y: 1, z: 0 }, light));
     expect(peak).toBeGreaterThan(0);
-    expect(peak).toBeLessThan(at(0, top - 0.02));
+    // The up-facing top face sits right under the lamp, so it may slightly out-light the canvas (a real
+    // picture light does the same); it's a thin strip, above eye level for this size. Was 0.95× with the
+    // 7 cm frame, ~1.12× with the slim 4 cm one (closer to the lamp) — guard against it turning into a glare.
+    expect(peak).toBeLessThan(at(0, top - 0.02) * 1.2);
   });
 
   it("sends nothing into the room or through the wall", () => {

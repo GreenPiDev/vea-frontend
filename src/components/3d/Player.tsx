@@ -1,11 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { PointerLockControls } from "@react-three/drei";
 import * as THREE from "three";
 import { EYE_HEIGHT } from "./galleryLayout";
 import { useExhibition } from "./ExhibitionContext";
 import type { SeatSpot } from "./seating";
-import { angleDelta, collides, stepToward, type NavigationRequest } from "./clickNavigationGeometry";
+import { angleDelta, clearNavigation, collides, stepToward, wallBoxes, type NavigationRequest } from "./clickNavigationGeometry";
 import type { NavigationMode } from "../../lib/navigationMode";
 
 /**
@@ -34,6 +34,8 @@ const SIT_LERP_SPEED = 6;
 // facing while seated, i.e. away from the chair) clears the box; shrinking
 // distances are tried in case a wall/other collider sits close behind.
 const STAND_CLEARANCE_STEPS = [0.9, 0.6, 0.3];
+/** A planned corner counts as passed within this distance (m), so the walk flows round it without stopping. */
+const WAYPOINT_REACHED = 0.15;
 
 interface PlayerProps {
   onLockChange?: (locked: boolean) => void;
@@ -49,6 +51,8 @@ interface PlayerProps {
 export default function Player({ onLockChange, seatedSpot, navigationMode, navigation }: PlayerProps) {
   const { camera } = useThree();
   const { layout } = useExhibition();
+  // A routed walk may pass through furniture, never through a wall (that's how a visitor ended up outside the room).
+  const walls = useMemo(() => wallBoxes(layout), [layout]);
   const keys = useRef({ forward: false, back: false, left: false, right: false });
   // Tracks which seat we're currently gliding toward, so the one-time yaw
   // snap only fires on the frame a new sit begins, not every frame while
@@ -113,8 +117,7 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
   useFrame((_, delta) => {
     if (seatedSpot) {
       // Sitting overrides any walk in progress.
-      navigation.target = null;
-      navigation.look = null;
+      clearNavigation(navigation);
       // seatedSpot.rotationY is the placement's own facing (the direction
       // the furniture model's front — where its back/backrest is — points).
       // A visitor sitting IN it faces the opposite way, out into the room,
@@ -141,7 +144,9 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
       // comment above) before WASD control resumes below.
       const forwardX = -Math.sin(seatedRotationRef.current);
       const forwardZ = -Math.cos(seatedRotationRef.current);
-      for (const clearance of STAND_CLEARANCE_STEPS) {
+      // Only when actually stuck in the seat's collider — a thumbnail-rail teleport may have already moved
+      // the visitor somewhere free on this same frame, and must not be shoved forward.
+      if (collides(camera.position.x, camera.position.z, layout.colliders)) for (const clearance of STAND_CLEARANCE_STEPS) {
         const nx = camera.position.x + forwardX * clearance;
         const nz = camera.position.z + forwardZ * clearance;
         if (!collides(nx, nz, layout.colliders)) {
@@ -156,8 +161,7 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
     const anyKey = forward || back || left || right;
     if (anyKey) {
       // The keyboard always wins over a click-to-go walk in progress.
-      navigation.target = null;
-      navigation.look = null;
+      clearNavigation(navigation);
     }
 
     if (navigation.look) {
@@ -174,13 +178,51 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
 
     if (navigation.target && !anyKey) {
       const pos = camera.position;
+      // Routed walks (routePlanner.ts) pass their planned corners first, then head for the target.
+      const finalLeg = navigation.waypoints.length === 0;
+      const leg = finalLeg ? navigation.target : navigation.waypoints[0];
       const remaining = Math.hypot(navigation.target.x - pos.x, navigation.target.z - pos.z);
-      const speed = CLICK_WALK_SPEED * Math.min(1, 0.25 + remaining);
-      const step = stepToward(pos, navigation.target, speed * Math.min(delta, 0.05), layout.colliders);
+      // Eases down only over the last metre of the whole walk, not at every corner.
+      const speed = (navigation.speed ?? CLICK_WALK_SPEED) * Math.min(1, 0.25 + remaining);
+      const maxStep = speed * Math.min(delta, 0.05);
+      let step = stepToward(pos, leg, maxStep, layout.colliders);
+      // Something the route didn't account for (or a painting fenced in by furniture): walk through it.
+      // Furniture the route didn't account for (or a painting fenced in by it): walk through it — walls still stop us.
+      if (step.blocked && navigation.mustArrive) step = stepToward(pos, leg, maxStep, walls);
       pos.x = step.x;
       pos.z = step.z;
       pos.y = EYE_HEIGHT;
-      if (step.arrived || step.blocked) navigation.target = null;
+      if (step.blocked && !step.arrived && navigation.mustArrive) {
+        // A wall in the way (shouldn't happen with a planned route): stop here rather than leave the room.
+        clearNavigation(navigation);
+        return;
+      }
+
+      if (!finalLeg) {
+        if (Math.hypot(leg.x - pos.x, leg.z - pos.z) <= Math.max(maxStep, WAYPOINT_REACHED)) {
+          navigation.waypoints.shift();
+          if (navigation.waypoints.length === 0 && navigation.arrivalLook) {
+            // Last corner passed: turn to the painting over the final leg.
+            navigation.look = navigation.arrivalLook;
+            navigation.arrivalLook = null;
+            navigation.faceHeading = false;
+          }
+        }
+        if (navigation.faceHeading) {
+          const next = navigation.waypoints[0] ?? navigation.target;
+          const hx = next.x - pos.x;
+          const hz = next.z - pos.z;
+          // Camera forward at yaw ψ is (-sin ψ, -cos ψ); level gaze while walking.
+          if (Math.hypot(hx, hz) > 0.05) navigation.look = { yaw: Math.atan2(-hx, -hz), pitch: 0 };
+        }
+        return;
+      }
+
+      if (step.arrived || (step.blocked && !navigation.mustArrive)) {
+        navigation.target = null;
+        navigation.speed = null;
+        navigation.mustArrive = false;
+      }
       return;
     }
 

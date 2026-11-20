@@ -12,6 +12,7 @@ import type { Artwork } from "./artworks";
 import { ARTWORK_WALL_GAP, FRAME_BORDER } from "./artworkShadow";
 import type { LabelRect } from "./clickNavigationGeometry";
 import type { WallSegment } from "./galleryLayout";
+import type { WindowOpening } from "./windowOpenings";
 
 /**
  * Overall label size: board, padding and type all scale together (the one knob to make labels bigger or
@@ -246,7 +247,42 @@ function sameWallNeighbours(a: Artwork, all: Artwork[]) {
 }
 
 /** Free wall beside the frame on one side (m), up to a corner/partition or the next work's frame. */
-function freeSpace(a: Artwork, all: Artwork[], walls: WallSegment[], sign: 1 | -1, neighbourLabelsRight: Set<Artwork>): number {
+/** Clear wall kept between a label and a window opening (its casing). */
+const LABEL_WINDOW_MARGIN = 0.1;
+
+/**
+ * Distance from the frame edge to the nearest window on the same wall in direction `sign`, for windows that
+ * overlap the painting's height (where the label goes). The colliding walls are uncut, so labels would
+ * otherwise happily print themselves across the glass.
+ */
+function windowClearance(a: Artwork, openings: WindowOpening[], sign: 1 | -1): number {
+  const { right, normal } = axes(a);
+  const half = frameHalfWidth(a);
+  const bottom = a.position[1] - frameHalfHeight(a);
+  const top = a.position[1] + frameHalfHeight(a);
+  let free = Infinity;
+  for (const o of openings) {
+    const dx = o.center[0] - a.position[0];
+    const dz = o.center[2] - a.position[2];
+    if (Math.abs(dx * normal[0] + dz * normal[1]) > 0.5) continue; // another wall
+    const axis = o.axis === "x" ? [1, 0] : [0, 1];
+    if (Math.abs(axis[0] * right[0] + axis[1] * right[1]) < 0.9) continue; // perpendicular wall
+    if (o.sill >= top || o.sill + o.height <= bottom) continue; // above/below the painting
+    const along = (dx * right[0] + dz * right[1]) * sign;
+    if (along <= 0) continue;
+    free = Math.min(free, along - o.width / 2 - half - LABEL_WINDOW_MARGIN);
+  }
+  return free;
+}
+
+function freeSpace(
+  a: Artwork,
+  all: Artwork[],
+  walls: WallSegment[],
+  sign: 1 | -1,
+  neighbourLabelsRight: Set<Artwork>,
+  openings: WindowOpening[] = []
+): number {
   const { right, normal } = axes(a);
   const half = frameHalfWidth(a);
   // 3 cm in front of the wall face (the painting's origin is ~7 cm off it), so the ray never grazes its own wall.
@@ -262,7 +298,7 @@ function freeSpace(a: Artwork, all: Artwork[], walls: WallSegment[], sign: 1 | -
     if (sign === -1 && neighbourLabelsRight.has(n.b)) edge -= LABEL_GAP + LABEL_WIDTH;
     free = Math.min(free, edge);
   }
-  return free;
+  return Math.min(free, windowClearance(a, openings, sign));
 }
 
 /** Label centre height: reading height, kept within the painting's vertical span when it can be. */
@@ -279,16 +315,21 @@ export function labelCenterY(a: Artwork, labelHeight: number): number {
  * Places every work's label: to the right of the frame when there's room, else to the left, else centred
  * under the frame. `heights` are the labels' board heights (m), by artwork id.
  */
-export function placeLabels(all: Artwork[], walls: WallSegment[], heights: Map<string, number>): Map<string, LabelPlacement> {
+export function placeLabels(
+  all: Artwork[],
+  walls: WallSegment[],
+  heights: Map<string, number>,
+  openings: WindowOpening[] = []
+): Map<string, LabelPlacement> {
   const need = LABEL_GAP + LABEL_WIDTH + LABEL_CLEARANCE;
   const offset = (a: Artwork) => frameHalfWidth(a) + LABEL_GAP + LABEL_WIDTH / 2;
-  const rightOk = new Set(all.filter((a) => freeSpace(a, all, walls, 1, new Set()) >= need));
+  const rightOk = new Set(all.filter((a) => freeSpace(a, all, walls, 1, new Set(), openings) >= need));
   const out = new Map<string, LabelPlacement>();
   for (const a of all) {
     const h = heights.get(a.id) ?? LABEL_MIN_HEIGHT;
     const yLocal = labelCenterY(a, h) - a.position[1];
     if (rightOk.has(a)) out.set(a.id, { side: "right", x: offset(a), y: yLocal });
-    else if (freeSpace(a, all, walls, -1, rightOk) >= need) out.set(a.id, { side: "left", x: -offset(a), y: yLocal });
+    else if (freeSpace(a, all, walls, -1, rightOk, openings) >= need) out.set(a.id, { side: "left", x: -offset(a), y: yLocal });
     else out.set(a.id, { side: "below", x: 0, y: -frameHalfHeight(a) - LABEL_BELOW_GAP - h / 2 });
   }
   return out;
@@ -304,10 +345,11 @@ export function computeWallLabels(
   artworks: Artwork[],
   walls: WallSegment[],
   locale: string,
-  measure: MeasureText
+  measure: MeasureText,
+  openings: WindowOpening[] = []
 ): Map<string, WallLabel> {
   const layouts = new Map(artworks.map((a) => [a.id, layoutLabel(a, locale, measure)]));
-  const placements = placeLabels(artworks, walls, new Map([...layouts].map(([id, l]) => [id, l.height])));
+  const placements = placeLabels(artworks, walls, new Map([...layouts].map(([id, l]) => [id, l.height])), openings);
   return new Map(artworks.map((a) => [a.id, { layout: layouts.get(a.id)!, placement: placements.get(a.id)! }]));
 }
 
