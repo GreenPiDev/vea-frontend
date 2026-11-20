@@ -104,6 +104,24 @@ export function templateWallRuns(roomSize: [number, number]): (WallRunGeometry &
   ];
 }
 
+/**
+ * Wall runs of a static EXHIBITIONS preset: its 4 walls, plus — when the preset has a mezzanine (vitrin-11) —
+ * a `<wall>@mezz` copy of each wall whose works hang on the slab (floor = its top, ceiling = what's left above).
+ * The copies span the whole wall; the curator's `alongFraction` puts the work over the slab.
+ */
+export function staticTemplateRuns(template: Exhibition): {
+  runs: (WallRunGeometry & { id: string })[];
+  rules: Map<string, RunRule>;
+} {
+  const runs = templateWallRuns(template.roomSize!);
+  const rules = new Map<string, RunRule>();
+  const mezz = template.customLayout?.mezzanine;
+  if (!mezz) return { runs, rules };
+  const mezzRuns = runs.map((run) => ({ ...run, id: `${run.id}${MEZZ_RUN_SUFFIX}` }));
+  for (const run of mezzRuns) rules.set(run.id, { floorY: mezz.top, ceiling: template.wallHeight - mezz.top });
+  return { runs: [...runs, ...mezzRuns], rules };
+}
+
 /** Groups artworkLinks by their positionData.wallRunId, sorted by the sibling `order` column (nulls last, then by id for a stable tie-break). Links with no positionData/wallRunId aren't placed (not hung yet). */
 export function groupByWallRun(links: ApiExhibitionArtwork[]): Map<string, ApiExhibitionArtwork[]> {
   const byWall = new Map<string, ApiExhibitionArtwork[]>();
@@ -464,12 +482,12 @@ export function adaptApiExhibition(exhibition: ApiExhibition, furnitureCatalog: 
   if (config.kind === "template") {
     const staticTemplate = EXHIBITIONS.find((e) => e.id === config.templateId);
     if (staticTemplate && staticTemplate.roomSize) {
-      const runs = templateWallRuns(staticTemplate.roomSize);
+      const { runs, rules } = staticTemplateRuns(staticTemplate);
       return {
         ...staticTemplate,
         id: exhibition.id,
         name: exhibition.title,
-        artworks: placeAll(runs, staticTemplate.wallHeight, byWall, exhibition.id),
+        artworks: placeAll(runs, staticTemplate.wallHeight, byWall, exhibition.id, staticTemplate.customLayout?.windows ?? [], rules),
       };
     }
 
