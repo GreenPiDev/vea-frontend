@@ -14,6 +14,7 @@ export const Paths = {
 
   Exhibitions: '/exhibitions',
   ExhibitionsMine: '/exhibitions/mine',
+  ExhibitionsAdmin: '/exhibitions/admin',
 
   ExhibitionTemplates: '/exhibition-templates',
   ExhibitionTemplatesMine: '/exhibition-templates/mine',

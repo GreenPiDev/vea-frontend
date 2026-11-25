@@ -1,20 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { useOrganizationOffers, type ApiOffer } from '../../lib/api/domains/offers';
 import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
-
-const OFFER_STATUS_KEYS: Record<ApiOffer['status'], string> = {
-  PENDING: 'offerStatusPending',
-  ACCEPTED: 'offerStatusAccepted',
-  PAYMENT_HELD: 'offerStatusPaymentHeld',
-  DELIVERED: 'offerStatusDelivered',
-  RELEASED: 'offerStatusReleased',
-  REJECTED: 'offerStatusRejected',
-  CANCELLED: 'offerStatusCancelled',
-};
-
-function formatAmount(amount: number, currency: string): string {
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(amount / 100);
-}
+import ArtistDecisionBadge from './ArtistDecisionBadge';
+import { OFFER_STATUS_KEYS, formatAmount } from './offerDisplay';
 
 // Admin's org-wide, read-only view — every offer on any artwork by any
 // artist in this admin's organization, buyer identity included (unlike
@@ -63,23 +51,7 @@ export default function OrgOfferTable() {
     {
       key: 'artistDecision',
       header: t('orgOfferArtistDecision'),
-      render: (offer) => {
-        if (offer.artistDecision === 'APPROVED') {
-          return (
-            <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-              {t('orgOfferDecisionApproved')}
-            </span>
-          );
-        }
-        if (offer.artistDecision === 'REJECTED') {
-          return (
-            <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
-              {t('orgOfferDecisionRejected')}
-            </span>
-          );
-        }
-        return <span className="text-xs text-brand-500">—</span>;
-      },
+      render: (offer) => <ArtistDecisionBadge decision={offer.artistDecision} />,
     },
   ];
 

@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient, type QueryKey, type UseQueryOptions } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryKey, type UseQueryOptions } from '@tanstack/react-query';
 import { get, patch, post, remove } from './client';
+import { withQuery, type ListQueryParams, type Paginated } from './paged';
 
 /**
  * Generic REST-over-TanStack-Query wrappers, one factory per resource
@@ -28,6 +29,28 @@ export function useApiGetList<T>(
   options?: Omit<UseQueryOptions<T[]>, 'queryKey' | 'queryFn'>,
 ) {
   return useApiGet<T[]>(path, queryKey, options);
+}
+
+/**
+ * Server-side paginated list (vea-api's Paginated<T>). `params` (page,
+ * search, filters — see usePagedListState) are part of the query key, so
+ * every page/search/filter combination is cached on its own;
+ * keepPreviousData keeps the current rows on screen while the next page
+ * loads instead of flashing an empty table.
+ */
+export function useApiGetPaged<T>(
+  path: string,
+  keyBase: QueryKey,
+  params: ListQueryParams,
+  options?: Omit<UseQueryOptions<Paginated<T>>, 'queryKey' | 'queryFn' | 'placeholderData'>,
+) {
+  return useQuery<Paginated<T>>({
+    queryKey: [...keyBase, params],
+    queryFn: () => get<Paginated<T>>({ path: withQuery(path, params) }),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    ...options,
+  });
 }
 
 interface UpdatePayload<T> {

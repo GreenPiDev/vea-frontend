@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import LoadingScreen from "../components/common/LoadingScreen";
 import SuperAdminPanel from "../components/panel/SuperAdminPanel";
+import OrganizationDetailPage from "../components/panel/OrganizationDetailPage";
+import AdminExhibitionPreviewPage from "../components/panel/AdminExhibitionPreviewPage";
 import CuratorPanel from "../components/panel/CuratorPanel";
 import NewExhibitionPage from "../components/panel/NewExhibitionPage";
 import EditExhibitionPage from "../components/panel/EditExhibitionPage";
@@ -53,6 +55,14 @@ export default function Dashboard() {
       return (
         <Routes>
           <Route path="admin/organizations" element={<SuperAdminPanel onBack={onBack} />} />
+          <Route
+            path="admin/organizations/:organizationId"
+            element={<OrganizationDetailPage onBack={onBack} />}
+          />
+          <Route
+            path="admin/organizations/:organizationId/exhibitions/:exhibitionId/preview"
+            element={<AdminExhibitionPreviewPage />}
+          />
           <Route path="*" element={<Navigate to="admin/organizations" replace />} />
         </Routes>
       );

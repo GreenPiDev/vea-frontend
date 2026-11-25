@@ -6,7 +6,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Paths } from '../paths';
 import { post, remove } from '../client';
-import { useApiGetList, useApiMutations } from '../factory';
+import { useApiGet, useApiGetList, useApiGetPaged, useApiMutations } from '../factory';
+import type { ListQueryParams } from '../paged';
+import type { ArtistDecision, OfferStatus } from './offers';
+import type { ArtworkStatus } from './artworks';
+import type { ApiExhibition } from './exhibitions';
 
 export interface ApiOrganization {
   id: string;
@@ -52,8 +56,9 @@ export function useAddOrgAdmin(organizationId: string) {
   return useMutation({
     mutationFn: (email: string) =>
       post<ApiOrgAdmin>({ path: `${Paths.Organizations}/${organizationId}/admins`, payload: { email } }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: [Paths.Organizations, organizationId, 'admins'] }),
+    // Prefix match: refreshes the admin list, the detail page's KPI counts
+    // and the organizations table's admin-count column together.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [Paths.Organizations] }),
     meta: { successKey: 'toastOrgAdminAddSuccess', errorKey: 'toastOrgAdminAddError' },
   });
 }
@@ -63,8 +68,7 @@ export function useRemoveOrgAdmin(organizationId: string) {
   return useMutation({
     mutationFn: (userId: string) =>
       remove<void>({ path: `${Paths.Organizations}/${organizationId}/admins/${userId}` }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: [Paths.Organizations, organizationId, 'admins'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [Paths.Organizations] }),
     meta: { successKey: 'toastOrgAdminRemoveSuccess', errorKey: 'toastOrgAdminRemoveError' },
   });
 }
@@ -98,4 +102,142 @@ export function useRemoveMyOrgArtist() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: MINE_ARTISTS_KEY }),
     meta: { successKey: 'toastOrgArtistRemoveSuccess', errorKey: 'toastOrgArtistRemoveError' },
   });
+}
+
+// ---- SUPERADMIN organization detail page (read-only) ----------------------
+// Mirrors vea-api's OrganizationsService.getOverview /
+// listExhibitionsForOverview / listArtistsForOverview. Amounts are minor
+// units (the API serializes its BIGINT money columns as plain numbers).
+
+export interface ApiOrganizationOverview {
+  id: string;
+  name: string;
+  createdAt: string;
+  /** exhibitions excludes soft-deleted ones; artists = SELLER users of the org. */
+  counts: { admins: number; exhibitions: number; artists: number };
+}
+
+export interface ApiOrgOverviewExhibition {
+  id: string;
+  title: string;
+  status: ApiExhibition['status'];
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  /** Non-null = soft-deleted by a curator; still listed (flagged) for investigation. */
+  deletedAt: string | null;
+  curator: { email: string };
+  /** Set for a solo show pinned to one artist. */
+  artistProfile: { displayName: string } | null;
+  /** visitEvents = all-time EXHIBITION_ENTER count, same as the curator's stats screen. */
+  _count: { artworkLinks: number; visitEvents: number };
+}
+
+export interface ApiOrgOverviewOffer {
+  id: string;
+  amount: number;
+  currency: string;
+  status: OfferStatus;
+  artistDecision: ArtistDecision | null;
+  createdAt: string;
+  buyer: { email: string };
+}
+
+export interface ApiOrgOverviewArtwork {
+  id: string;
+  title: string;
+  status: ArtworkStatus;
+  priceAmount: number;
+  currency: string;
+  createdAt: string;
+  offers: ApiOrgOverviewOffer[];
+}
+
+export interface ApiOrgOverviewArtist {
+  id: string;
+  email: string;
+  createdAt: string;
+  /** Null until the invited artist creates their profile. */
+  artistProfile: { id: string; displayName: string; artworks: ApiOrgOverviewArtwork[] } | null;
+}
+
+export function useOrganizationOverview(organizationId: string) {
+  return useApiGet<ApiOrganizationOverview>(
+    `${Paths.Organizations}/${organizationId}`,
+    [Paths.Organizations, organizationId, 'overview'],
+    { enabled: !!organizationId },
+  );
+}
+
+// The three lists below are server-side paginated/searchable: `params`
+// comes from usePagedListState (page, pageSize, search + the filters typed
+// here, mirroring vea-api's dto/org-overview-query.dto.ts).
+
+export type OrgExhibitionFilters = {
+  status?: ApiExhibition['status'];
+  /** Omitted = live and soft-deleted together. */
+  deleted?: 'exclude' | 'only';
+};
+
+export type OrgArtistFilters = {
+  show?: 'pending-offers' | 'no-profile';
+};
+
+export type OrgOfferFilters = {
+  status?: OfferStatus;
+  /** NONE = the artist hasn't decided yet. */
+  decision?: ArtistDecision | 'NONE';
+};
+
+export function useOrganizationExhibitionsOverview(organizationId: string, params: ListQueryParams) {
+  return useApiGetPaged<ApiOrgOverviewExhibition>(
+    `${Paths.Organizations}/${organizationId}/exhibitions`,
+    [Paths.Organizations, organizationId, 'exhibitions'],
+    params,
+    { enabled: !!organizationId },
+  );
+}
+
+export function useOrganizationArtistsOverview(organizationId: string, params: ListQueryParams) {
+  return useApiGetPaged<ApiOrgOverviewArtist>(
+    `${Paths.Organizations}/${organizationId}/artists-overview`,
+    [Paths.Organizations, organizationId, 'artists-overview'],
+    params,
+    { enabled: !!organizationId },
+  );
+}
+
+export type TransactionStatus = 'PENDING' | 'HELD' | 'RELEASED' | 'REFUNDED' | 'FAILED';
+
+/** One org-wide offer with everything needed to follow it end to end. */
+export interface ApiOrgOverviewOfferRow {
+  id: string;
+  amount: number;
+  currency: string;
+  status: OfferStatus;
+  artistDecision: ArtistDecision | null;
+  /** Snapshotted when payment is held; null before that. */
+  commissionAmount: number | null;
+  commissionTaxAmount: number | null;
+  createdAt: string;
+  respondedAt: string | null;
+  buyer: { email: string };
+  artwork: { id: string; title: string; artistDisplayName: string; artistProfile: { displayName: string } };
+  /** Payment record; null until the buyer pays. */
+  transaction: {
+    status: TransactionStatus;
+    provider: string;
+    providerRef: string | null;
+    heldAt: string | null;
+    releasedAt: string | null;
+  } | null;
+}
+
+export function useOrganizationOffersOverview(organizationId: string, params: ListQueryParams) {
+  return useApiGetPaged<ApiOrgOverviewOfferRow>(
+    `${Paths.Organizations}/${organizationId}/offers`,
+    [Paths.Organizations, organizationId, 'offers'],
+    params,
+    { enabled: !!organizationId },
+  );
 }

@@ -1,42 +1,22 @@
-import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { adaptApiExhibition } from '../3d/backendAdapter';
-import { toFurnitureDef } from '../3d/furniture';
 import { useOwnExhibition } from '../../lib/api/domains/exhibitions';
-import { useFurnitureAssetsByOrganization } from '../../lib/api/domains/furnitureAssets';
-import { useMinimumLoadingTime, GALLERY_SCENE_MIN_LOADING_MS } from '../../lib/useMinimumLoadingTime';
-import ExhibitionPreviewScene from './ExhibitionPreviewScene';
-import '../../App.css';
+import ExhibitionPreviewContent from './ExhibitionPreviewContent';
 
 // /dashboard/organization/exhibitions/preview/:exhibitionId — lets a curator
 // walk through their own exhibition in the real 3D scene before publishing
 // it (DRAFT exhibitions 404 on the public GET /exhibitions/:id path, so this
 // uses useOwnExhibition/GET /exhibitions/mine/:id instead, same owner-only
-// endpoint ExhibitionArtworkPlacement.tsx already relies on — its Prisma
-// include already carries artworkLinks, so adaptApiExhibition works
-// unmodified). The actual rendering (canvas, instructions, HUD) lives in
-// ExhibitionPreviewScene.tsx, shared with ExhibitionTemplatePreviewPage.tsx —
-// this component is just the data-fetching/adaptation glue for the
-// exhibition case.
+// endpoint ExhibitionArtworkPlacement.tsx already relies on). Rendering
+// lives in ExhibitionPreviewContent.tsx, shared with the SUPERADMIN preview.
 export default function ExhibitionPreviewPage() {
   const navigate = useNavigate();
   const { exhibitionId } = useParams<{ exhibitionId: string }>();
-
-  const { data: backendDetail, isLoading } = useOwnExhibition(exhibitionId ?? '');
-  const { data: furnitureAssets } = useFurnitureAssetsByOrganization(
-    backendDetail?.exhibitionTemplate?.organizationId ?? null
-  );
-  const exhibition = useMemo(
-    () => (backendDetail ? adaptApiExhibition(backendDetail, (furnitureAssets ?? []).map(toFurnitureDef)) : null),
-    [backendDetail, furnitureAssets]
-  );
-  const showLoadingScreen = useMinimumLoadingTime(isLoading, GALLERY_SCENE_MIN_LOADING_MS);
+  const { data, isLoading } = useOwnExhibition(exhibitionId ?? '');
 
   return (
-    <ExhibitionPreviewScene
-      exhibition={exhibition}
-      showLoadingScreen={showLoadingScreen}
-      badgeKey="exhibitionPreviewBadge"
+    <ExhibitionPreviewContent
+      detail={data}
+      isLoading={isLoading}
       onBack={() => navigate('/dashboard/organization/exhibitions')}
     />
   );

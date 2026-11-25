@@ -31,10 +31,6 @@ export default function OrgAdminList({ organizationId, organizationName }: OrgAd
 
   return (
     <div className="flex flex-col gap-3 rounded-md bg-brand-50 p-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-brand-900">
-        {t('orgAdminsTitle', { name: organizationName })}
-      </h3>
-
       {!isLoading && (!admins || admins.length === 0) && (
         <p className="text-sm text-brand-600">{t('orgAdminEmpty')}</p>
       )}

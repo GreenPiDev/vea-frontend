@@ -122,6 +122,15 @@ export function useOwnExhibition(id: string) {
   });
 }
 
+// SUPERADMIN preview (organization detail page → "Görüntüle"): any
+// organization's exhibition in any status, same detail shape as
+// useOwnExhibition so ExhibitionPreviewContent renders it unchanged.
+export function useSuperAdminExhibition(id: string) {
+  return useApiGet<ApiExhibition>(`${Paths.ExhibitionsAdmin}/${id}`, [Paths.ExhibitionsAdmin, id], {
+    enabled: Boolean(id),
+  });
+}
+
 export function useExhibitionMutations() {
   return useApiMutations<ApiExhibition>(Paths.Exhibitions, [Paths.ExhibitionsMine], {
     create: { successKey: 'toastExhibitionCreateSuccess', errorKey: 'toastExhibitionCreateError' },

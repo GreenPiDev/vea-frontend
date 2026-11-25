@@ -92,3 +92,38 @@ describe("GenericTable expandable rows", () => {
     expect(screen.getAllByRole("button", { expanded: false })[0]).toHaveAccessibleName();
   });
 });
+
+describe("GenericTable onRowClick", () => {
+  it("calls onRowClick with the row, but not when a stopPropagation button in it is clicked", () => {
+    const onRowClick = vi.fn();
+    const onEdit = vi.fn();
+    const columns: GenericTableColumn<Row>[] = [
+      { key: "name", header: "Kurum", render: (row) => row.name },
+      {
+        key: "actions",
+        header: "İşlemler",
+        render: (row) => (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(row);
+            }}
+          >
+            {`edit-${row.id}`}
+          </button>
+        ),
+      },
+    ];
+    render(
+      <GenericTable columns={columns} data={rows} getRowKey={(row) => row.id} emptyMessage="boş" onRowClick={onRowClick} />,
+    );
+
+    fireEvent.click(screen.getByText("Başka Galeri"));
+    expect(onRowClick).toHaveBeenCalledWith(rows[1]);
+
+    fireEvent.click(screen.getByText("edit-a"));
+    expect(onEdit).toHaveBeenCalledWith(rows[0]);
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+});

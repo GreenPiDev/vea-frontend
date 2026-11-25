@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useOrganizationMutations, useOrganizations, type ApiOrganization } from '../../lib/api/domains/organizations';
 import { ApiError } from '../../lib/api/client';
 import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
 import GenericAddEditPanel from '../common/GenericAddEditPanel';
-import OrgAdminList from './OrgAdminList';
 import Tooltip from '../layout/Tooltip';
 import { EditIcon } from '../layout/icons';
 
@@ -13,18 +13,18 @@ import { EditIcon } from '../layout/icons';
 // ExhibitionForm elsewhere in this codebase).
 type FormMode = 'none' | 'create' | ApiOrganization;
 
-// Each organization row expands in place (GenericTable's `expandable`:
-// chevron at the row start, or a click anywhere on the row) to show its
-// admin list + "add admin by email" form (OrgAdminList). One row open at a
-// time, same single-`expandedId` pattern as ExhibitionStatsList.tsx.
+// Clicking an organization row opens its detail page
+// (/dashboard/admin/organizations/:id — KPIs, admins, exhibitions, artists;
+// see OrganizationDetailPage.tsx). The edit button in the actions column
+// stops propagation so it only opens the rename form.
 export default function OrganizationList() {
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { data: organizations, isLoading } = useOrganizations();
   const { create, update } = useOrganizationMutations();
   const [formMode, setFormMode] = useState<FormMode>('none');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const openCreate = () => {
     setFormMode('create');
@@ -49,8 +49,8 @@ export default function OrganizationList() {
         {
           onSuccess: (org) => {
             setFormMode('none');
-            // A new org has no admins yet — open its row straight to the add-admin form.
-            setExpandedId(org.id);
+            // A new org has no admins yet — go straight to its page (admins tab).
+            openDetail(org.id);
           },
           onError: (err) => setError(err instanceof ApiError ? err.message : t('orgFormError')),
         },
@@ -66,12 +66,16 @@ export default function OrganizationList() {
     }
   }
 
+  function openDetail(organizationId: string) {
+    navigate(`/dashboard/admin/organizations/${organizationId}`);
+  }
+
   const columns: GenericTableColumn<ApiOrganization>[] = [
     {
       key: 'name',
       header: t('orgColName'),
       render: (org) => (
-        <span className={expandedId === org.id ? 'font-medium text-brand-700' : 'text-brand-900'}>{org.name}</span>
+        <span className="font-medium text-brand-900">{org.name}</span>
       ),
     },
     {
@@ -92,7 +96,7 @@ export default function OrganizationList() {
           <button
             type="button"
             onClick={(e) => {
-              // Don't let the click reach the row — that would expand/collapse it.
+              // Don't let the click reach the row — that would open the detail page.
               e.stopPropagation();
               openEdit(org);
             }}
@@ -166,11 +170,7 @@ export default function OrganizationList() {
         getRowKey={(org) => org.id}
         isLoading={isLoading}
         emptyMessage={t('orgEmpty')}
-        expandable={{
-          isExpanded: (org) => expandedId === org.id,
-          onToggle: (org) => setExpandedId(expandedId === org.id ? null : org.id),
-          renderExpanded: (org) => <OrgAdminList organizationId={org.id} organizationName={org.name} />,
-        }}
+        onRowClick={(org) => openDetail(org.id)}
       />
     </div>
   );

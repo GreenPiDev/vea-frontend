@@ -34,6 +34,11 @@ interface GenericTableProps<T> {
   isLoading?: boolean;
   emptyMessage: string;
   expandable?: GenericTableExpandable<T>;
+  /** Makes the whole row a link-like target (pointer cursor + hover tint) —
+   * e.g. OrganizationList.tsx opens the organization's detail page. Same
+   * rule as `expandable`: buttons inside a cell must stopPropagation. Not
+   * combined with `expandable` (expansion wins if both are given). */
+  onRowClick?: (row: T) => void;
   /** Extra classes appended to a row's <tr> — e.g. ExhibitionList.tsx dims soft-deleted rows behind its "Kaldırılan sergileri göster" toggle. */
   getRowClassName?: (row: T) => string;
 }
@@ -44,7 +49,7 @@ interface GenericTableProps<T> {
 // (borders, header style, empty/loading state, optional row expansion).
 // OrgOfferTable.tsx is the first consumer; other panel tables migrate to
 // this incrementally, not in one pass.
-export default function GenericTable<T>({ columns, data, getRowKey, isLoading, emptyMessage, expandable, getRowClassName }: GenericTableProps<T>) {
+export default function GenericTable<T>({ columns, data, getRowKey, isLoading, emptyMessage, expandable, onRowClick, getRowClassName }: GenericTableProps<T>) {
   const { t } = useTranslation();
   if (isLoading) return null;
 
@@ -94,12 +99,13 @@ export default function GenericTable<T>({ columns, data, getRowKey, isLoading, e
             {data.map((row) => {
               const rowKey = getRowKey(row);
               const isExpanded = expandable?.isExpanded(row) ?? false;
+              const handleRowClick = expandable ? () => expandable.onToggle(row) : onRowClick ? () => onRowClick(row) : undefined;
 
               return (
                 <Fragment key={rowKey}>
                   <tr
-                    className={`border-b border-brand-100 last:border-0 ${expandable ? 'cursor-pointer hover:bg-brand-100/60' : ''} ${getRowClassName?.(row) ?? ''}`}
-                    onClick={expandable ? () => expandable.onToggle(row) : undefined}
+                    className={`border-b border-brand-100 last:border-0 ${handleRowClick ? 'cursor-pointer hover:bg-brand-100/60' : ''} ${getRowClassName?.(row) ?? ''}`}
+                    onClick={handleRowClick}
                   >
                     {expandable && (
                       <td className="px-4 py-3 text-brand-500">
