@@ -301,6 +301,12 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
       // behind it, hijacking the mouse into camera look while that UI is
       // still open.
       selector="#gallery-canvas-wrapper"
+      // Always lock the canvas itself. Without this drei picks `events.connected || gl.domElement` once, on
+      // its first render: on page load (walk mode stored) `events.connected` isn't set yet → canvas, but when
+      // the visitor switches click → walk it's already R3F's wrapper <div>, so the div got locked and every
+      // `pointerLockElement === canvas` check (mouse-look below, FrameScheduler, WalkArtworkPicker) failed —
+      // no looking around until a refresh.
+      domElement={gl.domElement}
       // Lock only — the look itself is smoothed in useFrame above (mouseLookSmoothing.ts).
       pointerSpeed={0}
       onLock={() => onLockChange?.(true)}
