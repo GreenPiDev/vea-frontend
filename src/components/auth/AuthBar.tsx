@@ -70,7 +70,7 @@ export default function AuthBar({ atTop }: AuthBarProps) {
       ]
     : [
         <HeaderTextLink key="login" atTop={atTop} onClick={() => setShowLogin(true)}>
-          {t('authLogin')}
+          {t('authBarLogin')}
         </HeaderTextLink>,
       ];
 

@@ -21,7 +21,8 @@ export default function Landing() {
           "linear-gradient(90deg, rgba(10, 7, 5, 0.9) 0%, rgba(15, 10, 6, 0.55) 55%, rgba(15, 10, 6, 0.35) 100%), url('/landing-hero.jpg')",
       }}
     >
-      <span className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-200">
+      {/* lang="en": marka adı İngilizce — Türkçe locale altında CSS `uppercase` "i"yi "İ" yapıyordu. */}
+      <span lang="en" className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-200">
         {t("headerBrandTitle")}
       </span>
       <h1 className="max-w-3xl text-5xl font-semibold leading-[1.05] text-white sm:text-6xl lg:text-7xl">
