@@ -28,9 +28,10 @@ interface RealtimeInvalidation {
  * REST resource to invalidate (see useExhibitionVisitorCount.ts, which
  * handles it directly).
  *
- * Notification `type` strings mirror vea-api (offers.service.ts's
- * NOTIFICATION_TYPES, artwork removal-request service) and
- * NotificationBell.tsx's renderMessage — keep them in sync by hand.
+ * Notification `type` strings mirror vea-api's
+ * src/notifications/notification-types.ts (pinned there by
+ * notification-types.contract.spec.ts) and NotificationBell.tsx's
+ * renderMessage — keep them in sync by hand.
  */
 export const REALTIME_INVALIDATION_MAP: RealtimeInvalidation[] = [
   {
