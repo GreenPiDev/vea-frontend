@@ -9,7 +9,7 @@ import { post, remove } from '../client';
 import { useApiGet, useApiGetList, useApiGetPaged, useApiMutations } from '../factory';
 import type { ListQueryParams } from '../paged';
 import type { ArtistDecision, OfferStatus } from './offers';
-import type { ArtworkStatus } from './artworks';
+import type { ArtworkCategory, ArtworkStatus } from './artworks';
 import type { ApiExhibition } from './exhibitions';
 
 export interface ApiOrganization {
@@ -239,5 +239,73 @@ export function useOrganizationOffersOverview(organizationId: string, params: Li
     [Paths.Organizations, organizationId, 'offers'],
     params,
     { enabled: !!organizationId },
+  );
+}
+
+// ---- Curator's artist detail page (/dashboard/organization/artists/:id) ----
+// Mirrors vea-api's OrganizationsService.getArtistDetail — one payload
+// (profile + every artwork + every offer) the page derives its KPIs and both
+// tabs from, so switching tabs never refetches.
+
+export interface ApiArtistDetailOffer {
+  id: string;
+  amount: number;
+  currency: string;
+  status: OfferStatus;
+  artistDecision: ArtistDecision | null;
+  commissionAmount: number | null;
+  commissionTaxAmount: number | null;
+  createdAt: string;
+  respondedAt: string | null;
+  buyer: { email: string; name: string | null };
+  transaction: ApiOrgOverviewOfferRow['transaction'];
+}
+
+export interface ApiArtistDetailArtwork {
+  id: string;
+  title: string;
+  artistDisplayName: string;
+  technique: string | null;
+  yearCreated: number | null;
+  heightCm: number;
+  widthCm: number;
+  category: ArtworkCategory;
+  priceAmount: number;
+  maxDiscountPercent: number | null;
+  currency: string;
+  imageUrl: string;
+  status: ArtworkStatus;
+  createdAt: string;
+  exhibitionLinks: {
+    exhibition: { id: string; title: string; status: ApiExhibition['status']; deletedAt: string | null };
+  }[];
+  /** visitEvents = distinct ARTWORK_VIEW sessions. */
+  _count: { visitEvents: number };
+  offers: ApiArtistDetailOffer[];
+}
+
+export interface ApiArtistDetail {
+  id: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  createdAt: string;
+  /** Null until the invited artist creates their profile. */
+  artistProfile: {
+    id: string;
+    displayName: string;
+    bio: string | null;
+    institutionName: string | null;
+    verified: boolean;
+    createdAt: string;
+    artworks: ApiArtistDetailArtwork[];
+  } | null;
+}
+
+export function useMyOrgArtist(userId: string) {
+  return useApiGet<ApiArtistDetail>(
+    `${Paths.Organizations}/mine/artists/${userId}`,
+    [...MINE_ARTISTS_KEY, userId],
+    { enabled: !!userId },
   );
 }

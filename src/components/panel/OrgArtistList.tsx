@@ -1,6 +1,7 @@
 import { currentIntlLocale } from '../../lib/i18n';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useAddMyOrgArtist, useMyOrgArtists, useRemoveMyOrgArtist, type ApiOrgArtist } from '../../lib/api/domains/organizations';
 import { ApiError } from '../../lib/api/client';
 import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
@@ -10,8 +11,10 @@ import { TrashIcon } from '../layout/icons';
 
 // Same list+add+remove shape as OrgAdminList.tsx, but "mine" — the ADMIN's
 // own organization, no id prop needed (backend derives it from the JWT).
+// A row opens that artist's detail page (OrgArtistDetailPage.tsx).
 export default function OrgArtistList() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { data: artists, isLoading } = useMyOrgArtists();
   const addArtist = useAddMyOrgArtist();
   const removeArtist = useRemoveMyOrgArtist();
@@ -66,7 +69,11 @@ export default function OrgArtistList() {
         <Tooltip label={t('artistRemove')} placement="top">
           <button
             type="button"
-            onClick={() => setPendingRemove(artist)}
+            onClick={(e) => {
+              // The row itself navigates to the detail page (see GenericTable's onRowClick).
+              e.stopPropagation();
+              setPendingRemove(artist);
+            }}
             aria-label={t('artistRemove')}
             className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-red-300 text-red-600 transition-colors hover:bg-red-50 hover:text-red-800"
           >
@@ -87,6 +94,7 @@ export default function OrgArtistList() {
         getRowKey={(artist) => artist.id}
         isLoading={isLoading}
         emptyMessage={t('artistEmpty')}
+        onRowClick={(artist) => navigate(`/dashboard/organization/artists/${artist.id}`)}
       />
 
       <form onSubmit={handleSubmit} className="flex w-full flex-col gap-2 rounded-md bg-brand-50 p-4 shadow-sm">

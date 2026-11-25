@@ -4,6 +4,7 @@ import SuperAdminPanel from "../components/panel/SuperAdminPanel";
 import OrganizationDetailPage from "../components/panel/OrganizationDetailPage";
 import AdminExhibitionPreviewPage from "../components/panel/AdminExhibitionPreviewPage";
 import CuratorPanel from "../components/panel/CuratorPanel";
+import OrgArtistDetailPage from "../components/panel/OrgArtistDetailPage";
 import NewExhibitionPage from "../components/panel/NewExhibitionPage";
 import EditExhibitionPage from "../components/panel/EditExhibitionPage";
 import NewExhibitionTemplatePage from "../components/panel/NewExhibitionTemplatePage";
@@ -96,6 +97,10 @@ export default function Dashboard() {
           <Route
             path="organization/exhibition-templates/preview/:templateId"
             element={<ExhibitionTemplatePreviewPage />}
+          />
+          <Route
+            path="organization/artists/:artistId"
+            element={<OrgArtistDetailPage onBack={onBack} />}
           />
           <Route path="organization/:section" element={<CuratorPanel onBack={onBack} />} />
           <Route path="*" element={<Navigate to="organization/exhibitions" replace />} />
