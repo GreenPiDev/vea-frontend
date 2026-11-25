@@ -141,6 +141,8 @@ export interface CeilingLightUniforms {
   uSlabRect: { value: THREE.Vector4 };
   /** … and underside, top, 1 when the room has one (0 = no slab, the test is skipped). */
   uSlabY: { value: THREE.Vector3 };
+  /** Fixtures' first bounce onto the ceiling (ceilingBounce.ts), linear RGB before uCeilingLightColor. Ceiling material only. */
+  uCeilingBounce: { value: THREE.Vector3 };
 }
 
 /**
@@ -155,7 +157,13 @@ export const ceilingLightUniforms: CeilingLightUniforms = {
   uCeilingLightColor: { value: new THREE.Color(1, 1, 1) },
   uSlabRect: { value: new THREE.Vector4() },
   uSlabY: { value: new THREE.Vector3() },
+  uCeilingBounce: { value: new THREE.Vector3() },
 };
+
+/** The current room's ceiling bounce (ceilingBounce.ts). Always written — a room without fixtures clears it. */
+export function setCeilingBounce(rgb: [number, number, number]): void {
+  ceilingLightUniforms.uCeilingBounce.value.set(rgb[0], rgb[1], rgb[2]);
+}
 
 /** The current room's mezzanine slab (null: none) — it shadows the fixtures on the other side of it. */
 export function setCeilingSlab(m: Pick<Mezzanine, "rect" | "top" | "underside"> | null | undefined): void {
@@ -188,6 +196,7 @@ uniform int uCeilingLightCount;
 uniform vec3 uCeilingLightColor;
 uniform vec4 uSlabRect;
 uniform vec3 uSlabY;
+uniform vec3 uCeilingBounce;
 
 // Mirrors mezzanine.ts's slabVisibility(): the segment p → light crossing the slab's mid-plane inside its
 // footprint is blocked, with a soft band at the edge.

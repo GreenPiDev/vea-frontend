@@ -55,6 +55,21 @@ export const SPOT_INTENSITY_SCALE = 0.75;
  */
 export const CEILING_FILL_SCALE = 0.55;
 /**
+ * Multiplier on the ceiling fixtures' first bounce onto the ceiling (ceilingBounce.ts, 2026-11-25): the light
+ * the floor and walls reflect back up, which is what actually lights a real gallery ceiling. 1 = the
+ * physical first-bounce estimate (view factor × albedo × average irradiance); 0.75 because walls and floor
+ * get no bounce term of their own — at 1 a light ceiling caught up with the walls (light parquet + off-white
+ * walls, 24 × 20 × 5 m: bounce ≈ 0.43 vs the cut fill's 0.17, walls ≈ 0.5–0.7). Added on top of the cut fill
+ * above, so the ceiling stays a tone darker than the walls but no longer reads as a dark, muddy lid.
+ */
+export const CEILING_BOUNCE_SCALE = 0.75;
+/**
+ * Share of the ceiling bounce's colour pulled toward its own luminance. The first-bounce estimate carries the
+ * floor's full tint (a light parquet gave a clearly brown ceiling); in a real room the further bounces
+ * between off-white walls and ceiling wash most of it out. Same idea as the window light's 40 % desaturation.
+ */
+export const CEILING_BOUNCE_DESATURATION = 0.6;
+/**
  * Ceiling colour multiplier inside the env map (RoomEnvironment.tsx), i.e. how bright glossy floors
  * reflect the ceiling. Was 0.7; lowered with CEILING_FILL_SCALE so the reflection matches the darker
  * ceiling the visitor actually sees.

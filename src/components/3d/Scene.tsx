@@ -116,7 +116,7 @@ export default function Scene({
   const [cameraZoom] = useState<CameraZoom>(() => ({ zoom: 1 }));
   // FPS-driven quality (0..1), turned into a pixel ratio by AdaptiveRenderScale above.
   const [quality, setQuality] = useState(INITIAL_QUALITY);
-  const [antialias] = useState(() => antialiasMode(window.devicePixelRatio));
+  const [antialias] = useState(() => antialiasMode(window.devicePixelRatio, isTouchPrimaryDevice()));
 
   const layout = useMemo(
     () =>

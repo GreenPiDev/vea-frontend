@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { CEILING_AO, DEFAULT_AO_FIELD_OPTIONS, FURNITURE_CONTACT, FURNITURE_FIELD_RANGE, type AoField } from "./roomAo";
 import { EYE_HEIGHT, WALL_THICKNESS } from "./galleryLayout";
 import { CEILING_FILL_SCALE } from "./sceneLighting";
+import { BASEBOARD_FADE_END, BASEBOARD_FADE_START } from "./baseboard";
 import { UNDER_SLAB_REACH, UNDER_SLAB_SHADE } from "./mezzanine";
 import { CEILING_LIGHT_FRAGMENT_DECL, CEILING_ONLY_FRAGMENT_DECL, ceilingLightApply, ceilingLightUniforms } from "./ceilingLight";
 import { windowLightUniforms } from "./windowLight";
@@ -102,16 +103,42 @@ vec3 roomBakedDaylight() {
 const VERTEX_DECL = /* glsl */ `
 varying vec3 vRoomAoWorldPos;
 varying vec3 vRoomAoWorldNormal;
+#ifdef ROOM_BASEBOARD
+attribute vec3 baseboardOutward;
+varying vec3 vBaseboardOutward;
+#endif
 `;
 
 const VERTEX_BODY = /* glsl */ `
 vRoomAoWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
 vRoomAoWorldNormal = normalize(mat3(modelMatrix) * objectNormal);
+#ifdef ROOM_BASEBOARD
+vBaseboardOutward = normalize(mat3(modelMatrix) * baseboardOutward);
+#endif
+`;
+
+// Skirting boards only (baseboard.ts BASEBOARD_FADE_*): once a pixel covers a sizeable share of the board's
+// up-facing strip (chamfer + top, ~1.5 cm), its normal eases to the side's front normal, so the bright line
+// fades out instead of crawling at sub-pixel width. Footprint = world size of a pixel on the surface itself,
+// so a grazing view of the top (long footprint in depth) fades sooner, as it should. Runs after the normal map
+// step, before any lighting reads `normal`; on the front face it's a no-op (normal = outward).
+const BASEBOARD_NORMAL_FADE = /* glsl */ `
+#ifdef ROOM_BASEBOARD
+{
+  float footprint = max(length(dFdx(vRoomAoWorldPos)), length(dFdy(vRoomAoWorldPos)));
+  float fade = smoothstep(${BASEBOARD_FADE_START.toFixed(5)}, ${BASEBOARD_FADE_END.toFixed(5)}, footprint);
+  vec3 frontN = normalize((viewMatrix * vec4(vBaseboardOutward, 0.0)).xyz);
+  normal = normalize(mix(normal, frontN, fade));
+}
+#endif
 `;
 
 const FRAGMENT_DECL = /* glsl */ `
 varying vec3 vRoomAoWorldPos;
 varying vec3 vRoomAoWorldNormal;
+#ifdef ROOM_BASEBOARD
+varying vec3 vBaseboardOutward;
+#endif
 uniform sampler2D uRoomAoMap;
 uniform vec4 uRoomAoBounds;
 uniform float uRoomWallHeight;
@@ -167,6 +194,15 @@ float roomCeilingLightOcclusion() {
   #endif
 }
 
+// Ceiling: walls only — furniture sits far below it. The wall channel is remapped to a much narrower, weaker
+// band than the floor's (mirrors roomAo.ts's ceilingOcclusion()). Its fill is then scaled down
+// (CEILING_FILL_SCALE, sceneLighting.ts); the same band also shapes its bounce light (FRAGMENT_APPLY).
+float roomCeilingWallAo() {
+  float wallProximity = clamp(
+    (1.0 - roomAoField(vRoomAoWorldPos.xz).r) / ${DEFAULT_AO_FIELD_OPTIONS.wall.strength.toFixed(3)}, 0.0, 1.0);
+  return 1.0 - ${CEILING_AO.strength.toFixed(3)} * pow(wallProximity, ${CEILING_AO.sharpness.toFixed(1)});
+}
+
 float roomAmbientOcclusion() {
   #if ROOM_AO_SURFACE == 2
     // Walls: sampling the field one falloff-radius out along the wall's own normal puts the sample
@@ -183,13 +219,8 @@ float roomAmbientOcclusion() {
     vec2 ao = roomAoField(vRoomAoWorldPos.xz);
     return ao.r * roomFurnitureContact(ao.g);
   #else
-    // Ceiling: walls only — furniture sits far below it. The wall channel is remapped to a much narrower,
-    // weaker band than the floor's (mirrors roomAo.ts's ceilingOcclusion()). Scaled down overall: the
-    // ceiling only gets bounce light in a real room, so it's kept darker than the walls (sceneLighting.ts).
-    float wallProximity = clamp(
-      (1.0 - roomAoField(vRoomAoWorldPos.xz).r) / ${DEFAULT_AO_FIELD_OPTIONS.wall.strength.toFixed(3)}, 0.0, 1.0);
-    float ceilingAo = 1.0 - ${CEILING_AO.strength.toFixed(3)} * pow(wallProximity, ${CEILING_AO.sharpness.toFixed(1)});
-    return ceilingAo * ${CEILING_FILL_SCALE.toFixed(3)};
+    // Ceiling: handled in FRAGMENT_APPLY (roomCeilingWallAo × CEILING_FILL_SCALE, shared with its bounce).
+    return 1.0;
   #endif
 }
 `;
@@ -215,9 +246,21 @@ float roomSlabOcclusion() {
 
 // Mirrors three r185's aomap_fragment.glsl.js body (minus the texture read), so indirect specular
 // from the environment map gets the same roughness-aware specular occlusion a real aoMap would.
+//
+// Ceiling only: also adds the fixtures' first bounce off floor + walls (ceilingBounce.ts, one uniform). Done
+// here — after lights_fragment_end, before three sums directDiffuse — so the wall band (one AO texture read)
+// and the slab dimming are computed once and shared with the fill. Added to directDiffuse, not the indirect
+// fill, so CEILING_FILL_SCALE doesn't cut it again.
 const FRAGMENT_APPLY = /* glsl */ `
 {
-  float ambientOcclusion = roomAmbientOcclusion() * roomSlabOcclusion();
+  float roomSlab = roomSlabOcclusion();
+  #if ROOM_AO_SURFACE == 1
+    float roomCeilingAo = roomCeilingWallAo() * roomSlab;
+    float ambientOcclusion = roomCeilingAo * ${CEILING_FILL_SCALE.toFixed(3)};
+    reflectedLight.directDiffuse += uCeilingBounce * uCeilingLightColor * BRDF_Lambert(material.diffuseColor) * roomCeilingAo;
+  #else
+    float ambientOcclusion = roomAmbientOcclusion() * roomSlab;
+  #endif
   reflectedLight.indirectDiffuse *= ambientOcclusion;
   #if defined( USE_CLEARCOAT )
     clearcoatSpecularIndirect *= ambientOcclusion;
@@ -261,7 +304,7 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
     // Specular AA (specularAa.ts): normal detail a pixel can't resolve becomes roughness, so glossy floors
     // don't sparkle in the distance.
     .replace("#include <normal_fragment_begin>", `${SPEC_AA_DECLARE}\n#include <normal_fragment_begin>`)
-    .replace("#include <normal_fragment_maps>", NORMAL_FRAGMENT_MAPS)
+    .replace("#include <normal_fragment_maps>", `${NORMAL_FRAGMENT_MAPS}\n${BASEBOARD_NORMAL_FADE}`)
     .replace("#include <lights_physical_fragment>", `#include <lights_physical_fragment>\n${SPEC_AA_ROUGHNESS}`)
     // Directional light from the ceiling fixtures (ceilingLight.ts) — direct light, so the AO below
     // doesn't touch it; only furniture contact shadows on the floor scale it.
@@ -281,9 +324,16 @@ export function applyRoomAo(
   surface: RoomAoSurface,
   uniforms: RoomAoUniforms,
   macroVariation: number = surface === "ceiling" ? CEILING_MACRO_VARIATION : DEFAULT_MACRO_VARIATION,
-  daylight: RoomDaylight = { mode: "live" }
+  daylight: RoomDaylight = { mode: "live" },
+  options: { baseboard?: boolean } = {}
 ): void {
-  material.defines = { ...(material.defines ?? {}), ROOM_AO_SURFACE: SURFACE_DEFINE[surface], ROOM_DAYLIGHT: DAYLIGHT_DEFINE[daylight.mode] };
+  material.defines = {
+    ...(material.defines ?? {}),
+    ROOM_AO_SURFACE: SURFACE_DEFINE[surface],
+    ROOM_DAYLIGHT: DAYLIGHT_DEFINE[daylight.mode],
+    // Skirting boards (baseboard.ts): distance fade of the up-facing faces — its own program.
+    ...(options.baseboard ? { ROOM_BASEBOARD: 1 } : {}),
+  };
   material.userData.roomAoUniforms = uniforms;
   material.userData.daylight = daylight;
   material.userData.macroVariation = { value: macroVariation };

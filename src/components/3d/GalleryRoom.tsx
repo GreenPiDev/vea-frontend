@@ -196,7 +196,7 @@ function Baseboards({
       roughness: BASEBOARD_ROUGHNESS,
       metalness: 0,
     });
-    applyRoomAo(m, "wall", aoUniforms, undefined, daylight);
+    applyRoomAo(m, "wall", aoUniforms, undefined, daylight, { baseboard: true });
     return m;
   }, [wallColor, aoUniforms, daylight]);
   useEffect(() => () => material.dispose(), [material]);

@@ -1,7 +1,8 @@
 import { useLayoutEffect, useMemo } from "react";
 import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
-import { ceilingLightsForLayout, setCeilingLights, setCeilingSlab } from "./ceilingLight";
+import { ceilingLightsForLayout, setCeilingBounce, setCeilingLights, setCeilingSlab } from "./ceilingLight";
+import { ceilingBounceIrradiance } from "./ceilingBounce";
 import { HEMISPHERE_INTENSITY, ROOM_FILL_SCALE } from "./sceneLighting";
 import { setWindowLights, windowLightsFor } from "./windowLight";
 import { setSunLight, sunSetupFor } from "./sunLight";
@@ -69,10 +70,13 @@ export default function GalleryLights() {
   // positions into the shared uniforms before the first frame. Uniforms are read at draw time, so no
   // material recompiles when the room changes.
   useLayoutEffect(() => {
-    setCeilingLights(ceilingLightsForLayout(layout.ceilingSpots, theme.ambientIntensity, layout.mezzanine), theme.spotColor);
+    const lights = ceilingLightsForLayout(layout.ceilingSpots, theme.ambientIntensity, layout.mezzanine);
+    setCeilingLights(lights, theme.spotColor);
     // A mezzanine slab shadows the fixtures on its other side (always written: clears the previous room's).
     setCeilingSlab(layout.mezzanine);
-  }, [layout.ceilingSpots, layout.mezzanine, theme.ambientIntensity, theme.spotColor]);
+    // What floor + walls reflect back onto the ceiling (ceilingBounce.ts) — once per room, a few k samples.
+    setCeilingBounce(ceilingBounceIrradiance(layout, lights, linearAlbedo(theme.floorColor), linearAlbedo(theme.wallColor)));
+  }, [layout, theme.ambientIntensity, theme.spotColor, theme.floorColor, theme.wallColor]);
 
   // Daylight through the windows (windowLight.ts), coloured by the view outside. Always written — a room
   // without windows clears the previous room's.

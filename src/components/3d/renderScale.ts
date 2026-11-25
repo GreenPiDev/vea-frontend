@@ -16,18 +16,22 @@ export const MAX_RENDER_PIXELS = 1920 * 1080;
 export const MIN_RENDER_SCALE = 0.5;
 /** On the slowest path a high-density screen still gets at least this share of its native density. */
 export const MIN_DENSITY_SHARE = 0.5;
-/** At or above this density the cheaper FXAA replaces SMAA. */
+/** At or above this density a touch device gets the cheaper FXAA instead of SMAA. */
 export const FXAA_MIN_DEVICE_PIXEL_RATIO = 2;
 
 export type AntialiasMode = "smaa" | "fxaa";
 
 /**
  * SMAA is three full-screen passes — fine on a desktop, a real cost at phone resolutions. FXAA is a single
- * pass; its slight softening, visible at 1×, disappears at phone/retina density. Without any pass, painting
+ * pass; its slight softening, visible at 1×, disappears at phone density. Without any pass, painting
  * frame edges look jagged even on a 2.6× phone screen, so one of the two always runs.
+ *
+ * Desktops always get SMAA (2026-11-25): a Retina Mac is also dpr 2, but MAX_RENDER_PIXELS caps it at
+ * ~1.3× (≈ 65 % of native, upscaled), so FXAA's "density hides it" assumption fails there — the wall/ceiling
+ * line and the skirting read as stair-steps and the skirting's thin chamfer shimmered while walking.
  */
-export function antialiasMode(devicePixelRatio: number): AntialiasMode {
-  return devicePixelRatio >= FXAA_MIN_DEVICE_PIXEL_RATIO ? "fxaa" : "smaa";
+export function antialiasMode(devicePixelRatio: number, touchPrimary: boolean): AntialiasMode {
+  return touchPrimary && devicePixelRatio >= FXAA_MIN_DEVICE_PIXEL_RATIO ? "fxaa" : "smaa";
 }
 
 export interface RenderScaleInput {

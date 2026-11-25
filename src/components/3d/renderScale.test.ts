@@ -15,11 +15,16 @@ describe("renderPixelRatio", () => {
     expect(renderPixelRatio({ ...phone, quality: 0 })).toBeGreaterThanOrEqual(1.3);
   });
 
-  it("uses the cheaper FXAA only on high-density screens", () => {
-    expect(antialiasMode(1)).toBe("smaa");
-    expect(antialiasMode(1.5)).toBe("smaa");
-    expect(antialiasMode(2)).toBe("fxaa");
-    expect(antialiasMode(2.625)).toBe("fxaa");
+  it("uses the cheaper FXAA only on high-density touch screens", () => {
+    expect(antialiasMode(1, true)).toBe("smaa");
+    expect(antialiasMode(1.5, true)).toBe("smaa");
+    expect(antialiasMode(2, true)).toBe("fxaa");
+    expect(antialiasMode(2.625, true)).toBe("fxaa");
+  });
+
+  it("keeps SMAA on a desktop even at retina density (rendered below native there)", () => {
+    expect(antialiasMode(2, false)).toBe("smaa");
+    expect(antialiasMode(1, false)).toBe("smaa");
   });
 
   it("never exceeds the device's own density", () => {
