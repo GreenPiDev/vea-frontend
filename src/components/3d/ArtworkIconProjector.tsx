@@ -8,7 +8,6 @@ import { useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
-import { ARTWORKS } from "./artworks";
 import { EYE_HEIGHT } from "./galleryLayout";
 
 export interface ArtworkIconPosition {
@@ -41,10 +40,7 @@ export default function ArtworkIconProjector({
     if (clock.elapsedTime - lastUpdate.current < UPDATE_INTERVAL) return;
     lastUpdate.current = clock.elapsedTime;
 
-    // Same fallback GalleryArtworks.tsx uses — the static demo exhibitions
-    // never populate exhibition.artworks, so icons work there too.
-    const artworks =
-      exhibition.artworks ?? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id);
+    const artworks = exhibition.artworks ?? [];
 
     const positions: ArtworkIconPosition[] = artworks.map((artwork) => {
       const width = artwork.height * artwork.aspect;

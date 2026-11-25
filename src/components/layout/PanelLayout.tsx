@@ -87,7 +87,7 @@ export default function PanelLayout({
         logoutLabel={t('authLogout')}
       />
 
-      {/* Darkened sanat-galerisi.jpg backdrop — shared by every role's
+      {/* Darkened sanat-galerisi.webp backdrop — shared by every role's
           dashboard since they all render through this shell. The overlay is
           baked into the same `backgroundImage` (linear-gradient stacked on
           top of the url()) rather than a separate absolutely-positioned
@@ -97,7 +97,7 @@ export default function PanelLayout({
         className="relative h-full overflow-y-auto bg-cover bg-center bg-no-repeat pt-16 md:pl-16"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(15, 10, 6, 0.72), rgba(15, 10, 6, 0.72)), url('/sanat-galerisi.jpg')",
+            "linear-gradient(rgba(15, 10, 6, 0.72), rgba(15, 10, 6, 0.72)), url('/sanat-galerisi.webp')",
         }}
       >
         <div className={`px-6 py-8 ${fullWidth ? 'w-full' : 'max-w-6xl'}`}>{children}</div>

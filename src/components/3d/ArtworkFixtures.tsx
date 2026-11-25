@@ -1,6 +1,7 @@
-import { Fragment, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { Instance, Instances } from "@react-three/drei";
+import StaticInstances from "./StaticInstances";
+import type { StaticInstance } from "./instanceMatrices";
 import type { Artwork as ArtworkData } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
 import { CANONICAL_ARM_RADIUS, FIXTURE_BASE_LENGTH, computeFixtureTransform } from "./fixtureGeometry";
@@ -14,6 +15,13 @@ import { CANONICAL_ARM_RADIUS, FIXTURE_BASE_LENGTH, computeFixtureTransform } fr
 const FIXTURE_BASE_MATERIAL = new THREE.MeshStandardMaterial({ color: "#1a1a1a", roughness: 0.4, metalness: 0.6 });
 const FIXTURE_ARM_MATERIAL = new THREE.MeshStandardMaterial({ color: "#1a1a1a", roughness: 0.35, metalness: 0.6 });
 const FIXTURE_BAR_MATERIAL = new THREE.MeshStandardMaterial({ color: "#1c1c1c", roughness: 0.3, metalness: 0.6 });
+
+// Shared by every room (never disposed). Wall bases and bars: radialSegments 10 (was 20) — at this radius
+// and normal viewing distance the facets aren't distinguishable.
+const BASE_GEOMETRY = new THREE.CylinderGeometry(0.055, 0.055, FIXTURE_BASE_LENGTH, 10);
+const ARM_GEOMETRY = new THREE.TorusGeometry(CANONICAL_ARM_RADIUS, 0.016, 6, 14, Math.PI);
+const BAR_GEOMETRY = new THREE.CylinderGeometry(0.032, 0.032, 1, 10);
+const STRIP_GEOMETRY = new THREE.BoxGeometry(1, 0.014, 0.02);
 
 /** Every painting's swing-arm picture-light fixture (wall base + 2 curved arms + light bar + LED strip), batched into shared InstancedMesh pools instead of one set of meshes per painting. The light itself isn't a three.js light: it's baked on the walls (pictureLightBake.ts) and evaluated on each painting/label (pictureLightMaterial.ts), always on. */
 export default function ArtworkFixtures({ artworks }: { artworks: ArtworkData[] }) {
@@ -39,52 +47,36 @@ export default function ArtworkFixtures({ artworks }: { artworks: ArtworkData[] 
       }),
     [exhibition.theme.spotColor]
   );
+  useEffect(() => () => ledMaterial.dispose(), [ledMaterial]);
+
+  // Static instance lists (instanceMatrices.ts) — rebuilt only when the paintings or the wall height change.
+  const instances = useMemo(
+    () => ({
+      bases: transforms.map((t): StaticInstance => ({ position: t.basePosition, quaternion: t.baseQuaternion })),
+      // Two curved support arms per painting — the torus geometry is built at the canonical (overwhelmingly
+      // common) ring radius; the rare painting whose lamp gets clamped against a low ceiling gets a uniform
+      // scale correction instead of its own geometry (see fixtureGeometry.ts's CANONICAL_ARM_RADIUS doc).
+      arms: transforms.flatMap((t): StaticInstance[] => {
+        const scale = t.armRadius / CANONICAL_ARM_RADIUS;
+        return t.armCenters.map((position) => ({ position, quaternion: t.armQuaternion, scale }));
+      }),
+      // Light bars — unit-length shared geometry, stretched to each painting's actual bar length via a
+      // per-instance non-uniform Y scale (the cylinder's radius, unaffected by a Y-only scale, stays correct).
+      bars: transforms.map((t): StaticInstance => ({ position: t.barPosition, quaternion: t.barQuaternion, scale: [1, t.barLength, 1] })),
+      // Glowing LED strip along each bar's underside — same unit-geometry + non-uniform-scale trick, along X.
+      strips: transforms.map((t): StaticInstance => ({ position: t.stripPosition, quaternion: t.stripQuaternion, scale: [t.stripLength, 1, 1] })),
+    }),
+    [transforms]
+  );
 
   if (transforms.length === 0) return null;
 
   return (
     <>
-      {/* Wall-mounted bases — radialSegments dropped from 20 to 10, same reasoning as the rest of this
-          fixture: at this radius and normal viewing distance the facets aren't distinguishable. */}
-      <Instances limit={transforms.length} material={FIXTURE_BASE_MATERIAL}>
-        <cylinderGeometry args={[0.055, 0.055, FIXTURE_BASE_LENGTH, 10]} />
-        {transforms.map((t, i) => (
-          <Instance key={i} position={t.basePosition} quaternion={t.baseQuaternion} />
-        ))}
-      </Instances>
-
-      {/* Two curved support arms per painting — the torus geometry is built at the canonical (overwhelmingly
-          common) ring radius; the rare painting whose lamp gets clamped against a low ceiling gets a uniform
-          scale correction instead of its own geometry (see fixtureGeometry.ts's CANONICAL_ARM_RADIUS doc). */}
-      <Instances limit={transforms.length * 2} material={FIXTURE_ARM_MATERIAL}>
-        <torusGeometry args={[CANONICAL_ARM_RADIUS, 0.016, 6, 14, Math.PI]} />
-        {transforms.map((t, i) => {
-          const scale = t.armRadius / CANONICAL_ARM_RADIUS;
-          return (
-            <Fragment key={i}>
-              <Instance position={t.armCenters[0]} quaternion={t.armQuaternion} scale={scale} />
-              <Instance position={t.armCenters[1]} quaternion={t.armQuaternion} scale={scale} />
-            </Fragment>
-          );
-        })}
-      </Instances>
-
-      {/* Light bars — unit-length shared geometry, stretched to each painting's actual bar length via a
-          per-instance non-uniform Y scale (the cylinder's radius, unaffected by a Y-only scale, stays correct). */}
-      <Instances limit={transforms.length} material={FIXTURE_BAR_MATERIAL}>
-        <cylinderGeometry args={[0.032, 0.032, 1, 10]} />
-        {transforms.map((t, i) => (
-          <Instance key={i} position={t.barPosition} quaternion={t.barQuaternion} scale={[1, t.barLength, 1]} />
-        ))}
-      </Instances>
-
-      {/* Glowing LED strip along each bar's underside — same unit-geometry + non-uniform-scale trick, along X. */}
-      <Instances limit={transforms.length} material={ledMaterial}>
-        <boxGeometry args={[1, 0.014, 0.02]} />
-        {transforms.map((t, i) => (
-          <Instance key={i} position={t.stripPosition} quaternion={t.stripQuaternion} scale={[t.stripLength, 1, 1]} />
-        ))}
-      </Instances>
+      <StaticInstances geometry={BASE_GEOMETRY} material={FIXTURE_BASE_MATERIAL} instances={instances.bases} />
+      <StaticInstances geometry={ARM_GEOMETRY} material={FIXTURE_ARM_MATERIAL} instances={instances.arms} />
+      <StaticInstances geometry={BAR_GEOMETRY} material={FIXTURE_BAR_MATERIAL} instances={instances.bars} />
+      <StaticInstances geometry={STRIP_GEOMETRY} material={ledMaterial} instances={instances.strips} />
     </>
   );
 }

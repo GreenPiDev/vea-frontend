@@ -18,7 +18,7 @@ import {
 import { setWindowLights } from "./windowLight";
 import { setSunLight } from "./sunLight";
 import { writeSunOccluderUniforms } from "./sunOccluders";
-import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
+import { CONCEPT_EXHIBITIONS } from "./__fixtures__/demoRooms";
 
 const ex = CONCEPT_EXHIBITIONS.find((e) => e.id === "vitrin-8")!;
 const layout = ex.customLayout!;

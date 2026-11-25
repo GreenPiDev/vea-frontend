@@ -14,12 +14,12 @@
   /* Top padding reserves space for the fixed Header (h-16 = 64px) so content
      starts below it in normal flow instead of being covered by it. */
   padding: 88px 24px 24px;
-  /* Landing.tsx ile aynı hero görseli (landing-hero.jpg, bkz. o dosyadaki
+  /* Landing.tsx ile aynı hero görseli (landing-hero.webp, bkz. o dosyadaki
      lisans notu) — koyu radial gradyan üstte katman olarak kalıyor ki
      kartların kontrastı/okunabilirliği önceki düz koyu arka planla aynı
      kalsın, sadece görsel bir "galeri" dokusu eklenmiş olsun. */
   background: radial-gradient(circle at 50% 30%, rgba(28, 26, 23, 0.88) 0%, rgba(12, 11, 10, 0.94) 75%),
-    url("/landing-hero.jpg") center / cover no-repeat fixed;
+    url("/landing-hero.webp") center / cover no-repeat fixed;
   font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #f6f5f1;
 }

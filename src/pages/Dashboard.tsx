@@ -1,23 +1,27 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import LoadingScreen from "../components/common/LoadingScreen";
-import SuperAdminPanel from "../components/panel/SuperAdminPanel";
-import OrganizationDetailPage from "../components/panel/OrganizationDetailPage";
-import AdminExhibitionPreviewPage from "../components/panel/AdminExhibitionPreviewPage";
-import CuratorPanel from "../components/panel/CuratorPanel";
-import OrgArtistDetailPage from "../components/panel/OrgArtistDetailPage";
-import NewExhibitionPage from "../components/panel/NewExhibitionPage";
-import EditExhibitionPage from "../components/panel/EditExhibitionPage";
-import NewExhibitionTemplatePage from "../components/panel/NewExhibitionTemplatePage";
-import EditExhibitionTemplatePage from "../components/panel/EditExhibitionTemplatePage";
-import ExhibitionTemplatePreviewPage from "../components/panel/ExhibitionTemplatePreviewPage";
-import AddArtworkPage from "../components/panel/AddArtworkPage";
-import ExhibitionPreviewPage from "../components/panel/ExhibitionPreviewPage";
-import ArtistPanel from "../components/panel/ArtistPanel";
-import NewArtworkPage from "../components/panel/NewArtworkPage";
-import EditArtworkPage from "../components/panel/EditArtworkPage";
-import BuyerPanel from "../components/panel/BuyerPanel";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useMinimumLoadingTime } from "../lib/useMinimumLoadingTime";
+
+// Every panel page is its own chunk: the 3D preview/editor pages pull in three.js, which a curator
+// browsing tables (or a buyer checking offers) shouldn't have to download first.
+const SuperAdminPanel = lazy(() => import("../components/panel/SuperAdminPanel"));
+const OrganizationDetailPage = lazy(() => import("../components/panel/OrganizationDetailPage"));
+const AdminExhibitionPreviewPage = lazy(() => import("../components/panel/AdminExhibitionPreviewPage"));
+const CuratorPanel = lazy(() => import("../components/panel/CuratorPanel"));
+const OrgArtistDetailPage = lazy(() => import("../components/panel/OrgArtistDetailPage"));
+const NewExhibitionPage = lazy(() => import("../components/panel/NewExhibitionPage"));
+const EditExhibitionPage = lazy(() => import("../components/panel/EditExhibitionPage"));
+const NewExhibitionTemplatePage = lazy(() => import("../components/panel/NewExhibitionTemplatePage"));
+const EditExhibitionTemplatePage = lazy(() => import("../components/panel/EditExhibitionTemplatePage"));
+const ExhibitionTemplatePreviewPage = lazy(() => import("../components/panel/ExhibitionTemplatePreviewPage"));
+const AddArtworkPage = lazy(() => import("../components/panel/AddArtworkPage"));
+const ExhibitionPreviewPage = lazy(() => import("../components/panel/ExhibitionPreviewPage"));
+const ArtistPanel = lazy(() => import("../components/panel/ArtistPanel"));
+const NewArtworkPage = lazy(() => import("../components/panel/NewArtworkPage"));
+const EditArtworkPage = lazy(() => import("../components/panel/EditArtworkPage"));
+const BuyerPanel = lazy(() => import("../components/panel/BuyerPanel"));
 
 // Markalı LoadingScreen'in hızlı bağlantılarda tek karelik bir "çakma" gibi
 // görünmesini önler — gerçek bir gecikme eklemiyor, sadece gösterimi en az
@@ -51,7 +55,11 @@ export default function Dashboard() {
 
   const onBack = () => navigate("/home");
 
-  switch (user?.role) {
+  return <Suspense fallback={<LoadingScreen />}>{roleRoutes(user?.role, onBack)}</Suspense>;
+}
+
+function roleRoutes(role: string | undefined, onBack: () => void) {
+  switch (role) {
     case "SUPERADMIN":
       return (
         <Routes>

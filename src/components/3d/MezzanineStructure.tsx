@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { useTexture } from "@react-three/drei";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { useExhibition } from "./ExhibitionContext";
-import { COLUMN_SIZE, type Mezzanine as MezzanineData, type Stair } from "./mezzanine";
+import { type Mezzanine as MezzanineData, type Stair } from "./mezzanine";
 import { BalustradeBuilder, RAILING_COLORS, RAILING_GLASS_ABSORPTION, type BalustradeGeometry } from "./glassBalustrade";
 import { createGlassMaterial } from "./glassMaterial";
 import type { WallSegment } from "./galleryLayout";
@@ -11,8 +11,7 @@ import { applyCeilingLight } from "./ceilingLight";
 import { WALL_TEXTURES, findTexture, type SurfaceTexture } from "./surfaceTextures";
 import { removeSunOccluderSource, setSunOccluderSource } from "./sunOccluders";
 
-// Oak-look treads (a scanned wood veneer, not a flat colour), powder-coated anthracite steel for stringers and
-// columns, and glass balustrades (glassBalustrade.ts — the same as the balconies') on the slab's free edges and
+// Oak-look treads (a scanned wood veneer, not a flat colour), powder-coated anthracite steel for stringers, and glass balustrades (glassBalustrade.ts — the same as the balconies') on the slab's free edges and
 // the stair's open sides.
 const TREAD_WOOD = findTexture(WALL_TEXTURES, "Wood062")!;
 /** Powder coat is paint, not bare metal: dielectric, satin. Colours are in the vertex colours. */
@@ -88,7 +87,7 @@ function balustrades(m: MezzanineData, walls: WallSegment[]): BalustradeGeometry
   return b.build();
 }
 
-/** Steel (stringers on the stair's open sides, columns) + the balustrades' solid parts — one vertex-coloured geometry. */
+/** Steel (stringers on the stair's open sides) + the balustrades' solid parts — one vertex-coloured geometry. */
 function steelGeometry(m: MezzanineData, solid: THREE.BufferGeometry | null): THREE.BufferGeometry | null {
   const s = m.stair;
   const riser = s.rise / s.risers;
@@ -98,11 +97,6 @@ function steelGeometry(m: MezzanineData, solid: THREE.BufferGeometry | null): TH
     const a = new THREE.Vector3(...xyz(pt(s, s.bottom, side.at), riser - STRINGER_DEPTH / 2));
     const b = new THREE.Vector3(...xyz(pt(s, s.topAt, side.at), s.rise - STRINGER_DEPTH / 2));
     parts.push(slopedBox(a, b, STRINGER_W, STRINGER_DEPTH));
-  }
-  for (const [x, z] of m.columns) {
-    const g = new THREE.BoxGeometry(COLUMN_SIZE, m.underside, COLUMN_SIZE);
-    g.translate(x, m.underside / 2, z);
-    parts.push(g);
   }
   const { steel } = RAILING_COLORS;
   const list = parts.map((p) => {
@@ -156,7 +150,7 @@ function useTreadMaps(texture: SurfaceTexture) {
 }
 
 /**
- * A mezzanine's stair, glass balustrades and columns (mezzanine.ts) — three draw calls: wood treads, all the
+ * A mezzanine's stair and glass balustrades (mezzanine.ts) — three draw calls: wood treads, all the
  * steel (incl. the balustrades' posts, handrail, clamps and glass edges), the glass.
  * The slab itself is part of the room (GalleryRoom). Both receive the ceiling fixtures (applyCeilingLight),
  * including the slab's shadow.

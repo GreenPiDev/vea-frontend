@@ -13,8 +13,8 @@ import type { ApiExhibitionTemplate, CeilingLightPoint, OutdoorView, WindowPlace
 
 // Mirrors vea-api's src/exhibitions/dto/scene-config.dto.ts discriminated
 // union (keep the two in sync by hand, same cross-repo caveat as
-// SOCKET_EVENTS). "template" points at one of components/3d/exhibitions.ts's
-// EXHIBITIONS presets by id; "custom" is a user-drawn room.
+// SOCKET_EVENTS). "template" points at an organization's backend
+// ExhibitionTemplate by id; "custom" is a user-drawn room.
 export interface TemplateSceneConfig {
   kind: 'template';
   templateId: string;
@@ -80,7 +80,7 @@ export interface ApiExhibition {
   _count?: { artworkLinks: number };
   /** Only present on GET /exhibitions/:id (findOneForView) — list endpoints (usePublicExhibitions/useMyExhibitions) don't include it. */
   artworkLinks?: ApiExhibitionArtwork[];
-  /** Only present on GET /exhibitions/:id and GET /exhibitions/mine/:id — resolved when sceneConfig.kind==='template' and templateId points at a real backend ExhibitionTemplate (not one of the static EXHIBITIONS presets). See backendAdapter.ts's adaptApiExhibition. */
+  /** Only present on GET /exhibitions/:id and GET /exhibitions/mine/:id — resolved when sceneConfig.kind==='template' (the template's ExhibitionTemplate). See backendAdapter.ts's adaptApiExhibition. */
   exhibitionTemplate?: ApiExhibitionTemplate | null;
   /**
    * Curator-chosen "kapak eseri" (ExhibitionArtworkPlacement.tsx's "Kapak

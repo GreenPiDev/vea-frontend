@@ -14,7 +14,7 @@ import {
 } from "./windowOpenings";
 import * as THREE from "three";
 import { WINDOW_SETBACK, barOffsets, buildWindowParts } from "./windowGeometry";
-import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
+import { CONCEPT_EXHIBITIONS } from "./__fixtures__/demoRooms";
 import { FRAME_BORDER } from "./artworkShadow";
 
 const win = (over: Partial<WindowPlacement> = {}): WindowPlacement => ({

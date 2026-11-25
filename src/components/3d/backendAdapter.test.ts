@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { adaptApiExhibition, adaptExhibitionTemplate, groupByWallRun, wallRunsForSceneConfig } from "./backendAdapter";
-import { EXHIBITIONS } from "./exhibitions";
+import { TEST_THEME } from "./__fixtures__/testTheme";
 import type { ApiExhibition, ApiExhibitionArtwork } from "../../lib/api/domains/exhibitions";
 import type { ApiArtwork } from "../../lib/api/domains/artworks";
 import type { ApiExhibitionTemplate } from "../../lib/api/domains/exhibitionTemplates";
@@ -65,34 +65,55 @@ function makeExhibition(overrides: Partial<ApiExhibition> = {}): ApiExhibition {
   };
 }
 
+/** A backend ExhibitionTemplate: plain 14 × 10 m rectangle, 6 m high. */
+function makeRoomTemplate(overrides: Partial<ApiExhibitionTemplate> = {}): ApiExhibitionTemplate {
+  return {
+    id: "template-room",
+    organizationId: "org-1",
+    name: "Test Room",
+    roomShape: { kind: "rectangle", width: 14, depth: 10 },
+    wallHeight: 6,
+    wallColor: "#efe4cf",
+    floorColor: "#8a6a45",
+    ceilingColor: "#f7f0e0",
+    theme: TEST_THEME,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+/** An exhibition on that template, with the relation included (as useExhibition returns it). */
+function makeTemplateExhibition(overrides: Partial<ApiExhibition> = {}): ApiExhibition {
+  const template = makeRoomTemplate();
+  return makeExhibition({ sceneConfig: { kind: "template", templateId: template.id }, exhibitionTemplate: template, ...overrides });
+}
+
 describe("adaptApiExhibition", () => {
   it("returns null when sceneConfig is missing", () => {
     expect(adaptApiExhibition(makeExhibition({ sceneConfig: null }))).toBeNull();
   });
 
-  it("returns null for a template pointing at an unknown templateId", () => {
+  it("returns null for a template whose ExhibitionTemplate isn't included (e.g. a removed static demo id)", () => {
     const result = adaptApiExhibition(
-      makeExhibition({ sceneConfig: { kind: "template", templateId: "does-not-exist" } })
+      makeExhibition({ sceneConfig: { kind: "template", templateId: "renaissance" } })
     );
     expect(result).toBeNull();
   });
 
-  it("builds a template exhibition using the local preset's room/theme and places artworks on named walls", () => {
-    const preset = EXHIBITIONS[0];
+  it("builds a template exhibition from its backend template's room/theme and places artworks on named walls", () => {
     const result = adaptApiExhibition(
-      makeExhibition({
-        title: "My Renaissance Room",
-        sceneConfig: { kind: "template", templateId: preset.id },
+      makeTemplateExhibition({
+        title: "My Room",
         artworkLinks: [makeLink({ positionData: { wallRunId: "north" } })],
       })
     );
 
     expect(result).not.toBeNull();
     expect(result!.id).toBe("exhibition-1");
-    expect(result!.name).toBe("My Renaissance Room");
-    expect(result!.roomSize).toEqual(preset.roomSize);
-    expect(result!.wallHeight).toBe(preset.wallHeight);
-    expect(result!.theme).toEqual(preset.theme);
+    expect(result!.name).toBe("My Room");
+    expect(result!.roomSize).toEqual([14, 10]);
+    expect(result!.wallHeight).toBe(6);
+    expect(result!.theme).toEqual(TEST_THEME);
     expect(result!.artworks).toHaveLength(1);
     // Default makeArtwork() sets framed: false: it hangs as a bare canvas, no frame is added.
     expect(result!.artworks![0].frame).toBeNull();
@@ -101,10 +122,8 @@ describe("adaptApiExhibition", () => {
   });
 
   it("skips the default frame mesh when the artist marked their artwork as already framed", () => {
-    const preset = EXHIBITIONS[0];
     const result = adaptApiExhibition(
-      makeExhibition({
-        sceneConfig: { kind: "template", templateId: preset.id },
+      makeTemplateExhibition({
         artworkLinks: [
           makeLink({ positionData: { wallRunId: "north" }, artwork: makeArtwork({ framed: true }) }),
         ],
@@ -116,10 +135,8 @@ describe("adaptApiExhibition", () => {
   });
 
   it("uses positionData.heightY as a curator hang-height override when set", () => {
-    const preset = EXHIBITIONS[0];
     const result = adaptApiExhibition(
-      makeExhibition({
-        sceneConfig: { kind: "template", templateId: preset.id },
+      makeTemplateExhibition({
         artworkLinks: [makeLink({ positionData: { wallRunId: "north", heightY: 2.2 } })],
       })
     );
@@ -128,10 +145,8 @@ describe("adaptApiExhibition", () => {
   });
 
   it("falls back to a Turkish placeholder artist name when artistProfile isn't embedded", () => {
-    const preset = EXHIBITIONS[0];
     const result = adaptApiExhibition(
-      makeExhibition({
-        sceneConfig: { kind: "template", templateId: preset.id },
+      makeTemplateExhibition({
         artworkLinks: [
           makeLink({ artwork: makeArtwork({ artistDisplayName: "", artistProfile: undefined }) }),
         ],
@@ -170,10 +185,8 @@ describe("adaptApiExhibition", () => {
   });
 
   it("places multiple artworks sharing the same wall run, ordered by the `order` column", () => {
-    const preset = EXHIBITIONS[0];
     const result = adaptApiExhibition(
-      makeExhibition({
-        sceneConfig: { kind: "template", templateId: preset.id },
+      makeTemplateExhibition({
         artworkLinks: [
           makeLink({ id: "link-b", order: 1, artwork: makeArtwork({ id: "b", title: "Second" }) }),
           makeLink({ id: "link-a", order: 0, artwork: makeArtwork({ id: "a", title: "First" }) }),
@@ -188,10 +201,8 @@ describe("adaptApiExhibition", () => {
   });
 
   it("ignores links with no positionData (not hung on a wall yet)", () => {
-    const preset = EXHIBITIONS[0];
     const result = adaptApiExhibition(
-      makeExhibition({
-        sceneConfig: { kind: "template", templateId: preset.id },
+      makeTemplateExhibition({
         artworkLinks: [makeLink({ positionData: null })],
       })
     );
@@ -200,10 +211,8 @@ describe("adaptApiExhibition", () => {
   });
 
   it("treats a missing artworkLinks (e.g. from a list endpoint) as an empty room", () => {
-    const preset = EXHIBITIONS[0];
     const result = adaptApiExhibition(
-      makeExhibition({
-        sceneConfig: { kind: "template", templateId: preset.id },
+      makeTemplateExhibition({
         artworkLinks: undefined,
       })
     );
@@ -223,7 +232,7 @@ describe("adaptExhibitionTemplate's seating resolution", () => {
       wallColor: "#112233",
       floorColor: "#445566",
       ceilingColor: "#778899",
-      theme: EXHIBITIONS[0].theme,
+      theme: TEST_THEME,
       createdAt: "2026-01-01T00:00:00.000Z",
       ...overrides,
     };
@@ -278,13 +287,13 @@ describe("wallRunsForSceneConfig", () => {
     expect(wallRunsForSceneConfig(null)).toBeNull();
   });
 
-  it("returns null for a template pointing at an unknown templateId", () => {
-    expect(wallRunsForSceneConfig({ kind: "template", templateId: "does-not-exist" })).toBeNull();
+  it("returns null for a template sceneConfig without its resolved ExhibitionTemplate", () => {
+    expect(wallRunsForSceneConfig({ kind: "template", templateId: "renaissance" })).toBeNull();
   });
 
-  it("returns the 4 named walls for a template sceneConfig", () => {
-    const preset = EXHIBITIONS[0];
-    const runs = wallRunsForSceneConfig({ kind: "template", templateId: preset.id });
+  it("returns the 4 named walls for a rectangle template sceneConfig", () => {
+    const template = makeRoomTemplate();
+    const runs = wallRunsForSceneConfig({ kind: "template", templateId: template.id }, template);
 
     expect(runs?.map((r) => r.id).sort()).toEqual(["east", "north", "south", "west"]);
   });
@@ -339,7 +348,7 @@ describe("windows + outdoor view from the backend", () => {
     wallColor: "#112233",
     floorColor: "#445566",
     ceilingColor: "#778899",
-    theme: EXHIBITIONS[0].theme,
+    theme: TEST_THEME,
     createdAt: "2026-01-01T00:00:00.000Z",
   };
 
@@ -394,7 +403,7 @@ describe("artwork placement around windows", () => {
       wallColor: "#112233",
       floorColor: "#445566",
       ceilingColor: "#778899",
-      theme: EXHIBITIONS[0].theme,
+      theme: TEST_THEME,
       createdAt: "2026-01-01T00:00:00.000Z",
     };
     const result = adaptApiExhibition(

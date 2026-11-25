@@ -14,7 +14,7 @@ import { SLAB_THICKNESS, resolveMezzanine } from "./mezzanine";
 import { buildRoomLayout, WALL_THICKNESS } from "./galleryLayout";
 import { adaptApiExhibition, adaptExhibitionTemplate, rectangleBlueprint, wallRunsForSceneConfig } from "./backendAdapter";
 import { levelNav, planLevelRoute, stepTowardOnLevels, floorYAt, type LevelPoint } from "./levels";
-import { EXHIBITIONS } from "./exhibitions";
+import { TEST_THEME } from "./__fixtures__/testTheme";
 import type { ApiExhibition, ApiExhibitionArtwork } from "../../lib/api/domains/exhibitions";
 import type { ApiExhibitionTemplate, MezzanineData } from "../../lib/api/domains/exhibitionTemplates";
 import type { ApiArtwork } from "../../lib/api/domains/artworks";
@@ -107,7 +107,7 @@ function makeTemplate(roomShape: ApiExhibitionTemplate["roomShape"]): ApiExhibit
     wallColor: "#eeeeee",
     floorColor: "#888888",
     ceilingColor: "#ffffff",
-    theme: EXHIBITIONS[0].theme,
+    theme: TEST_THEME,
     createdAt: "2026-01-01T00:00:00.000Z",
   };
 }

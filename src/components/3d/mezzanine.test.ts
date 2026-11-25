@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
+import { CONCEPT_EXHIBITIONS } from "./__fixtures__/demoRooms";
 import { EYE_HEIGHT, buildRoomLayout } from "./galleryLayout";
 import { computeArtworkViewpoint, collides, pickArtwork, wallBoxes } from "./clickNavigationGeometry";
 import { ceilingIrradiance, ceilingLightsForLayout, fixturePower } from "./ceilingLight";
@@ -53,7 +53,7 @@ function follow(n: LevelNav, from: LevelPoint, points: FloorPoint[], step = 0.05
 }
 
 describe("mezzanine geometry (vitrin-11)", () => {
-  it("rests on the three walls it touches: railing, edge face and columns only along the free south edge", () => {
+  it("rests on the three walls it touches: railing and edge face only along the free south edge, no columns", () => {
     expect(m.top).toBe(3.8);
     expect(m.underside).toBeCloseTo(3.8 - SLAB_THICKNESS, 10);
     // One railing run, from the west wall to the stair's landing (gap where the stair arrives).
@@ -64,13 +64,6 @@ describe("mezzanine geometry (vitrin-11)", () => {
     expect(r.from[1]).toBeLessThan(-1.85);
     expect(m.edgeFaces).toHaveLength(1);
     expect(m.edgeFaces[0].id).toContain(":");
-    // Columns: ≤ 4.5 m spans along the free edge, all under the slab.
-    expect(m.columns.length).toBe(3);
-    for (const [x, z] of m.columns) {
-      expect(z).toBeGreaterThan(m.rect.minZ);
-      expect(z).toBeLessThan(m.rect.maxZ);
-      expect(x).toBeLessThan(7.45);
-    }
   });
 
   it("builds a straight stair with comfortable steps, walled on the east side and open (railed) on the west", () => {
@@ -156,12 +149,11 @@ describe("walking on two levels", () => {
     }
   });
 
-  it("walks freely under the slab on the room floor (only the columns block)", () => {
+  it("walks freely under the slab on the room floor, right up to its free edge (no columns)", () => {
     expect(collidesOnLevel(nav, 0, -4, 0)).toBe(false);
-    const [cx, cz] = m.columns[0];
-    expect(collidesOnLevel(nav, cx, cz, 0)).toBe(true);
-    // Just behind it, one level up, is open slab.
-    expect(collidesOnLevel(nav, cx, cz - 2.4, 1)).toBe(false);
+    for (const x of [-6, -3, 0, 3, 6]) expect(collidesOnLevel(nav, x, m.rect.maxZ - 0.25, 0)).toBe(false);
+    // One level up, the same spot is open slab.
+    expect(collidesOnLevel(nav, 0, m.rect.maxZ - 2.4, 1)).toBe(false);
   });
 
   it("derives the level from where the camera is", () => {

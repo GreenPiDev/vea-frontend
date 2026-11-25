@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ARTWORKS } from "./artworks";
+import type { Artwork } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
 import type { Exhibition } from "./exhibitions";
 import { pictureLightPlacement, type PictureLightPlacement } from "./pictureLight";
@@ -21,7 +21,7 @@ export function usePictureLights(): RoomPictureLights {
   return useMemo(() => {
     const hit = cache.get(exhibition);
     if (hit && hit.wallHeight === layout.wallHeight) return hit.value;
-    const artworks = exhibition.artworks ?? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id);
+    const artworks: Artwork[] = exhibition.artworks ?? [];
     const lights = artworks.map((a) => pictureLightPlacement(a, layout.wallHeight));
     const value = { lights, index: new Map(artworks.map((a, i) => [a.id, i])) };
     cache.set(exhibition, { wallHeight: layout.wallHeight, value });

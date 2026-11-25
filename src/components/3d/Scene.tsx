@@ -17,6 +17,7 @@ import { isTouchPrimaryDevice } from "../../lib/navigationMode";
 import { BlendFunction, ToneMappingMode, type BloomEffect } from "postprocessing";
 import * as THREE from "three";
 import Gallery from "./Gallery";
+import ShaderWarmup from "./ShaderWarmup";
 import Player from "./Player";
 import ArtworkIconProjector, { type ArtworkIconPosition } from "./ArtworkIconProjector";
 import SeatProximityTracker from "./SeatProximityTracker";
@@ -172,6 +173,8 @@ export default function Scene({
         <Suspense fallback={null}>
           <Gallery />
         </Suspense>
+        {/* Compiles every shader + uploads every texture once loading settles — no stall on the first turns. */}
+        <ShaderWarmup />
         <CameraFov cameraZoom={cameraZoom} />
         <Player
           onLockChange={onLockChange}

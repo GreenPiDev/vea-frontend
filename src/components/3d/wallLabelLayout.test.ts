@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Artwork } from "./artworks";
-import { ARTWORKS } from "./artworks";
+import { ARTWORKS } from "./__fixtures__/catalogArtworks";
 import { FRAME_BORDER } from "./artworkShadow";
 import { WALL_CLEARANCE, buildRoomLayout } from "./galleryLayout";
 import { pickWallLabel, pickWallTarget, wallBoxes } from "./clickNavigationGeometry";
-import { SHOWCASE_ARTWORKS, SHOWCASE_EXHIBITION } from "./showcaseExhibition";
+import { SHOWCASE_ARTWORKS, SHOWCASE_EXHIBITION } from "./__fixtures__/showcaseRoom";
 import {
   LABEL_CENTER_Y,
   LABEL_GAP,

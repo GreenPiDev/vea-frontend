@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { EXHIBITIONS } from "./components/3d/exhibitions";
-import { ARTWORKS, type Artwork } from "./components/3d/artworks";
+import type { Artwork } from "./components/3d/artworks";
 import { adaptApiExhibition, previewAccentColor } from "./components/3d/backendAdapter";
 import { toFurnitureDef } from "./components/3d/furniture";
 import type { SeatSpot } from "./components/3d/seating";
@@ -57,13 +56,10 @@ export default function App() {
   const [seatedSpot, setSeatedSpot] = useState<SeatSpot | null>(null);
   // Thumbnail-rail click → teleport in front of that painting (ArtworkGoTo.tsx inside the Canvas).
   const [goToArtwork, setGoToArtwork] = useState<ArtworkGoToRequest | null>(null);
-  // Statik şablon sergiler (EXHIBITIONS) anında bulunduğu için hiçbir ağ
-  // isteği beklemiyor — kart tıklamasıyla hemen `exhibition` dolduğundan,
-  // sadece `backendId && backendLoading`'e bağlı eski kontrol bu sergiler
-  // için hiç tetiklenmiyordu. Seçim anında true olup `exhibition` hazır
-  // olunca otomatik false'a dönen bu bayrak, hem statik hem backend
-  // sergilerinde kart tıklamasından sonra LoadingScreen'in garanti
-  // gösterilmesini sağlıyor (bkz. useMinimumLoadingTime ile birleşimi altta).
+  // Seçim anında true olup `exhibition` hazır olunca otomatik false'a dönen
+  // bu bayrak, kart tıklamasından sonra (sergi önbellekte olsa bile)
+  // LoadingScreen'in garanti gösterilmesini sağlıyor (bkz.
+  // useMinimumLoadingTime ile birleşimi altta).
   const [enteringExhibition, setEnteringExhibition] = useState(false);
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
   const exhibitionSelectScrollRef = useRef<HTMLDivElement | null>(null);
@@ -80,18 +76,8 @@ export default function App() {
   const { data: backendExhibitions } = usePublicExhibitions();
   useRealtimeQuerySync(isAuthenticated);
 
-  // The static demo templates (EXHIBITIONS) are no longer offered on the
-  // homepage selector or the exhibition-creation picker (see
-  // ExhibitionForm.tsx) — org-scoped backend ExhibitionTemplates replaced
-  // them as the "hazır şablon" source. This lookup stays only so that any
-  // already-existing exhibition/bookmark built on one of those 4 static ids
-  // (sceneConfig.kind:'template', templateId:'renaissance' etc.) keeps
-  // rendering — see backendAdapter.ts's identical fallback.
-  const localExhibition = useMemo(
-    () => (selectedId ? (EXHIBITIONS.find((e) => e.id === selectedId) ?? null) : null),
-    [selectedId]
-  );
-  const backendId = selectedId && !localExhibition ? selectedId : "";
+  // Every exhibition comes from the backend (the static demo rooms were removed before launch, 2026-11-25).
+  const backendId = selectedId ?? "";
   // Kept as a live query (not copied into local state once) so that if this
   // exhibition's cached detail is stale (e.g. fetched earlier before an
   // artwork was placed on it), the background refetch TanStack Query does
@@ -104,13 +90,12 @@ export default function App() {
   );
 
   const exhibition = useMemo(() => {
-    if (localExhibition) return localExhibition;
     if (backendDetail) return adaptApiExhibition(backendDetail, (furnitureAssets ?? []).map(toFurnitureDef));
     return null;
-  }, [localExhibition, backendDetail, furnitureAssets]);
+  }, [backendDetail, furnitureAssets]);
 
   const exhibitionArtworks = useMemo(
-    () => exhibition?.artworks ?? (exhibition ? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id) : []),
+    () => exhibition?.artworks ?? [],
     [exhibition]
   );
 

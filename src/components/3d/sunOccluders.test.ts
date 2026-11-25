@@ -14,7 +14,7 @@ import {
   writeSunOccluderUniforms,
   type SunOccluder,
 } from "./sunOccluders";
-import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
+import { CONCEPT_EXHIBITIONS } from "./__fixtures__/demoRooms";
 import { sunSetupFor, sunVisibility } from "./sunLight";
 
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);

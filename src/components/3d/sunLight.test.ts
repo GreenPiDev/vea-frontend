@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { buildRoomLayout } from "./galleryLayout";
 import { resolveWindowOpenings, type WindowPlacement } from "./windowOpenings";
 import { WINDOW_SETBACK, buildWindowParts, windowTransmissionMask } from "./windowGeometry";
-import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
+import { CONCEPT_EXHIBITIONS } from "./__fixtures__/demoRooms";
 import { PANORAMA_LIGHT } from "./outdoorPanoramaLight";
 import { SUN_MASK_TILE, setSunLight, sunLightUniforms, sunSetupFor, sunTint, sunVisibility } from "./sunLight";
 import { glassShare } from "./windowLight";

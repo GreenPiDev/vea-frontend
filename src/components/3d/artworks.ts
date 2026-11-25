@@ -1,10 +1,4 @@
-// Curated public-domain masterpieces (Wikimedia Commons) used to give each
-// exhibition room a real, lived-in identity instead of bare walls. Each
-// entry carries its true aspect ratio so the canvas never looks stretched,
-// plus which exhibition it hangs in and its wall placement within that
-// room's local coordinates (see exhibitions.ts for room size/theme).
-
-import { WALL_CLEARANCE } from "./galleryLayout";
+// A hung artwork as the 3D scene renders it (built from backend data by backendAdapter.ts).
 
 export type FrameStyle = "gold" | "walnut" | "modernBlack";
 
@@ -21,7 +15,7 @@ export interface Artwork {
   aspect: number;
   /** Physical height of the canvas on the wall, in meters. */
   height: number;
-  /** Static demo ARTWORKS below always set "gold"/"walnut". Backend-sourced artworks are always null (backendAdapter.ts's toRenderableArtwork): `framed: true` — the uploaded image already shows its own frame; `framed: false` — it hangs as a bare stretched canvas (frameProfile.ts's buildStretchedCanvasGeometry), we don't add a frame the artist didn't. */
+  /** A moulded frame mesh (frameProfile.ts) — only test fixtures set one. Backend-sourced artworks are always null (backendAdapter.ts's toRenderableArtwork): `framed: true` — the uploaded image already shows its own frame; `framed: false` — it hangs as a bare stretched canvas (frameProfile.ts's buildStretchedCanvasGeometry), we don't add a frame the artist didn't. */
   frame?: FrameStyle | null;
   /** Center position of the canvas face, flush against the wall surface. */
   position: [number, number, number];
@@ -31,9 +25,8 @@ export interface Artwork {
   floorY?: number;
 
   // The fields below are only populated for backend-sourced artworks (see
-  // backendAdapter.ts's toRenderableArtwork) — the static demo ARTWORKS
-  // below never set them, which is exactly how ArtworkDetailCard tells a
-  // demo painting (not purchasable) apart from a real one.
+  // backendAdapter.ts's toRenderableArtwork) — ArtworkDetailCard hides the
+  // offer form when they're missing.
   /** Real backend Artwork.id — distinct from `id` above, which for a backend artwork is the ExhibitionArtwork join-row id. Needed to POST an offer against the right artwork. */
   artworkId?: string;
   technique?: string | null;
@@ -59,195 +52,3 @@ export interface Artwork {
   /** Mirrors ApiArtwork.hasApprovedOffer — true once the artist has recorded an informal "approved" decision on an offer for this artwork. Treated the same as status === 'SOLD' by ArtworkDetailCard, even though the real Artwork.status may not have flipped. */
   hasApprovedOffer?: boolean;
 }
-
-/** Standard museum hanging-line: center of artwork ~1.65m from the floor. */
-const HANG_CENTER_Y = 1.65;
-
-export const ARTWORKS: Artwork[] = [
-  // --- Rönesans Ustaları (14x10 room) ---
-  {
-    id: "birth-of-venus",
-    title: "Venüs'ün Doğuşu",
-    artist: "Sandro Botticelli",
-    year: "c. 1485",
-    technique: "Tuval üzerine tempera",
-    heightCm: 172.5,
-    widthCm: 278.9,
-    exhibitionId: "renaissance",
-    image: "/artworks/birth_of_venus.jpg",
-    aspect: 1920 / 1206,
-    height: 1.8,
-    frame: "gold",
-    position: [0, HANG_CENTER_Y, -5 + WALL_CLEARANCE],
-    rotationY: 0,
-  },
-  {
-    id: "mona-lisa",
-    title: "Mona Lisa",
-    artist: "Leonardo da Vinci",
-    year: "c. 1503",
-    technique: "Kavak panel üzerine yağlı boya",
-    heightCm: 77,
-    widthCm: 53,
-    exhibitionId: "renaissance",
-    image: "/artworks/mona_lisa.jpg",
-    aspect: 1073 / 1600,
-    height: 1.1,
-    frame: "gold",
-    position: [7 - WALL_CLEARANCE, HANG_CENTER_Y, 0],
-    rotationY: -Math.PI / 2,
-  },
-  {
-    id: "pearl-earring",
-    title: "İnci Küpeli Kız",
-    artist: "Johannes Vermeer",
-    year: "c. 1665",
-    technique: "Tuval üzerine yağlı boya",
-    heightCm: 44.5,
-    widthCm: 39,
-    exhibitionId: "renaissance",
-    image: "/artworks/pearl_earring.jpg",
-    aspect: 1351 / 1600,
-    height: 1.3,
-    frame: "gold",
-    position: [-7 + WALL_CLEARANCE, HANG_CENTER_Y, 0],
-    rotationY: Math.PI / 2,
-  },
-
-  // --- Empresyonizm ve Japon Sanatı (14x10 room) ---
-  {
-    id: "great-wave",
-    title: "Kanagawa Açıklarında Büyük Dalga",
-    artist: "Katsushika Hokusai",
-    year: "c. 1831",
-    technique: "Renkli ahşap baskı",
-    heightCm: 25.7,
-    widthCm: 37.9,
-    exhibitionId: "impressionism",
-    image: "/artworks/great_wave.jpg",
-    aspect: 1920 / 1324,
-    height: 2.2,
-    frame: "walnut",
-    position: [0, HANG_CENTER_Y, -5 + WALL_CLEARANCE],
-    rotationY: 0,
-  },
-  {
-    id: "starry-night",
-    title: "Yıldızlı Gece",
-    artist: "Vincent van Gogh",
-    year: "1889",
-    technique: "Tuval üzerine yağlı boya",
-    heightCm: 73.7,
-    widthCm: 92.1,
-    exhibitionId: "impressionism",
-    image: "/artworks/starry_night.jpg",
-    aspect: 1920 / 1520,
-    height: 1.6,
-    frame: "walnut",
-    position: [7 - WALL_CLEARANCE, HANG_CENTER_Y, 0],
-    rotationY: -Math.PI / 2,
-  },
-  {
-    id: "the-kiss",
-    title: "Öpücük",
-    artist: "Gustav Klimt",
-    year: "1908",
-    technique: "Tuval üzerine yağlı boya ve altın varak",
-    heightCm: 180,
-    widthCm: 180,
-    exhibitionId: "impressionism",
-    image: "/artworks/the_kiss.jpg",
-    aspect: 1079 / 1080,
-    height: 1.8,
-    frame: "gold",
-    position: [-7 + WALL_CLEARANCE, HANG_CENTER_Y, 0],
-    rotationY: Math.PI / 2,
-  },
-
-  // --- Barok ve Dışavurumculuk (10x10 room) ---
-  {
-    id: "night-watch",
-    title: "Gece Devriyesi",
-    artist: "Rembrandt van Rijn",
-    year: "1642",
-    technique: "Tuval üzerine yağlı boya",
-    heightCm: 363,
-    widthCm: 437,
-    exhibitionId: "baroque",
-    image: "/artworks/night_watch.jpg",
-    aspect: 1920 / 1562,
-    height: 2.2,
-    frame: "gold",
-    position: [0, HANG_CENTER_Y, -5 + WALL_CLEARANCE],
-    rotationY: 0,
-  },
-  {
-    id: "the-scream",
-    title: "Çığlık",
-    artist: "Edvard Munch",
-    year: "1893",
-    technique: "Karton üzerine yağlı boya, tempera ve pastel",
-    heightCm: 91,
-    widthCm: 73.5,
-    exhibitionId: "baroque",
-    image: "/artworks/the_scream.jpg",
-    aspect: 1289 / 1600,
-    height: 1.3,
-    frame: "walnut",
-    position: [5 - WALL_CLEARANCE, HANG_CENTER_Y, 0],
-    rotationY: -Math.PI / 2,
-  },
-
-  // --- Büyük Galeri (34x22 room, 13m ceiling, oversized canvases).
-  // These are far taller than the shared HANG_CENTER_Y assumes, so each
-  // gets its own hang center: height/2 + floor clearance + frame border,
-  // otherwise the canvas bottom sinks below the floor plane. ---
-  {
-    id: "napoleon-coronation",
-    title: "Napolyon'un Taç Giymesi",
-    artist: "Jacques-Louis David",
-    year: "1805–1807",
-    technique: "Tuval üzerine yağlı boya",
-    heightCm: 621,
-    widthCm: 979,
-    exhibitionId: "grande-galerie",
-    image: "/artworks/napoleon_coronation.jpg",
-    aspect: 1920 / 1207,
-    height: 5.5,
-    frame: "gold",
-    position: [0, 3.2, -11 + WALL_CLEARANCE],
-    rotationY: 0,
-  },
-  {
-    id: "raft-of-medusa",
-    title: "Medusa'nın Salı",
-    artist: "Théodore Géricault",
-    year: "1818–1819",
-    technique: "Tuval üzerine yağlı boya",
-    heightCm: 491,
-    widthCm: 716,
-    exhibitionId: "grande-galerie",
-    image: "/artworks/raft_of_medusa.jpg",
-    aspect: 1920 / 1305,
-    height: 4.2,
-    frame: "gold",
-    position: [17 - WALL_CLEARANCE, 2.6, 0],
-    rotationY: -Math.PI / 2,
-  },
-  {
-    id: "liberty-leading",
-    title: "Halka Yol Gösteren Özgürlük",
-    artist: "Eugène Delacroix",
-    year: "1830",
-    technique: "Tuval üzerine yağlı boya",
-    heightCm: 260,
-    widthCm: 325,
-    exhibitionId: "grande-galerie",
-    image: "/artworks/liberty_leading.jpg",
-    aspect: 1920 / 1520,
-    height: 3.6,
-    frame: "gold",
-    position: [-17 + WALL_CLEARANCE, 2.3, 0],
-    rotationY: Math.PI / 2,
-  },
-];

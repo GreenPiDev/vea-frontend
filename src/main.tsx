@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
@@ -9,14 +9,30 @@ import '@fontsource/plus-jakarta-sans/600.css'
 import '@fontsource/plus-jakarta-sans/700.css'
 import './index.css'
 import i18n from './lib/i18n'
-import App from './App.tsx'
 import Landing from './pages/Landing.tsx'
-import Dashboard from './pages/Dashboard.tsx'
+import LoadingScreen from './components/common/LoadingScreen'
 import { AuthProvider } from './lib/auth/AuthContext'
 import { ApiError } from './lib/api/client'
 import type { ToastMeta } from './lib/api/factory'
 import { AlertCircleIcon, CheckIcon, CloseIcon, InfoIcon } from './components/layout/icons'
 import PullToRefresh from './components/common/PullToRefresh'
+
+// Landing ilk ekran olduğu için ana pakette; 3D sahne (three.js, R3F, postprocessing) ve panel
+// kendi parçalarında — ana sayfayı açan biri sahne kodunu indirmek zorunda kalmasın.
+const App = lazy(() => import('./App.tsx'))
+const Dashboard = lazy(() => import('./pages/Dashboard.tsx'))
+
+// Yeni bir deploy eski parça dosyalarını kaldırınca, önceden açılmış bir sekme olmayan bir parçayı
+// ister ve sayfa boş kalır — o durumda yeni index.html'i almak için bir kez yenile. sessionStorage
+// bayrağı, parça gerçekten bozuksa sonsuz yenileme döngüsünü engelliyor.
+const CHUNK_RELOAD_KEY = 'vea:chunk-reload'
+window.addEventListener('vite:preloadError', (event) => {
+  if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return
+  sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
+  event.preventDefault()
+  window.location.reload()
+})
+window.addEventListener('load', () => sessionStorage.removeItem(CHUNK_RELOAD_KEY))
 
 const TOAST_DURATION_MS = 4000
 
@@ -109,12 +125,14 @@ createRoot(document.getElementById('root')!).render(
             {renderToast}
           </Toaster>
           <PullToRefresh />
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/home" element={<App />} />
-            <Route path="/exhibition/:id" element={<App />} />
-            <Route path="/dashboard/*" element={<Dashboard />} />
-          </Routes>
+          <Suspense fallback={<LoadingScreen />}>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/home" element={<App />} />
+              <Route path="/exhibition/:id" element={<App />} />
+              <Route path="/dashboard/*" element={<Dashboard />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

@@ -11,7 +11,7 @@ import {
   localBoxToWorld,
   rectTexelWorld,
 } from "./pictureLightBake";
-import { SHOWCASE_ARTWORKS, SHOWCASE_EXHIBITION } from "./showcaseExhibition";
+import { SHOWCASE_ARTWORKS, SHOWCASE_EXHIBITION } from "./__fixtures__/showcaseRoom";
 import { ARTWORK_WALL_GAP } from "./artworkShadow";
 import type { Artwork } from "./artworks";
 

@@ -414,6 +414,8 @@ function TexturedPlane({
     applyRoomAo(m, aoSurface, aoUniforms, aoSurface === "ceiling" ? undefined : texture.macroVariation, daylight, { ceilingLight });
     return m;
   }, [map, roughnessMap, normalMap, color, roughness, metalness, normalScale, aoSurface, aoUniforms, texture.macroVariation, daylight, ceilingLight]);
+  // Passed as a prop, so R3F doesn't dispose it on unmount — every room change leaked a floor + ceiling material.
+  useEffect(() => () => material.dispose(), [material]);
 
   return (
     <mesh position={position} rotation={rotation} material={material}>
@@ -475,6 +477,7 @@ function TexturedWalls({
     applyRoomAo(m, "wall", aoUniforms, texture.macroVariation, daylight, { pictureLight, ceilingLight });
     return m;
   }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, texture.macroVariation, aoUniforms, daylight, pictureLight, ceilingLight]);
+  useEffect(() => () => material.dispose(), [material]);
 
   const geometries = useMemo(
     () =>

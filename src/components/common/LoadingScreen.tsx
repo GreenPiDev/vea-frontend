@@ -17,7 +17,7 @@ export default function LoadingScreen({ message }: LoadingScreenProps) {
   return (
     <div className="animate-loading-fade-in fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5 bg-brand-950/95 backdrop-blur-sm">
       <img
-        src="/loading-state-logo.png"
+        src="/loading-state-logo.webp"
         alt={t('loadingLogoAlt')}
         className="animate-loading-bounce h-44 w-44 object-contain brightness-0 invert drop-shadow-lg"
       />

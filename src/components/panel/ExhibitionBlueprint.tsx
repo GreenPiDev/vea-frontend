@@ -11,7 +11,7 @@ import { artworkDisplaySize } from '../3d/artworkDisplayScale';
 
 interface ExhibitionBlueprintProps {
   sceneConfig: ApiSceneConfig | null;
-  /** The exhibition's resolved backend ExhibitionTemplate (if sceneConfig.templateId points at one, not a static EXHIBITIONS preset) — lets blueprintForSceneConfig fall back to it for room size. */
+  /** The exhibition's resolved backend ExhibitionTemplate — lets blueprintForSceneConfig fall back to it for room size. */
   resolvedTemplate?: ApiExhibitionTemplate | null;
   /** wallRunId -> its placed links, sorted by order — same shape ExhibitionArtworkPlacement.tsx already derives via groupByWallRun(exhibition.artworkLinks). */
   byWall: Map<string, ApiExhibitionArtwork[]>;

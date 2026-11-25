@@ -1,7 +1,6 @@
-// Backend-driven counterpart to components/3d/exhibitions.ts's static
-// EXHIBITIONS registry (4 hardcoded room presets) — an org's GALLERY_ADMINs
-// can create/update their own named room presets here, picked from
-// ExhibitionForm.tsx's template selector alongside the static ones. See
+// An org's named room presets — its GALLERY_ADMINs create/update them here,
+// and ExhibitionForm.tsx's template selector offers them (the static demo
+// presets were removed before launch, 2026-11-25). See
 // vea-api's src/exhibition-templates/ module.
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Paths } from '../paths';
@@ -120,7 +119,7 @@ export interface ApiExhibitionTemplate {
   floorTextureId?: string | null;
   wallTextureId?: string | null;
   ceilingTextureId?: string | null;
-  /** Full derived theme (vea-api's exhibition-templates/theme.ts), ready to render exactly like a static EXHIBITIONS[].theme entry. */
+  /** Full derived theme (vea-api's exhibition-templates/theme.ts), ready to render. */
   theme: ExhibitionTheme;
   createdAt: string;
   /** Only present on GET /exhibition-templates/mine — how many exhibitions currently use this template, for ExhibitionTemplateList.tsx's usage column. */

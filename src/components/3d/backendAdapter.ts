@@ -4,10 +4,10 @@
 // artworks.ts). View-only for now (Faz 3b) — no builder UI writes through
 // this yet, that's Faz 3c/3d.
 //
-// The static ARTWORKS/EXHIBITIONS demo data and this adapter's output are
-// both just Exhibition/Artwork values from the room's point of view — Scene/
-// Gallery/GalleryArtworks don't know or care whether an Exhibition came from
-// exhibitions.ts or from here.
+// Every renderable exhibition comes through here: the static demo rooms
+// (EXHIBITIONS/ARTWORKS, vitrin-N) were removed before launch (2026-11-25), so
+// a "template" sceneConfig always resolves against a backend
+// ExhibitionTemplate.
 import type {
   ApiExhibition,
   ApiExhibitionArtwork,
@@ -17,7 +17,7 @@ import type {
 import type { ApiExhibitionTemplate, FurniturePlacement, WindowPlacementData } from "../../lib/api/domains/exhibitionTemplates";
 import { openingSpansOnWall, type WindowOpening } from "./windowOpenings";
 import type { Artwork } from "./artworks";
-import { EXHIBITIONS, type Exhibition, type ExhibitionTheme } from "./exhibitions";
+import type { Exhibition, ExhibitionTheme } from "./exhibitions";
 import type { FurnitureDef } from "./furniture";
 import type { SeatSpot } from "./seating";
 import {
@@ -105,24 +105,6 @@ export function templateWallRuns(roomSize: [number, number]): (WallRunGeometry &
     { id: "east", orientation: "vertical", start: -D / 2, end: D / 2, fixed: W / 2, outward: 1 },
     { id: "west", orientation: "vertical", start: -D / 2, end: D / 2, fixed: -W / 2, outward: -1 },
   ];
-}
-
-/**
- * Wall runs of a static EXHIBITIONS preset: its 4 walls, plus — when the preset has a mezzanine (vitrin-11) —
- * a `<wall>@mezz` copy of each wall whose works hang on the slab (floor = its top, ceiling = what's left above).
- * The copies span the whole wall; the curator's `alongFraction` puts the work over the slab.
- */
-export function staticTemplateRuns(template: Exhibition): {
-  runs: (WallRunGeometry & { id: string })[];
-  rules: Map<string, RunRule>;
-} {
-  const runs = templateWallRuns(template.roomSize!);
-  const rules = new Map<string, RunRule>();
-  const mezz = template.customLayout?.mezzanine;
-  if (!mezz) return { runs, rules };
-  const mezzRuns = runs.map((run) => ({ ...run, id: `${run.id}${MEZZ_RUN_SUFFIX}` }));
-  for (const run of mezzRuns) rules.set(run.id, { floorY: mezz.top, ceiling: template.wallHeight - mezz.top });
-  return { runs: [...runs, ...mezzRuns], rules };
 }
 
 /** Groups artworkLinks by their positionData.wallRunId, sorted by the sibling `order` column (nulls last, then by id for a stable tie-break). Links with no positionData/wallRunId aren't placed (not hung yet). */
@@ -262,10 +244,7 @@ function buildCustomTheme(config: CustomSceneConfig): ExhibitionTheme {
  * detail (that only happens lazily on selection, see adaptApiExhibition).
  */
 export function previewAccentColor(config: ApiSceneConfig | null): string {
-  if (!config) return "#b9924a";
-  if (config.kind === "template") {
-    return EXHIBITIONS.find((e) => e.id === config.templateId)?.theme.spotColor ?? "#b9924a";
-  }
+  if (!config || config.kind === "template") return "#b9924a";
   return config.wallColor;
 }
 
@@ -307,8 +286,6 @@ export function wallRunsForSceneConfig(
 ): (WallRunGeometry & { id: string })[] | null {
   if (!config) return null;
   if (config.kind === "template") {
-    const template = EXHIBITIONS.find((e) => e.id === config.templateId);
-    if (template && template.roomSize) return templateWallRuns(template.roomSize);
     if (resolvedTemplate) return backendTemplateWallRuns(resolvedTemplate);
     return null;
   }
@@ -466,8 +443,6 @@ export function blueprintForSceneConfig(
 ): BlueprintLayout | null {
   if (!config) return null;
   if (config.kind === "template") {
-    const staticTemplate = EXHIBITIONS.find((e) => e.id === config.templateId);
-    if (staticTemplate?.roomSize) return rectangleBlueprint(staticTemplate.roomSize);
     if (!resolvedTemplate) return null;
     const furniture = resolveBlueprintFurniture(resolvedTemplate.roomShape.furniture, furnitureCatalog);
     const { roomShape } = resolvedTemplate;
@@ -482,7 +457,7 @@ export function blueprintForSceneConfig(
  * Converts a backend ApiExhibition (must include artworkLinks — i.e. come
  * from useExhibition(id), not usePublicExhibitions/useMyExhibitions) into a
  * renderable Exhibition, or null if it can't be rendered yet (no
- * sceneConfig, or a "template" pointing at an unknown/removed preset id).
+ * sceneConfig, or a "template" whose ExhibitionTemplate relation wasn't included).
  */
 export function adaptApiExhibition(exhibition: ApiExhibition, furnitureCatalog: FurnitureDef[] = []): Exhibition | null {
   const config = exhibition.sceneConfig;
@@ -491,20 +466,8 @@ export function adaptApiExhibition(exhibition: ApiExhibition, furnitureCatalog: 
   const byWall = groupByWallRun(exhibition.artworkLinks ?? []);
 
   if (config.kind === "template") {
-    const staticTemplate = EXHIBITIONS.find((e) => e.id === config.templateId);
-    if (staticTemplate && staticTemplate.roomSize) {
-      const { runs, rules } = staticTemplateRuns(staticTemplate);
-      return {
-        ...staticTemplate,
-        id: exhibition.id,
-        name: exhibition.title,
-        artworks: placeAll(runs, staticTemplate.wallHeight, byWall, exhibition.id, staticTemplate.customLayout?.windows ?? [], rules),
-      };
-    }
-
-    // Not a static preset — resolve against the org's own backend
-    // ExhibitionTemplate (only present when GET included the relation, i.e.
-    // came from useExhibition/useOwnExhibition, not a list endpoint).
+    // Resolved against the org's own backend ExhibitionTemplate (only present when GET included the
+    // relation, i.e. came from useExhibition/useOwnExhibition, not a list endpoint).
     const backendTemplate = exhibition.exhibitionTemplate;
     if (!backendTemplate) return null;
 

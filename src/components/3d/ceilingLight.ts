@@ -296,7 +296,7 @@ const FURNITURE_VERTEX_DECL = /* glsl */ `
 varying vec3 vCeilingLightWorldPos;
 `;
 // Own world position (three's `worldPosition` only exists under some defines). Instanced: furniture is
-// drawn with drei's <Instances>.
+// drawn as an InstancedMesh (StaticInstances.tsx).
 const FURNITURE_VERTEX_BODY = /* glsl */ `
 {
   vec4 ceilingWorld = vec4(transformed, 1.0);

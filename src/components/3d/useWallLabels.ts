@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import i18n from "../../lib/i18n";
-import { ARTWORKS, type Artwork } from "./artworks";
+import type { Artwork } from "./artworks";
 import { useExhibition } from "./ExhibitionContext";
 import type { Exhibition } from "./exhibitions";
 import type { RoomLayout, WallSegment } from "./galleryLayout";
@@ -17,12 +17,14 @@ interface Entry {
   rects: Map<string, LabelRect>;
 }
 const cache = new WeakMap<Exhibition, Entry>();
+/** Stable empty collection, so a room without works doesn't hand every consumer a fresh array per render. */
+const NO_ARTWORKS: Artwork[] = [];
 
 /** This exhibition's artworks and their wall labels (wallLabelLayout.ts). */
 export function useWallLabels(): { artworks: Artwork[]; labels: Map<string, WallLabel>; rects: Map<string, LabelRect> } {
   const { exhibition, layout } = useExhibition();
   return useMemo(() => {
-    const artworks = exhibition.artworks ?? ARTWORKS.filter((a) => a.exhibitionId === exhibition.id);
+    const artworks = exhibition.artworks ?? NO_ARTWORKS;
     const hit = cache.get(exhibition);
     if (hit && hit.walls === layout.walls && hit.windows === layout.windows) return { artworks, labels: hit.labels, rects: hit.rects };
     const labels = computeWallLabels(artworks, layout.walls, i18n.language, measureLabelText, layout.windows);

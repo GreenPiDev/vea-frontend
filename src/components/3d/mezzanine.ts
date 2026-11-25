@@ -1,15 +1,15 @@
 // Mezzanine (asma kat) — pure geometry, no rendering (GalleryRoom draws the slab, MezzanineStructure.tsx the
-// stair, railings and columns; levels.ts walks on it). Not "Mezzanine.tsx": macOS would clash it with this file.
+// stair and railings; levels.ts walks on it). Not "Mezzanine.tsx": macOS would clash it with this file.
 //
 // A mezzanine is a slab inside a double-height room: a rectangle at `top` m (its walk surface), resting on
-// the walls it touches and on slim columns along its free edges, with a railing along every free edge and
+// the walls it touches (free-spanning — no columns, user decision 2026-11-25), with a railing along every free edge and
 // one straight stair rising from the room floor to one of those edges. Everything here is room-local
 // world metres, same space as RoomLayout.walls.
 //
 // Walking is split into two levels (levels.ts): the room floor (y = 0) and the slab (y = top). Each level
 // has its own collider set:
 //   - floor: the walls, the stair's sides, a box across the stair's top end (nobody walks under the slab and
-//     into the stair from above), the columns, and the ground furniture;
+//     into the stair from above), and the ground furniture;
 //   - slab: the uncut walls, the railings, the stair's sides, "void" boxes over every part of the room that
 //     isn't slab or stair (so the slab level can't be left except down the stair), and the slab furniture.
 // Inside the stair's rectangle the floor height ramps from 0 to `top`; the level flips halfway up.
@@ -24,11 +24,6 @@ export const STAIR_GOING = 0.28;
 export const STAIR_TARGET_RISER = 0.18;
 /** Thickness of a stair side (stringer) collider. */
 export const STAIR_SIDE = 0.06;
-/** Square steel column section (m) and the widest free span between supports along an edge. */
-export const COLUMN_SIZE = 0.16;
-export const COLUMN_MAX_SPAN = 4.5;
-/** Columns stand this far in from the slab edge. */
-export const COLUMN_INSET = 0.25;
 /** Thin box across the stair's top end on the room-floor level (blocks walking in from under the slab). */
 const STAIR_END_BLOCK = 0.1;
 /** Tolerance for "this edge lies on a wall face". */
@@ -46,7 +41,7 @@ export interface StairSpec {
 }
 
 export interface MezzanineSpec {
-  /** Slab footprint. Edges lying on a wall's inner face rest on it; the others get a railing (and columns). */
+  /** Slab footprint. Edges lying on a wall's inner face rest on it; the others get a railing. */
   rect: FloorRect;
   /** Walk surface height (m). */
   top: number;
@@ -79,8 +74,6 @@ export interface Mezzanine {
   stair: Stair;
   /** Railing runs along the slab's free edges (gap where the stair arrives). */
   railings: RailingRun[];
-  /** Column centres (x, z) under the free edges. */
-  columns: [number, number][];
   /**
    * The slab's exposed edge faces as thin wall pieces (ids "mezz:n" — the ":" gives them world-anchored UVs),
    * rendered and daylight-baked with the walls (GalleryRoom).
@@ -194,7 +187,6 @@ export function resolveMezzanine(spec: MezzanineSpec, walls: WallSegment[]): Mez
   const stair = resolveStair(spec.stair, top, walls);
   const stairLineAxis = spec.stair.axis; // the arrival edge lies on line {axis} = topAt
   const railings: RailingRun[] = [];
-  const columns: [number, number][] = [];
   const edgeFaces: WallSegment[] = [];
   const thickness = SLAB_THICKNESS - 0.004; // a hair inside the top/underside planes (no z-fighting on the strip's top)
   for (const e of slabEdges(rect)) {
@@ -213,23 +205,8 @@ export function resolveMezzanine(spec: MezzanineSpec, walls: WallSegment[]): Mez
     const railed = arrival ? free.flatMap((iv) => subtractIntervals(iv, [stair.across])) : free;
     const railLine = e.line + e.inward * RAILING_INSET;
     for (const [a, b] of railed) railings.push({ from: edgePoint(e.lineAxis, railLine, a), to: edgePoint(e.lineAxis, railLine, b) });
-    // Columns: evenly along every free stretch (the stair carries its own landing), never inside the stair.
-    const colLine = e.line + e.inward * COLUMN_INSET;
-    for (const [a, b] of railed) {
-      const n = Math.ceil((b - a) / COLUMN_MAX_SPAN);
-      for (let k = 1; k < n; k++) columns.push(edgePoint(e.lineAxis, colLine, a + ((b - a) * k) / n));
-      // A free end (not against a wall or the stair) needs its own support.
-      for (const end of [a, b]) {
-        const walled = onWallIntervals(walls, e.lineAxis, e.line, [end - 0.02, end + 0.02]).length > 0;
-        const atStair = arrival && end > stair.across[0] - 0.02 && end < stair.across[1] + 0.02;
-        if (!walled && !atStair) {
-          const inset = end === a ? COLUMN_INSET : -COLUMN_INSET;
-          columns.push(edgePoint(e.lineAxis, colLine, end + inset));
-        }
-      }
-    }
   }
-  return { rect, top, underside: top - SLAB_THICKNESS, stair, railings, columns, edgeFaces };
+  return { rect, top, underside: top - SLAB_THICKNESS, stair, railings, edgeFaces };
 }
 
 /** Under-slab fixtures: one row along the slab, ≤ 4 m apart, 10 cm under its underside. */
@@ -264,11 +241,6 @@ export function stairTopEndBox(s: Stair): ColliderBox {
   return s.axis === "z"
     ? { minX: s.across[0], maxX: s.across[1], minZ: s.topAt - h, maxZ: s.topAt + h }
     : { minX: s.topAt - h, maxX: s.topAt + h, minZ: s.across[0], maxZ: s.across[1] };
-}
-
-export function columnBoxes(m: Mezzanine): ColliderBox[] {
-  const h = COLUMN_SIZE / 2;
-  return m.columns.map(([x, z]) => ({ minX: x - h, maxX: x + h, minZ: z - h, maxZ: z + h }));
 }
 
 export function mezzanineRailingBoxes(m: Mezzanine): ColliderBox[] {
@@ -329,7 +301,7 @@ export function mezzanineLevels(
   slabFurniture: ColliderBox[]
 ): Level[] {
   const sides = stairSideBoxes(m.stair);
-  const structure = [...sides, stairTopEndBox(m.stair), ...columnBoxes(m)];
+  const structure = [...sides, stairTopEndBox(m.stair)];
   const solidWalls = walls.map(wallBox);
   const voids = subtractRects(boundsOf(solidWalls), [m.rect, m.stair.rect]);
   const slabWalls = [...solidWalls, ...mezzanineRailingBoxes(m), ...sides, ...voids];

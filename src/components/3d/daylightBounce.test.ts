@@ -7,7 +7,7 @@ import { sunSetupFor, sunVisibility } from "./sunLight";
 import { windowFormFactor, windowLightsFor } from "./windowLight";
 import { daylightFill, enteringFlux, linearAlbedo, sunBounceLights } from "./daylightBounce";
 import { DAYLIGHT_FILL_MAX } from "./sceneLighting";
-import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
+import { CONCEPT_EXHIBITIONS } from "./__fixtures__/demoRooms";
 
 const layout = buildRoomLayout([10, 8], 4, undefined, undefined, [
   { id: "w", wallId: "north", alongFraction: 0.5, width: 2, height: 2, sillHeight: 1, styleId: "panorama" } satisfies WindowPlacement,

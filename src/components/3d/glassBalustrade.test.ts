@@ -17,7 +17,7 @@ import {
   postsPerSegment,
 } from "./glassBalustrade";
 import { SweepBuilder, arc } from "./profileSweep";
-import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
+import { CONCEPT_EXHIBITIONS } from "./__fixtures__/demoRooms";
 
 /** 12 × 8 room: a 3.2 × 1.8 m balcony on the south wall (+z), outer face z = 4.15. */
 const layout = buildRoomLayout([12, 8], 3.6, undefined, undefined, [

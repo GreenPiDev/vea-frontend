@@ -1,6 +1,8 @@
-import { useLayoutEffect, useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo } from "react";
 import * as THREE from "three";
-import { useGLTF, Instance, Instances } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
+import StaticInstances from "./StaticInstances";
+import type { StaticInstance } from "./instanceMatrices";
 import { applyCeilingLight } from "./ceilingLight";
 import { furnitureOccluder, removeSunOccluderSource, setSunOccluderSource } from "./sunOccluders";
 
@@ -79,7 +81,7 @@ interface FurnitureInstancesProps {
 
 /**
  * One furniture model, however many times a curator placed it in the room,
- * rendered as one InstancedMesh per sub-part (drei's Instances/Instance —
+ * rendered as one InstancedMesh per sub-part (StaticInstances.tsx —
  * same GPU-instancing pattern ArtworkFixtures.tsx already uses for picture-
  * light fixtures) instead of one full scene graph clone per placement. A
  * curator can't control how many copies end up in a room, so draw calls
@@ -90,6 +92,9 @@ interface FurnitureInstancesProps {
 export default function FurnitureInstances({ modelUrl, scale = 1, placements }: FurnitureInstancesProps) {
   const { scene } = useGLTF(modelUrl);
   const parts = useMemo(() => extractParts(scene), [scene]);
+  // extractParts builds fresh geometry copies per mount (the GLTF's own stay in useGLTF's cache) — free them
+  // when the room changes, or every visited room leaked its furniture's vertex buffers.
+  useEffect(() => () => parts.forEach((part) => part.geometry.dispose()), [parts]);
 
   // Each placed copy casts a sun shadow from its model's real bounding box (sunOccluders.ts).
   const localBox = useMemo(() => {
@@ -107,16 +112,18 @@ export default function FurnitureInstances({ modelUrl, scale = 1, placements }: 
     return () => removeSunOccluderSource(key);
   }, [localBox, modelUrl, placements]);
 
+  // Written once per placement change (instanceMatrices.ts) — drei's <Instances> re-uploaded them every frame.
+  const instances = useMemo(
+    () => placements.map((p): StaticInstance => ({ position: p.position, rotationY: p.rotationY, scale })),
+    [placements, scale]
+  );
+
   if (placements.length === 0) return null;
 
   return (
     <>
       {parts.map((part, i) => (
-        <Instances key={i} limit={placements.length} geometry={part.geometry} material={part.material}>
-          {placements.map((p, j) => (
-            <Instance key={j} position={p.position} rotation={[0, p.rotationY, 0]} scale={scale} />
-          ))}
-        </Instances>
+        <StaticInstances key={i} geometry={part.geometry} material={part.material} instances={instances} />
       ))}
     </>
   );

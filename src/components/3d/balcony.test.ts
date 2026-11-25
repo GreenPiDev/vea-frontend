@@ -24,7 +24,7 @@ import { planRoute } from "./routePlanner";
 import { DOOR_LEAF_THICKNESS, balconyDoorLayout, buildWindowParts } from "./windowGeometry";
 import { glassShare, windowLightsFor } from "./windowLight";
 import { facadeSunVisibility, outdoorLightFor, spillLightsFor } from "./outdoorLight";
-import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
+import { CONCEPT_EXHIBITIONS } from "./__fixtures__/demoRooms";
 
 /** 12 × 8 room, 3.6 m high: a balcony door in the middle of the south wall (+z), a window to its east. */
 const door: WindowPlacement = {

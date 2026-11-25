@@ -25,7 +25,7 @@ export interface ApiFurnitureAsset {
 // Public — any visitor viewing a published exhibition that uses an
 // organization's template needs to resolve its furniture, not just that
 // organization's own admins. Disabled until a real organizationId is known
-// (a static EXHIBITIONS preset / custom room never has one, see
+// (a custom room never has one, see
 // backendAdapter.ts's resolveFurniture callers).
 export function useFurnitureAssetsByOrganization(organizationId: string | null) {
   return useApiGetList<ApiFurnitureAsset>(

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 // Site'ye ilk giren ziyaretçinin gördüğü karşılama ekranı — doğrudan
 // header+sergi kartları ekranına (/home) düşmek yerine, önce marka/vizyonu
 // anlatan tek bir CTA ile o ekrana yönlendiriyor.
-// landing-hero.jpg: Louvre Grande Galerie (Cheng-en Cheng, Wikimedia Commons,
+// landing-hero.webp: Louvre Grande Galerie (Cheng-en Cheng, Wikimedia Commons,
 // CC BY-SA 2.0) — alt köşedeki atıf bu lisansın gerektirdiği tek koşul.
 export default function Landing() {
   const { t } = useTranslation();
@@ -18,7 +18,7 @@ export default function Landing() {
           // Metnin oturduğu sol taraf sağdan daha koyu/kapalı olsun diye yatay bir
           // karartma eklendi — düz üst/alt gradyan tek başına sola yaslı başlığın
           // kontrastını garanti etmiyordu.
-          "linear-gradient(90deg, rgba(10, 7, 5, 0.9) 0%, rgba(15, 10, 6, 0.55) 55%, rgba(15, 10, 6, 0.35) 100%), url('/landing-hero.jpg')",
+          "linear-gradient(90deg, rgba(10, 7, 5, 0.9) 0%, rgba(15, 10, 6, 0.55) 55%, rgba(15, 10, 6, 0.35) 100%), url('/landing-hero.webp')",
       }}
     >
       {/* lang="en": marka adı İngilizce — Türkçe locale altında CSS `uppercase` "i"yi "İ" yapıyordu. */}

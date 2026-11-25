@@ -6,8 +6,6 @@
 import type { Artwork } from "./artworks";
 import type { RoomLayout } from "./galleryLayout";
 import type { SeatSpot } from "./seating";
-import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
-import { SHOWCASE_EXHIBITION } from "./showcaseExhibition";
 
 export interface ExhibitionTheme {
   wallColor: string;
@@ -59,7 +57,7 @@ export interface Exhibition {
   custom?: boolean;
   /** Precomputed layout for a user-drawn (non-rectangular) room; overrides roomSize. */
   customLayout?: RoomLayout;
-  /** Explicit hung collection for a custom exhibition; overrides the ARTWORKS-by-id lookup. */
+  /** Explicit hung collection for a custom exhibition; none means an empty room. */
   artworks?: Artwork[];
   /** Curator-placed furniture (template-only for now, see backendAdapter.ts's exhibitionFromBackendTemplate) — rendered by GalleryFurniture.tsx, already resolved against 3d/furniture.ts's FURNITURE_CATALOG. */
   furniture?: { modelUrl: string; position: [number, number, number]; rotationY: number; scale?: number; round?: boolean }[];
@@ -70,102 +68,3 @@ export interface Exhibition {
   /** Original builder inputs, kept so the exhibition can be reopened and edited. */
   builderSource?: CustomExhibitionSource;
 }
-
-export const EXHIBITIONS: Exhibition[] = [
-  {
-    id: "renaissance",
-    name: "Rönesans Ustaları",
-    subtitle: "Klasik portre ve figür sanatı",
-    roomSize: [14, 10],
-    wallHeight: 6,
-    theme: {
-      wallColor: "#efe4cf",
-      wallRoughness: 0.9,
-      floorColor: "#8a6a45",
-      floorRoughness: 0.4,
-      floorMetalness: 0.02,
-      ceilingColor: "#f7f0e0",
-      fogColor: "#efe4cf",
-      backgroundColor: "#e9dcc2",
-      ambientColor: "#fff1d6",
-      ambientIntensity: 0.38,
-      hemisphereSkyColor: "#fff6e6",
-      hemisphereGroundColor: "#c9a876",
-      spotColor: "#fff2d0",
-      spotIntensity: 20,
-    },
-  },
-  {
-    id: "impressionism",
-    name: "Empresyonizm ve Japon Sanatı",
-    subtitle: "Işık, renk ve ahşap baskı",
-    roomSize: [14, 10],
-    wallHeight: 6,
-    theme: {
-      wallColor: "#22303f",
-      wallRoughness: 0.75,
-      floorColor: "#141a22",
-      floorRoughness: 0.15,
-      floorMetalness: 0.35,
-      ceilingColor: "#0f141b",
-      fogColor: "#1b2531",
-      backgroundColor: "#141c26",
-      ambientColor: "#cfe0ff",
-      ambientIntensity: 0.22,
-      hemisphereSkyColor: "#a9c7ff",
-      hemisphereGroundColor: "#0d1620",
-      spotColor: "#eaf2ff",
-      spotIntensity: 24,
-    },
-  },
-  {
-    id: "baroque",
-    name: "Barok ve Dışavurumculuk",
-    subtitle: "Dramatik ışık, koyu salon",
-    roomSize: [10, 10],
-    wallHeight: 5,
-    theme: {
-      wallColor: "#3b1418",
-      wallRoughness: 0.85,
-      floorColor: "#1c1210",
-      floorRoughness: 0.3,
-      floorMetalness: 0.05,
-      ceilingColor: "#2a1013",
-      fogColor: "#33110f",
-      backgroundColor: "#2a0f0f",
-      ambientColor: "#ffd8b0",
-      ambientIntensity: 0.16,
-      hemisphereSkyColor: "#5a2a2a",
-      hemisphereGroundColor: "#100606",
-      spotColor: "#ffd9a0",
-      spotIntensity: 26,
-    },
-  },
-  {
-    id: "grande-galerie",
-    name: "Büyük Galeri",
-    subtitle: "Louvre esintili, kırmızı duvarlı, devasa tablolar salonu",
-    roomSize: [34, 22],
-    wallHeight: 13,
-    theme: {
-      wallColor: "#8f2323",
-      wallRoughness: 0.85,
-      floorColor: "#c8a874",
-      floorRoughness: 0.35,
-      floorMetalness: 0.05,
-      ceilingColor: "#f9f5ec",
-      fogColor: "#d8c4a0",
-      backgroundColor: "#efe3cc",
-      ambientColor: "#fff8ec",
-      ambientIntensity: 0.5,
-      hemisphereSkyColor: "#fff6e0",
-      hemisphereGroundColor: "#c9a876",
-      spotColor: "#fff8e8",
-      spotIntensity: 20,
-    },
-  },
-  // Adım 13 showcase room (/exhibition/vitrin-1) — see showcaseExhibition.ts.
-  SHOWCASE_EXHIBITION,
-  // Concept sibling rooms (/exhibition/vitrin-2 … vitrin-7, 6 and 7 have windows) — see conceptRooms.ts.
-  ...CONCEPT_EXHIBITIONS,
-];

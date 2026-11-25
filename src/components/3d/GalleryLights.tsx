@@ -14,12 +14,17 @@ import { useWallLabels } from "./useWallLabels";
 import { FRAME_BORDER } from "./artworkShadow";
 import { canvasZ } from "./frameProfile";
 import { WALL_CLEARANCE, WALL_THICKNESS } from "./galleryLayout";
+import StaticInstances from "./StaticInstances";
+import type { StaticInstance } from "./instanceMatrices";
 
 // Fill strength is set in sceneLighting.ts (the scene's single exposure dial), not here.
 
 // Every ceiling fixture disc in a given room shares the exact same material (same theme,
 // same emissive color) — one per theme color, not one per disc, same reasoning as
 // Artwork.tsx's fixture material cache.
+// radialSegments 10 (was 20): the disc is small, cosmetic and seen from a few metres away. Shared, never disposed.
+const FIXTURE_DISC_GEOMETRY = new THREE.CylinderGeometry(0.18, 0.18, 0.06, 10);
+
 const ceilingFixtureMaterialCache = new Map<string, THREE.MeshStandardMaterial>();
 function getCeilingFixtureMaterial(spotColor: string) {
   let material = ceilingFixtureMaterialCache.get(spotColor);
@@ -105,6 +110,11 @@ export default function GalleryLights() {
 
   // Paintings throw sun shadows on their wall (sunOccluders.ts; furniture registers its own in
   // FurnitureInstances.tsx). Packed after the furniture, and only those the sun can reach.
+  const fixtureDiscs = useMemo(
+    () => layout.ceilingSpots.map(([x, y, z]): StaticInstance => ({ position: [x, y + 0.05, z] })),
+    [layout.ceilingSpots]
+  );
+
   const { artworks } = useWallLabels();
   useLayoutEffect(() => {
     const wallGap = WALL_CLEARANCE - WALL_THICKNESS / 2;
@@ -126,19 +136,9 @@ export default function GalleryLights() {
       {/* Daylight inter-reflected around the room (split-flux estimate, daylightBounce.ts) — zero without windows. */}
       {daylight.fill.r + daylight.fill.g + daylight.fill.b > 0 && <ambientLight color={daylight.fill} intensity={1} />}
 
-      {/* Emissive fixture discs — the visible source of the analytic ceiling light (ceilingLight.ts) */}
-      {layout.ceilingSpots.map(([x, y, z], i) => (
-        <mesh
-          key={`fixture-${i}`}
-          // Spots sit 10 cm under their ceiling (the room's, or a mezzanine's underside): the disc hangs from it.
-          position={[x, y + 0.05, z]}
-          material={getCeilingFixtureMaterial(theme.spotColor)}
-        >
-          {/* radialSegments dropped from 20 to 10 — same reasoning as Artwork.tsx's fixture geometry: this disc
-              is small, cosmetic, and viewed from a few meters away, so the facets aren't visible either way. */}
-          <cylinderGeometry args={[0.18, 0.18, 0.06, 10]} />
-        </mesh>
-      ))}
+      {/* Emissive fixture discs — the visible source of the analytic ceiling light (ceilingLight.ts). One
+          instanced draw call for the whole ceiling (was one mesh + one geometry per fixture). */}
+      <StaticInstances geometry={FIXTURE_DISC_GEOMETRY} material={getCeilingFixtureMaterial(theme.spotColor)} instances={fixtureDiscs} />
     </>
   );
 }

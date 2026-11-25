@@ -63,7 +63,7 @@ export default function ArtworkIconOverlay({ store, artworks, hidden, onOpen, on
             <span
               className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition-[color,background-color,border-color,box-shadow] duration-200 group-hover:border-brand-100 group-hover:bg-brand-900/90 group-hover:shadow-lg ${
                 isNearest
-                  ? "artwork-icon-ring animate-artwork-icon-breathe border-brand-200/80 bg-brand-950/70"
+                  ? "artwork-icon-ring border-brand-200/80 bg-brand-950/70"
                   : "border-brand-200/30 bg-brand-950/50"
               }`}
             >
