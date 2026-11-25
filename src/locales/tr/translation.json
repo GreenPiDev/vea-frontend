@@ -307,6 +307,7 @@
   "orgAdminAdding": "Ekleniyor…",
   "orgAdminAddError": "Admin eklenemedi",
   "orgAdminRemove": "Kaldır",
+  "orgAdminRemoveConfirm": "\"{{email}}\" adresini {{name}} kurumunun adminlerinden çıkarmak istediğinize emin misiniz?",
 
   "curatorArtistsTitle": "Kayıtlı Satıcılar",
   "artistEmpty": "Henüz kuruma davet edilmiş bir sanatçı yok.",
@@ -320,6 +321,7 @@
   "artistAdding": "Davet ediliyor…",
   "artistAddError": "Sanatçı davet edilemedi",
   "artistRemove": "Kaldır",
+  "artistRemoveConfirm": "\"{{email}}\" adresli satıcıyı kurumdan çıkarmak istediğinize emin misiniz?",
 
   "buyerPanelHeaderTitle": "Alıcı Paneli",
   "buyerPanelTitle": "Tekliflerim",
@@ -399,6 +401,8 @@
   "removalRequestDecisionApproveConfirm": "\"{{title}}\" eserinin sergiden kaldırılması talebini onaylamak üzeresiniz. Bu işlem eseri sergiden kaldırıp arşivleyecek.",
   "removalRequestDecisionRejectConfirm": "\"{{title}}\" eserinin sergiden kaldırılması talebini reddetmek üzeresiniz.",
   "commonCancel": "Vazgeç",
+  "tableRowExpand": "Satırı aç",
+  "tableRowCollapse": "Satırı kapat",
   "removalRequestSend": "Başvuru Gönder",
   "removalRequestMessageLabel": "Talebiniz",
   "removalRequestPlaceholder": "Bu eserin sergiden kaldırılmasını neden istediğinizi yazın...",

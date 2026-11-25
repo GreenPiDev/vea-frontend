@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAddOrgAdmin, useOrgAdmins, useRemoveOrgAdmin } from '../../lib/api/domains/organizations';
 import { ApiError } from '../../lib/api/client';
+import ConfirmModal from '../common/ConfirmModal';
 
 interface OrgAdminListProps {
   organizationId: string;
@@ -15,6 +16,9 @@ export default function OrgAdminList({ organizationId, organizationName }: OrgAd
   const removeAdmin = useRemoveOrgAdmin(organizationId);
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Removing an admin is a consequential, easy-to-misclick action, so it goes
+  // through a confirm step instead of firing on click.
+  const [pendingRemove, setPendingRemove] = useState<{ id: string; email: string } | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -40,7 +44,7 @@ export default function OrgAdminList({ organizationId, organizationName }: OrgAd
           <li key={admin.id} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-sm shadow-sm">
             <span className="text-brand-900">{admin.email}</span>
             <button
-              onClick={() => removeAdmin.mutate(admin.id)}
+              onClick={() => setPendingRemove({ id: admin.id, email: admin.email })}
               className="text-red-600 underline hover:text-red-800"
             >
               {t('orgAdminRemove')}
@@ -69,6 +73,20 @@ export default function OrgAdminList({ organizationId, organizationName }: OrgAd
         </button>
         {error && <p className="text-sm text-red-600">{error}</p>}
       </form>
+
+      {pendingRemove && (
+        <ConfirmModal
+          message={t('orgAdminRemoveConfirm', { email: pendingRemove.email, name: organizationName })}
+          confirmLabel={t('orgAdminRemove')}
+          tone="danger"
+          isSubmitting={removeAdmin.isPending}
+          onConfirm={() =>
+            // Success/error toasts come from the mutation's meta (global MutationCache).
+            removeAdmin.mutate(pendingRemove.id, { onSettled: () => setPendingRemove(null) })
+          }
+          onCancel={() => setPendingRemove(null)}
+        />
+      )}
     </div>
   );
 }

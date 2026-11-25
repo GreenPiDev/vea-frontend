@@ -1,4 +1,6 @@
 import { Fragment, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ChevronDownIcon } from '../layout/icons';
 
 export interface GenericTableColumn<T> {
   key: string;
@@ -14,6 +16,11 @@ export interface GenericTableColumn<T> {
 // be expanded at once is entirely up to the caller's `isExpanded`/`onToggle`
 // (e.g. ExhibitionStatsList.tsx keeps a single `expandedId`, so opening one
 // row closes the previous one).
+//
+// The whole row toggles on click. Interactive controls inside a cell (an
+// edit/delete button, a link, an inline input) must call
+// e.stopPropagation() in their own onClick, or the click also toggles the
+// row — see OrganizationList.tsx's edit button.
 export interface GenericTableExpandable<T> {
   isExpanded: (row: T) => boolean;
   onToggle: (row: T) => void;
@@ -38,6 +45,7 @@ interface GenericTableProps<T> {
 // OrgOfferTable.tsx is the first consumer; other panel tables migrate to
 // this incrementally, not in one pass.
 export default function GenericTable<T>({ columns, data, getRowKey, isLoading, emptyMessage, expandable, getRowClassName }: GenericTableProps<T>) {
+  const { t } = useTranslation();
   if (isLoading) return null;
 
   if (!data || data.length === 0) {
@@ -95,7 +103,22 @@ export default function GenericTable<T>({ columns, data, getRowKey, isLoading, e
                   >
                     {expandable && (
                       <td className="px-4 py-3 text-brand-500">
-                        <span className={`inline-block transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+                        {/* A real button so the row is keyboard/screen-reader operable;
+                            stopPropagation keeps the row's own onClick from toggling it back. */}
+                        <button
+                          type="button"
+                          aria-expanded={isExpanded}
+                          aria-label={t(isExpanded ? 'tableRowCollapse' : 'tableRowExpand')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            expandable.onToggle(row);
+                          }}
+                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-brand-500 hover:text-brand-800"
+                        >
+                          <ChevronDownIcon
+                            className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                          />
+                        </button>
                       </td>
                     )}
                     {columns.map((column) => (

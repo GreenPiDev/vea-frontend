@@ -4,26 +4,27 @@ import { useOrganizationMutations, useOrganizations, type ApiOrganization } from
 import { ApiError } from '../../lib/api/client';
 import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
 import GenericAddEditPanel from '../common/GenericAddEditPanel';
+import OrgAdminList from './OrgAdminList';
 import Tooltip from '../layout/Tooltip';
 import { EditIcon } from '../layout/icons';
-
-interface OrganizationListProps {
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}
 
 // 'create' opens the add form empty; an ApiOrganization opens it prefilled
 // for editing (same 'none' | 'create' | T formMode shape as ArtworkForm/
 // ExhibitionForm elsewhere in this codebase).
 type FormMode = 'none' | 'create' | ApiOrganization;
 
-export default function OrganizationList({ selectedId, onSelect }: OrganizationListProps) {
+// Each organization row expands in place (GenericTable's `expandable`:
+// chevron at the row start, or a click anywhere on the row) to show its
+// admin list + "add admin by email" form (OrgAdminList). One row open at a
+// time, same single-`expandedId` pattern as ExhibitionStatsList.tsx.
+export default function OrganizationList() {
   const { t } = useTranslation();
   const { data: organizations, isLoading } = useOrganizations();
   const { create, update } = useOrganizationMutations();
   const [formMode, setFormMode] = useState<FormMode>('none');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const openCreate = () => {
     setFormMode('create');
@@ -48,7 +49,8 @@ export default function OrganizationList({ selectedId, onSelect }: OrganizationL
         {
           onSuccess: (org) => {
             setFormMode('none');
-            onSelect(org.id);
+            // A new org has no admins yet — open its row straight to the add-admin form.
+            setExpandedId(org.id);
           },
           onError: (err) => setError(err instanceof ApiError ? err.message : t('orgFormError')),
         },
@@ -69,14 +71,7 @@ export default function OrganizationList({ selectedId, onSelect }: OrganizationL
       key: 'name',
       header: t('orgColName'),
       render: (org) => (
-        <button
-          onClick={() => onSelect(org.id)}
-          className={`text-left hover:underline ${
-            selectedId === org.id ? 'font-medium text-brand-700' : 'text-brand-900'
-          }`}
-        >
-          {org.name}
-        </button>
+        <span className={expandedId === org.id ? 'font-medium text-brand-700' : 'text-brand-900'}>{org.name}</span>
       ),
     },
     {
@@ -96,7 +91,11 @@ export default function OrganizationList({ selectedId, onSelect }: OrganizationL
         <Tooltip label={t('artworkEdit')} placement="top">
           <button
             type="button"
-            onClick={() => openEdit(org)}
+            onClick={(e) => {
+              // Don't let the click reach the row — that would expand/collapse it.
+              e.stopPropagation();
+              openEdit(org);
+            }}
             aria-label={t('artworkEdit')}
             className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-brand-300 text-brand-700 transition-colors hover:bg-brand-100 hover:text-brand-900"
           >
@@ -167,6 +166,11 @@ export default function OrganizationList({ selectedId, onSelect }: OrganizationL
         getRowKey={(org) => org.id}
         isLoading={isLoading}
         emptyMessage={t('orgEmpty')}
+        expandable={{
+          isExpanded: (org) => expandedId === org.id,
+          onToggle: (org) => setExpandedId(expandedId === org.id ? null : org.id),
+          renderExpanded: (org) => <OrgAdminList organizationId={org.id} organizationName={org.name} />,
+        }}
       />
     </div>
   );

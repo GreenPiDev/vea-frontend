@@ -105,7 +105,7 @@ createRoot(document.getElementById('root')!).render(
           {/* bi-frontend'deki referans toast'la aynı görsel: büyük silik ikon, alt kenarda
               otomatik-kapanma ilerleme çubuğu, sağ üstte kapatma butonu — bkz. renderToast
               yukarıda. Konum sağ üst, giriş/çıkış sağdan kayarak (src/index.css). */}
-          <Toaster position="top-right" gutter={12} toastOptions={{ duration: TOAST_DURATION_MS }}>
+          <Toaster position="bottom-right" gutter={12} toastOptions={{ duration: TOAST_DURATION_MS }}>
             {renderToast}
           </Toaster>
           <PullToRefresh />

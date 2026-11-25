@@ -307,6 +307,7 @@
   "orgAdminAdding": "Adding…",
   "orgAdminAddError": "Could not add the admin",
   "orgAdminRemove": "Remove",
+  "orgAdminRemoveConfirm": "Are you sure you want to remove \"{{email}}\" from {{name}}'s admins?",
 
   "curatorArtistsTitle": "Authenticated Sellers",
   "artistEmpty": "No artists invited to this organization yet.",
@@ -320,6 +321,7 @@
   "artistAdding": "Inviting…",
   "artistAddError": "Could not invite the artist",
   "artistRemove": "Remove",
+  "artistRemoveConfirm": "Are you sure you want to remove the seller \"{{email}}\" from the organization?",
 
   "buyerPanelHeaderTitle": "Buyer Panel",
   "buyerPanelTitle": "My Offers",
@@ -399,6 +401,8 @@
   "removalRequestDecisionApproveConfirm": "You're about to approve the removal request for \"{{title}}\". This will remove the artwork from the exhibition and archive it.",
   "removalRequestDecisionRejectConfirm": "You're about to reject the removal request for \"{{title}}\".",
   "commonCancel": "Cancel",
+  "tableRowExpand": "Expand row",
+  "tableRowCollapse": "Collapse row",
   "removalRequestSend": "Send Request",
   "removalRequestMessageLabel": "Your request",
   "removalRequestPlaceholder": "Explain why you'd like this artwork removed from the exhibition...",

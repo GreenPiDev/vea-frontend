@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAddMyOrgArtist, useMyOrgArtists, useRemoveMyOrgArtist, type ApiOrgArtist } from '../../lib/api/domains/organizations';
 import { ApiError } from '../../lib/api/client';
 import GenericTable, { type GenericTableColumn } from '../common/GenericTable';
+import ConfirmModal from '../common/ConfirmModal';
 import Tooltip from '../layout/Tooltip';
 import { TrashIcon } from '../layout/icons';
 
@@ -15,6 +16,8 @@ export default function OrgArtistList() {
   const removeArtist = useRemoveMyOrgArtist();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Same confirm-before-remove step as OrgAdminList.tsx.
+  const [pendingRemove, setPendingRemove] = useState<ApiOrgArtist | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -62,7 +65,7 @@ export default function OrgArtistList() {
         <Tooltip label={t('artistRemove')} placement="top">
           <button
             type="button"
-            onClick={() => removeArtist.mutate(artist.id)}
+            onClick={() => setPendingRemove(artist)}
             aria-label={t('artistRemove')}
             className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-red-300 text-red-600 transition-colors hover:bg-red-50 hover:text-red-800"
           >
@@ -105,6 +108,20 @@ export default function OrgArtistList() {
         </button>
         {error && <p className="text-sm text-red-600">{error}</p>}
       </form>
+
+      {pendingRemove && (
+        <ConfirmModal
+          message={t('artistRemoveConfirm', { email: pendingRemove.email })}
+          confirmLabel={t('artistRemove')}
+          tone="danger"
+          isSubmitting={removeArtist.isPending}
+          onConfirm={() =>
+            // Success/error toasts come from the mutation's meta (global MutationCache).
+            removeArtist.mutate(pendingRemove.id, { onSettled: () => setPendingRemove(null) })
+          }
+          onCancel={() => setPendingRemove(null)}
+        />
+      )}
     </div>
   );
 }
