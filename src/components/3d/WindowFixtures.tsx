@@ -2,27 +2,9 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { applyCeilingLight } from "./ceilingLight";
+import { createGlassMaterial } from "./glassMaterial";
 import { GLASS_ABSORPTION, WINDOW_STYLES, buildWindowParts } from "./windowGeometry";
 import type { WindowOpening, WindowStyleId } from "./windowOpenings";
-
-/**
- * Glass: what it lets through is the background multiplied by a slight green-grey tint (blendDst = 1 − tint,
- * GLASS_ABSORPTION), and on top it *adds* its own colour, which is black diffuse + the env-map reflection with
- * the BRDF's Fresnel — ~4 % of the room's reflection face-on, much more at a grazing angle, like real float
- * glass. One pass, no MeshPhysicalMaterial.transmission (that re-renders the scene).
- */
-
-function createGlassMaterial() {
-  const m = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.03, metalness: 0 });
-  m.transparent = true;
-  m.depthWrite = false;
-  m.blending = THREE.CustomBlending;
-  m.blendEquation = THREE.AddEquation;
-  m.blendSrc = THREE.OneFactor;
-  m.blendDst = THREE.OneMinusConstantColorFactor;
-  m.blendColor.setRGB(...GLASS_ABSORPTION);
-  return m;
-}
 
 /**
  * Every window in the room (joinery from windowGeometry.ts). One merged, vertex-coloured mesh per style used,
@@ -64,7 +46,7 @@ export default function WindowFixtures({ windows }: { windows: WindowOpening[] }
     }
 
     // A room whose only openings are balcony doors has no glass at all.
-    const glass = panes.length ? { geometry: mergeGeometries(panes)!, material: createGlassMaterial() } : null;
+    const glass = panes.length ? { geometry: mergeGeometries(panes)!, material: createGlassMaterial(GLASS_ABSORPTION) } : null;
     for (const p of panes) p.dispose();
     return { meshes, glass };
   }, [windows]);

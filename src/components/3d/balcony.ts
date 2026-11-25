@@ -5,8 +5,9 @@
 //
 // - the wall's *collider* is cut at the door (solidWallBoxes), so the visitor walks out — the rendered wall
 //   pieces already come from splitWallsAroundOpenings like any window;
-// - the platform gets a railing on its three free sides, and the railing is a collider too, so nobody walks
-//   off the edge;
+// - the door's leaves stand open into the room (windowGeometry.ts) and are colliders (doorLeafColliders);
+// - the platform gets a glass balustrade on its three free sides (glassBalustrade.ts), and it is a collider
+//   too, so nobody walks off the edge;
 // - click-to-go treats the railing like a wall for "which floor can I see" (clickNavigationGeometry.ts's
 //   wallBoxes), so the ground in the panorama beyond it is never a destination.
 //
@@ -14,13 +15,15 @@
 // reveal) out to its edge. The facade — the wall's outer face, which nobody saw before a balcony existed — is
 // a separate outdoor-lit skin a little proud of the wall (FACADE_OFFSET), holed around every opening on it.
 
+import * as THREE from "three";
 import type { ColliderBox, WallSegment } from "./galleryLayout";
 import { splitWallAroundOpenings, type WindowOpening } from "./windowOpenings";
+import { balconyDoorLeafRects, windowMatrix } from "./windowGeometry";
 
 /** Railing height above the platform (building codes ask ≥ 1.0–1.1 m). */
 export const RAILING_HEIGHT = 1.05;
-/** Railing centre line, in from the platform's edge. */
-export const RAILING_INSET = 0.04;
+/** Railing centre line, in from the platform's edge — keeps the posts' 12 cm base plates on the slab. */
+export const RAILING_INSET = 0.08;
 /** Collider thickness of a railing run. */
 export const RAILING_COLLIDER = 0.08;
 /** Slab thickness under the platform. */
@@ -114,6 +117,30 @@ export function railingColliders(balconies: BalconyGeometry[]): ColliderBox[] {
       maxZ: Math.max(from[1], to[1]) + h,
     }))
   );
+}
+
+/**
+ * The open leaves of every balcony door (windowGeometry.ts's French door stands open 90° into the room) as
+ * colliders — nobody walks through a door leaf. The doorway between them stays walkable.
+ */
+export function doorLeafColliders(openings: WindowOpening[] | undefined): ColliderBox[] {
+  const v = new THREE.Vector3();
+  return (openings ?? []).filter(isBalcony).flatMap((o) => {
+    const m = windowMatrix(o);
+    return balconyDoorLeafRects(o.width, o.height).map((r) => {
+      const xs: number[] = [];
+      const zs: number[] = [];
+      for (const [x, z] of [
+        [r.x0, r.z0],
+        [r.x1, r.z1],
+      ]) {
+        v.set(x, 0, z).applyMatrix4(m);
+        xs.push(v.x);
+        zs.push(v.z);
+      }
+      return { minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs) };
+    });
+  });
 }
 
 function box(w: WallSegment): ColliderBox {

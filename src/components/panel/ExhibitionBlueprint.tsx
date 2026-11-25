@@ -7,6 +7,7 @@ import { MEZZ_RUN_SUFFIX, isMezzanineRunId, mezzanineGroundRules } from '../3d/m
 import type { FurnitureDef } from '../3d/furniture';
 import { placeArtworksAlongWall, slideClamp } from '../3d/galleryLayout';
 import { openingSpansOnWall } from '../3d/windowOpenings';
+import { artworkDisplaySize } from '../3d/artworkDisplayScale';
 
 interface ExhibitionBlueprintProps {
   sceneConfig: ApiSceneConfig | null;
@@ -105,8 +106,7 @@ export default function ExhibitionBlueprint({
         run,
         100,
         links.map((link) => ({
-          aspect: link.artwork.widthCm / link.artwork.heightCm,
-          height: link.artwork.heightCm / 100,
+          ...artworkDisplaySize(link.artwork),
           alongFraction: link.id in (alongOverrides ?? {}) ? (alongOverrides![link.id] ?? undefined) : link.positionData?.alongFraction,
         })),
         // Same spans the 3D placement keeps artworks off (backendAdapter.ts's placeAll).
@@ -121,7 +121,7 @@ export default function ExhibitionBlueprint({
         index: i,
         x: placements[i].position[0] + dx,
         z: placements[i].position[2] + dz,
-        width: placements[i].height * (link.artwork.widthCm / link.artwork.heightCm),
+        width: placements[i].height * artworkDisplaySize(link.artwork).aspect,
         imageUrl: link.artwork.imageUrl,
         title: link.artwork.title,
       }));

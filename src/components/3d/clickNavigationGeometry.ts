@@ -6,7 +6,7 @@
 
 import type { Artwork as ArtworkData } from "./artworks";
 import { EYE_HEIGHT, PLAYER_RADIUS, type ColliderBox, type RoomLayout } from "./galleryLayout";
-import { balconyGeometries, railingColliders, solidWallBoxes } from "./balcony";
+import { balconyGeometries, doorLeafColliders, railingColliders, solidWallBoxes } from "./balcony";
 import { blockedBefore, type SolidBox } from "./mezzanine";
 
 export interface FloorPoint {
@@ -106,7 +106,7 @@ export function collides(x: number, z: number, colliders: ColliderBox[], radius 
  * never a floor point to walk to (balcony.ts).
  */
 export function wallBoxes(layout: Pick<RoomLayout, "walls" | "windows">): ColliderBox[] {
-  return [...solidWallBoxes(layout.walls, layout.windows), ...railingColliders(balconyGeometries(layout.windows))];
+  return [...solidWallBoxes(layout.walls, layout.windows), ...doorLeafColliders(layout.windows), ...railingColliders(balconyGeometries(layout.windows))];
 }
 
 /** Parameter t ∈ [0, 1] where segment a→b first enters `box` (slab method), or null if it never does. */

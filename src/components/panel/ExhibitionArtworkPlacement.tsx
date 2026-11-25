@@ -14,6 +14,7 @@ import { groupByWallRun, wallRunsForSceneConfig } from '../3d/backendAdapter';
 import { isMezzanineRunId } from '../3d/mezzanineTemplate';
 import { toFurnitureDef } from '../3d/furniture';
 import { FLOOR_CLEARANCE } from '../3d/galleryLayout';
+import { artworkDisplayHeight } from '../3d/artworkDisplayScale';
 import { ApiError } from '../../lib/api/client';
 import Tooltip from '../layout/Tooltip';
 import { StarIcon, TrashIcon } from '../layout/icons';
@@ -22,7 +23,7 @@ import ExhibitionBlueprint from './ExhibitionBlueprint';
 
 /** Same formula placeArtworksAlongWall() falls back to when no curator override is set — used here only to pre-fill a sensible starting value in the height input, not as a hard default. */
 function defaultHangHeight(artwork: ApiArtwork): number {
-  return artwork.heightCm / 100 / 2 + FLOOR_CLEARANCE;
+  return artworkDisplayHeight(artwork) / 2 + FLOOR_CLEARANCE;
 }
 
 interface ExhibitionArtworkPlacementProps {

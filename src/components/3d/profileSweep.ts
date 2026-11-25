@@ -118,6 +118,105 @@ export class SweepBuilder {
     }
   }
 
+  /**
+   * Sweeps a cross-section along a horizontal polyline in world space (a handrail), with exact mitres at every
+   * inner vertex. Profile point [r, z]: r = horizontal offset to the left of the walking direction, z = up.
+   * `caps` closes both ends.
+   */
+  sweepPolyline(points: THREE.Vector3Tuple[], profile: Profile, color: THREE.Color, caps = false) {
+    if (points.length < 2) return;
+    const sec = section(profile);
+    const up = new THREE.Vector3(0, 1, 0);
+    const P = points.map((p) => new THREE.Vector3(...p));
+    const dirs = P.slice(1).map((p, k) => p.clone().sub(P[k]).setY(0).normalize());
+    // Left of the walking direction on the floor plane.
+    const sides = dirs.map((d) => new THREE.Vector3(-d.z, 0, d.x));
+    // Mitre vector at every vertex: the bisector of the neighbouring sides, stretched to keep the profile's width.
+    const mitres = P.map((_, k) => {
+      const a = sides[Math.max(k - 1, 0)];
+      const b = sides[Math.min(k, sides.length - 1)];
+      const m = a.clone().add(b).normalize();
+      return m.multiplyScalar(1 / Math.max(m.dot(b), 0.2));
+    });
+    for (let k = 0; k < dirs.length; k++) {
+      const side = sides[k];
+      for (let s = 0; s < sec.n; s++) {
+        if (sec.len[s] === 0) continue;
+        const ids: number[] = [];
+        for (const end of [0, 1] as const) {
+          const [r, z] = sec.pts[(s + end) % sec.n];
+          const [nr, nz] = sec.endNormal(s, end);
+          const n: THREE.Vector3Tuple = [side.x * nr, nz, side.z * nr];
+          for (const v of [k, k + 1]) {
+            const p = P[v].clone().addScaledVector(mitres[v], r).addScaledVector(up, z);
+            ids.push(this.vertex([p.x, p.y, p.z], n, color, sec.shade[s]));
+          }
+        }
+        this.quad(ids[0], ids[1], ids[3], ids[2]);
+      }
+    }
+    if (!caps) return;
+    const contour = sec.pts.map(([r, z]) => new THREE.Vector2(r, z));
+    const tris = THREE.ShapeUtils.triangulateShape(contour, []);
+    for (const [v, k, sign] of [
+      [0, 0, -1],
+      [P.length - 1, dirs.length - 1, 1],
+    ] as const) {
+      const d = dirs[k];
+      const n: THREE.Vector3Tuple = [d.x * sign, 0, d.z * sign];
+      const ids = sec.pts.map(([r, z]) => {
+        const p = P[v].clone().addScaledVector(sides[k], r).addScaledVector(up, z);
+        return this.vertex([p.x, p.y, p.z], n, color, 1);
+      });
+      for (const [i, j, l] of tris) this.tri(ids[i], ids[j], ids[l]);
+    }
+  }
+
+  /**
+   * Sweeps a cross-section along a straight 3D segment (a sloped stair handrail), cut square at both ends.
+   * Profile point [r, z]: r = horizontal offset to the left of the direction, z = perpendicular to the segment
+   * in its vertical plane (up-ish).
+   */
+  sweepSegment(from: THREE.Vector3Tuple, to: THREE.Vector3Tuple, profile: Profile, color: THREE.Color, caps = false) {
+    const sec = section(profile);
+    const a = new THREE.Vector3(...from);
+    const b = new THREE.Vector3(...to);
+    const d = b.clone().sub(a).normalize();
+    const side = new THREE.Vector3(-d.z, 0, d.x).normalize();
+    const up = new THREE.Vector3().crossVectors(side, d).normalize();
+    if (up.y < 0) up.negate();
+    const at = (p: THREE.Vector3, r: number, z: number) => p.clone().addScaledVector(side, r).addScaledVector(up, z);
+    for (let s = 0; s < sec.n; s++) {
+      if (sec.len[s] === 0) continue;
+      const ids: number[] = [];
+      for (const end of [0, 1] as const) {
+        const [r, z] = sec.pts[(s + end) % sec.n];
+        const [nr, nz] = sec.endNormal(s, end);
+        const n = side.clone().multiplyScalar(nr).addScaledVector(up, nz);
+        for (const p of [a, b]) {
+          const v = at(p, r, z);
+          ids.push(this.vertex([v.x, v.y, v.z], [n.x, n.y, n.z], color, sec.shade[s]));
+        }
+      }
+      this.quad(ids[0], ids[1], ids[3], ids[2]);
+    }
+    if (!caps) return;
+    const tris = THREE.ShapeUtils.triangulateShape(
+      sec.pts.map(([r, z]) => new THREE.Vector2(r, z)),
+      []
+    );
+    for (const [p, sign] of [
+      [a, -1],
+      [b, 1],
+    ] as const) {
+      const ids = sec.pts.map(([r, z]) => {
+        const v = at(p, r, z);
+        return this.vertex([v.x, v.y, v.z], [d.x * sign, d.y * sign, d.z * sign], color, 1);
+      });
+      for (const [i, j, k] of tris) this.tri(ids[i], ids[j], ids[k]);
+    }
+  }
+
   /** Appends a plain three.js geometry (boxes/cylinders for hardware), dropping its uv, flat colour. */
   addGeometry(geo: THREE.BufferGeometry, color: THREE.Color) {
     const g = geo.index ? geo.toNonIndexed() : geo;
@@ -131,6 +230,21 @@ export class SweepBuilder {
       if (i % 3 === 2) this.indices.push(base + i - 2, base + i - 1, base + i);
     }
     if (g !== geo) g.dispose();
+  }
+
+  /** Appends another builder's geometry moved by `matrix` (a rigid motion — a mirror would flip the winding). */
+  append(other: SweepBuilder, matrix: THREE.Matrix4) {
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
+    const base = this.positions.length / 3;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < other.positions.length; i += 3) {
+      v.fromArray(other.positions, i).applyMatrix4(matrix);
+      this.positions.push(v.x, v.y, v.z);
+      v.fromArray(other.normals, i).applyMatrix3(normalMatrix).normalize();
+      this.normals.push(v.x, v.y, v.z);
+    }
+    for (const c of other.colors) this.colors.push(c);
+    for (const i of other.indices) this.indices.push(base + i);
   }
 
   get empty() {

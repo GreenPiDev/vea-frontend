@@ -18,7 +18,7 @@ import type { WindowOpening } from "./windowOpenings";
  * Overall label size: board, padding and type all scale together (the one knob to make labels bigger or
  * smaller). 1 = a 17 cm board with ~7 mm type, a typical printed museum label — read too small on screen; 1.4 still needed walking right up to it, so 1.8 (~31 cm).
  */
-export const LABEL_SCALE = 1.8;
+export const LABEL_SCALE = 2.0;
 
 /** Board size and finish (m). */
 export const LABEL_WIDTH = 0.17 * LABEL_SCALE;
@@ -44,15 +44,20 @@ export const LABEL_FONT_FAMILY = '"Helvetica Neue", Helvetica, Arial, sans-serif
 export const LABEL_PAPER = "#f3f1ec";
 export const LABEL_INK = "#1f1d1a";
 export const LABEL_INK_MUTED = "#6a655e";
+/** Thin black frame around the board (m) — a white label on a white wall disappeared (user request 2026-11-25). */
+export const LABEL_BORDER = 0.004;
+export const LABEL_BORDER_COLOR = "#141414";
+/** Type size multiplier on top of LABEL_SCALE — bigger type in the same board (user request 2026-11-25). */
+const TYPE_SCALE = 1.25;
 
 export type LabelStyle = "artist" | "title" | "year" | "meta";
 
 /** Cap-height-ish type sizes (m) and the CSS font for each style. */
 export const LABEL_TYPE: Record<LabelStyle, { size: number; weight: number; italic: boolean; muted: boolean }> = {
-  artist: { size: 0.0074 * LABEL_SCALE, weight: 600, italic: false, muted: false },
-  title: { size: 0.0068 * LABEL_SCALE, weight: 400, italic: true, muted: false },
-  year: { size: 0.0068 * LABEL_SCALE, weight: 400, italic: false, muted: false },
-  meta: { size: 0.0052 * LABEL_SCALE, weight: 400, italic: false, muted: true },
+  artist: { size: 0.0074 * LABEL_SCALE * TYPE_SCALE, weight: 600, italic: false, muted: false },
+  title: { size: 0.0068 * LABEL_SCALE * TYPE_SCALE, weight: 400, italic: true, muted: false },
+  year: { size: 0.0068 * LABEL_SCALE * TYPE_SCALE, weight: 400, italic: false, muted: false },
+  meta: { size: 0.0052 * LABEL_SCALE * TYPE_SCALE, weight: 400, italic: false, muted: true },
 };
 const LINE_HEIGHT = 1.32;
 /** Extra space after the artist line and before the meta block (m). */

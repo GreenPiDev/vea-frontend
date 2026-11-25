@@ -5,7 +5,7 @@
 // being hand-authored per room.
 
 import { resolveWindowOpenings, type WindowOpening, type WindowPlacement } from "./windowOpenings";
-import { balconyGeometries, railingColliders, rectOverlapsCells, solidWallBoxes } from "./balcony";
+import { balconyGeometries, doorLeafColliders, railingColliders, rectOverlapsCells, solidWallBoxes } from "./balcony";
 import { mezzanineLevels, onSlab, resolveMezzanine, underSlabFixtures, type Level, type Mezzanine, type MezzanineSpec } from "./mezzanine";
 
 export const WALL_THICKNESS = 0.3;
@@ -177,7 +177,7 @@ export function buildRoomLayout(
 
 /** Walls (cut at balcony doors) and balcony railings — the room floor's walls for routing/line of sight. */
 function roomWallBoxes(walls: WallSegment[], openings: WindowOpening[]): ColliderBox[] {
-  return [...solidWallBoxes(walls, openings), ...railingColliders(balconyGeometries(openings))];
+  return [...solidWallBoxes(walls, openings), ...doorLeafColliders(openings), ...railingColliders(balconyGeometries(openings))];
 }
 
 /** Walls (cut at balcony doors), balcony railings and room-floor furniture — everything the visitor can't walk through. */

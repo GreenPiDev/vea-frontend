@@ -14,7 +14,7 @@
 // plastered reveal shows on the room side. buildWindowParts returns world-space geometry.
 
 import * as THREE from "three";
-import { SweepBuilder, arc, mirroredSection, type Profile } from "./profileSweep";
+import { SweepBuilder, arc, mirroredSection, type Profile, type ProfilePoint } from "./profileSweep";
 import type { WindowOpening, WindowStyleId } from "./windowOpenings";
 
 /** Linear RGB share of light the glass absorbs on the way through (slight green-grey tint). */
@@ -36,8 +36,8 @@ export const WINDOW_STYLES: Record<WindowStyleId, { joinery: WindowMaterialSpec;
   modern: { joinery: { color: "#232427", roughness: 0.55, metalness: 0.4 }, hardware: { color: "#18181a", roughness: 0.4, metalness: 0.6 } },
   // Anodised aluminium, dark bronze-grey.
   panorama: { joinery: { color: "#4a4c50", roughness: 0.38, metalness: 0.75 }, hardware: null },
-  // Balcony door: the same aluminium, an open doorway (balcony.ts).
-  balcony: { joinery: { color: "#4a4c50", roughness: 0.38, metalness: 0.75 }, hardware: null },
+  // Balcony door: a classic painted-timber French door, the same paint and brass as the classic window.
+  balcony: { joinery: { color: "#ebe6dc", roughness: 0.5, metalness: 0 }, hardware: { color: "#b38b52", roughness: 0.32, metalness: 1 } },
 };
 
 /** Shade of a 2 mm shadow gap / rebate face (multiplies the paint colour). */
@@ -65,9 +65,9 @@ export interface WindowParts {
   /** Frame, sashes, bars, casing, board — vertex-coloured, world space. */
   joinery: THREE.BufferGeometry;
   hardware: THREE.BufferGeometry | null;
-  /** Glass to draw (empty for an open balcony door). */
+  /** Glass to draw (a balcony door's open doorway has none; its leaves and transom light do). */
   panes: GlassPane[];
-  /** Glass rectangles and the glazing bars crossing them, in local coordinates (for the sun mask). */
+  /** Clear parts of the opening (glass panes, a balcony door's open doorway) and the glazing bars crossing them, in local coordinates (for the light/sun mask). */
   localPanes: LocalRect[];
   localBars: LocalRect[];
   /** World position of the local origin on the glass plane (opening centre) and of the local x axis. */
@@ -106,8 +106,10 @@ interface Out {
   panes: LocalRect[];
   /** Bars lying across glass (glazing bars) — mullions/transoms sit between panes and need no entry. */
   bars: LocalRect[];
-  /** False for an open doorway: `panes` is then the clear opening (light/sun mask), with no glass drawn. */
-  glazed: boolean;
+  /** Open (unglazed) parts of the opening: clear in the light/sun mask, no glass drawn. */
+  open: LocalRect[];
+  /** Glass that doesn't lie in the opening's plane (an open door leaf): local rect + its leaf's local matrix. */
+  leafPanes: { rect: LocalRect; matrix: THREE.Matrix4 }[];
   color: THREE.Color;
   hardwareColor: THREE.Color;
 }
@@ -171,6 +173,35 @@ function classicBoard(front: number): Profile {
   return [[0, C_BACK], [0, front - C_BOARD / 2], ...arc(C_BOARD / 2, front - C_BOARD / 2, C_BOARD / 2, Math.PI, 0, 6), [C_BOARD, C_BACK]];
 }
 
+/**
+ * A glazed sash filling the frame cell [cx0, cx1] × [ry0, ry1]: sash, glass and glazing bars. Returns false when
+ * the cell is too small for a sash (it is then glazed straight into the frame).
+ */
+function classicSash(out: Out, cx0: number, cx1: number, ry0: number, ry1: number): boolean {
+  const { joinery: j, color } = out;
+  const ccx = (cx0 + cx1) / 2;
+  const ccy = (ry0 + ry1) / 2;
+  const shw = (cx1 - cx0) / 2 + C_SASH_LAP - C_SASH;
+  const shh = (ry1 - ry0) / 2 + C_SASH_LAP - C_SASH;
+  if (shw < 0.05 || shh < 0.05) {
+    out.panes.push({ x: ccx, y: ccy, w: cx1 - cx0, h: ry1 - ry0 });
+    return false;
+  }
+  j.sweepRect(ccx, ccy, shw, shh, CLASSIC_SASH, color);
+  out.panes.push({ x: ccx, y: ccy, w: 2 * shw, h: 2 * shh });
+  // Glazing bars cross each other (rounded profiles, so the crossing reads as a coped joint) and run
+  // 12 mm into the sash, where its bead is already higher than the bar.
+  for (const u of barOffsets(2 * shw, 0.42, 0.022)) {
+    j.sweepBar("y", ccx + u, ccy - shh - 0.012, ccy + shh + 0.012, CLASSIC_MUNTIN, color);
+    out.bars.push({ x: ccx + u, y: ccy, w: 0.022, h: 2 * shh });
+  }
+  for (const v of barOffsets(2 * shh, 0.5, 0.022)) {
+    j.sweepBar("x", ccy + v, ccx - shw - 0.012, ccx + shw + 0.012, CLASSIC_MUNTIN, color);
+    out.bars.push({ x: ccx, y: ccy + v, w: 2 * shw, h: 0.022 });
+  }
+  return true;
+}
+
 function buildClassic(l: Local, out: Out) {
   const { joinery: j, color } = out;
   const lift = l.hasSill ? C_BOARD : 0;
@@ -197,32 +228,13 @@ function buildClassic(l: Local, out: Out) {
   const rows: [number, number][] = transom ? [[y0, ty - C_MULLION / 2], [ty + C_MULLION / 2, y1]] : [[y0, y1]];
   rows.forEach(([ry0, ry1], row) => {
     cols.forEach(([cx0, cx1], col) => {
-      const ccx = (cx0 + cx1) / 2;
-      const ccy = (ry0 + ry1) / 2;
-      const shw = (cx1 - cx0) / 2 + C_SASH_LAP - C_SASH;
-      const shh = (ry1 - ry0) / 2 + C_SASH_LAP - C_SASH;
-      if (shw < 0.05 || shh < 0.05) {
-        out.panes.push({ x: ccx, y: ccy, w: cx1 - cx0, h: ry1 - ry0 });
-        return;
-      }
-      j.sweepRect(ccx, ccy, shw, shh, CLASSIC_SASH, color);
-      out.panes.push({ x: ccx, y: ccy, w: 2 * shw, h: 2 * shh });
-      // Glazing bars cross each other (rounded profiles, so the crossing reads as a coped joint) and run
-      // 12 mm into the sash, where its bead is already higher than the bar.
-      for (const u of barOffsets(2 * shw, 0.42, 0.022)) {
-        j.sweepBar("y", ccx + u, ccy - shh - 0.012, ccy + shh + 0.012, CLASSIC_MUNTIN, color);
-        out.bars.push({ x: ccx + u, y: ccy, w: 0.022, h: 2 * shh });
-      }
-      for (const v of barOffsets(2 * shh, 0.5, 0.022)) {
-        j.sweepBar("x", ccy + v, ccx - shw - 0.012, ccx + shw + 0.012, CLASSIC_MUNTIN, color);
-        out.bars.push({ x: ccx, y: ccy + v, w: 2 * shw, h: 0.022 });
-      }
+      if (!classicSash(out, cx0, cx1, ry0, ry1)) return;
       // Lever on the opening sashes (bottom row), on the stile next to the mullion / the right stile.
       if (row === 0) {
         const latchRight = !mullion || col === 0;
         const hx = latchRight ? cx1 + C_SASH_LAP - C_SASH / 2 : cx0 - C_SASH_LAP + C_SASH / 2;
         const hy = Math.min(Math.max(l.floorY + 1.15, ry0 + 0.15), ry1 - 0.15);
-        lever(out, hx, hy, 0.028, "down");
+        lever(out.hardware, out.hardwareColor, hx, hy, 0.028, "down");
       }
     });
   });
@@ -290,7 +302,7 @@ function buildModern(l: Local, out: Out) {
   out.panes.push({ x: 0, y: 0, w: x1 - x0, h: y1 - y0 });
   const hx = vs.length ? vs[vs.length - 1] : x1 - 0.01;
   const hy = Math.min(Math.max(l.floorY + 1.1, y0 + 0.12), y1 - 0.12);
-  lever(out, hx, hy, 0.03, "side");
+  lever(out.hardware, out.hardwareColor, hx, hy, 0.03, "side");
 }
 
 // --- Panorama: aluminium curtain wall -----------------------------------------------------------------
@@ -341,36 +353,225 @@ function buildPanorama(l: Local, out: Out) {
   for (const [a, b] of cols) for (const [c, d] of rows) out.panes.push({ x: (a + b) / 2, y: (c + d) / 2, w: b - a, h: d - c });
 }
 
-// --- Balcony door: aluminium frame around an open doorway ---------------------------------------------
+// --- Balcony door: classic French door, both leaves swung open into the room -------------------------
 
-/** Door frame: the curtain-wall frame profile (its bottom member reads as the threshold). The leaves are slid
- * away into the wall pocket, so the doorway is open — no glass, nothing to walk into. */
+/** Door leaf thickness: 58 mm timber, the glass in its middle plane. */
+export const DOOR_LEAF_THICKNESS = 0.058;
+/** Stile / top rail width of a leaf. */
+const D_STILE = 0.09;
+/** Gap between an open leaf and the jamb it hangs on. */
+const DOOR_LEAF_GAP = 0.004;
+/** Hinge edge of an open leaf, just in front of the frame face (local z). */
+const DOOR_HINGE_Z = 0.039;
+/** A frame with less clear width than this gets one leaf instead of a pair. */
+const DOUBLE_DOOR_MIN_WIDTH = 1.2;
+/** A frame taller than this (clear) gets a fixed transom light over the leaves. */
+const DOOR_TRANSOM_MIN_HEIGHT = 2.6;
+/** Threshold: oiled oak. */
+const THRESHOLD_COLOR = new THREE.Color("#8a6a48");
+
+export interface DoorLeafLayout {
+  /** Jamb it hangs on: −1 = local −x, +1 = local +x. */
+  side: -1 | 1;
+  /** Hinge edge → free edge. */
+  width: number;
+  /** Bottom and top edge (local y). */
+  bottom: number;
+  top: number;
+}
+
+export interface BalconyDoorLayout {
+  /** Half the frame's clear width (local x). */
+  innerHw: number;
+  /** Clear top of the frame and the floor (local y). */
+  innerTop: number;
+  floorY: number;
+  /** Centre line of the transom bar, or null without a transom light. */
+  transomY: number | null;
+  leaves: DoorLeafLayout[];
+}
+
+/** Frame, transom and leaves of a balcony door of this opening size (local coordinates). */
+export function balconyDoorLayout(width: number, height: number): BalconyDoorLayout {
+  const innerHw = width / 2 - C_FRAME;
+  const floorY = -height / 2;
+  const innerTop = height / 2 - C_FRAME;
+  const clearH = innerTop - floorY;
+  const transomY = clearH > DOOR_TRANSOM_MIN_HEIGHT ? floorY + Math.min(Math.max(clearH - 0.75, 2.05), 2.4) : null;
+  const top = (transomY === null ? innerTop : transomY - C_MULLION / 2) - 0.003;
+  const bottom = floorY + 0.012;
+  const leaves: DoorLeafLayout[] =
+    2 * innerHw >= DOUBLE_DOOR_MIN_WIDTH
+      ? [
+          { side: -1, width: innerHw - 0.002, bottom, top },
+          { side: 1, width: innerHw - 0.002, bottom, top },
+        ]
+      : [{ side: -1, width: 2 * innerHw - 0.003, bottom, top }];
+  return { innerHw, innerTop, floorY, transomY, leaves };
+}
+
+/**
+ * Leaf space → window-local space for a leaf swung 90° into the room on its jamb. Leaf space: u from the hinge
+ * edge along the leaf, y = window-local y, w through the leaf (glass at w = 0). u → +z (into the room), w → −x.
+ */
+function leafMatrix(innerHw: number, side: -1 | 1): THREE.Matrix4 {
+  const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-1, 0, 0));
+  m.setPosition(side * (innerHw - DOOR_LEAF_GAP - DOOR_LEAF_THICKNESS / 2), 0, DOOR_HINGE_Z);
+  return m;
+}
+
+/** Leaf stile ring: beads either side of the glass, chamfer to a flat face on both sides, rounded edges. */
+const DOOR_STILE: Profile = [
+  [0, 0.006],
+  ...arc(0.012, 0.006, 0.012, Math.PI, Math.PI / 2, 4),
+  [0.016, 0.029],
+  [D_STILE - 0.005, 0.029],
+  ...arc(D_STILE - 0.005, 0.024, 0.005, Math.PI / 2, 0, 2),
+  [D_STILE, -0.024],
+  ...arc(D_STILE - 0.005, -0.024, 0.005, 0, -Math.PI / 2, 2),
+  [0.016, -0.029],
+  [0.012, -0.018],
+  ...arc(0.012, -0.006, 0.012, -Math.PI / 2, -Math.PI, 4),
+];
+
+const flipZ = (p: Profile): Profile => p.map(([a, z, s]) => [a, -z, s ?? 1] as ProfilePoint);
+/** Glazing bars on both faces of a leaf. */
+const DOOR_MUNTIN_FRONT = CLASSIC_MUNTIN;
+const DOOR_MUNTIN_BACK = flipZ(CLASSIC_MUNTIN);
+
+/** Applied panel moulding on a leaf face at z = f (ogee, 22 mm wide, 8 mm proud); r grows outward from the field. */
+function panelMoulding(f: number): Profile {
+  return [[0, f - 0.002], [0, f + 0.004], ...arc(0.008, f + 0.004, 0.008, Math.PI, Math.PI / 2, 3), [0.022, f + 0.004], [0.022, f - 0.002]];
+}
+const PANEL_MOULDING_FRONT = panelMoulding(DOOR_LEAF_THICKNESS / 2);
+const PANEL_MOULDING_BACK = flipZ(PANEL_MOULDING_FRONT);
+
+/** One open leaf, built in leaf space into `j` (joinery) and `hw` (hinges, levers). Returns its glass rect. */
+function buildLeaf(j: SweepBuilder, hw: SweepBuilder, leaf: DoorLeafLayout, color: THREE.Color, brass: THREE.Color): LocalRect {
+  const { width: W, bottom, top } = leaf;
+  const H = top - bottom;
+  // Glass above a solid bottom panel (kick panel) and the lock rail.
+  const kick = Math.min(Math.max(0.22 * H, 0.35), 0.55);
+  const gx0 = D_STILE;
+  const gx1 = W - D_STILE;
+  const gy0 = bottom + kick + D_STILE;
+  const gy1 = top - D_STILE;
+  const glass: LocalRect = { x: (gx0 + gx1) / 2, y: (gy0 + gy1) / 2, w: gx1 - gx0, h: gy1 - gy0 };
+  j.sweepRect(glass.x, glass.y, glass.w / 2, glass.h / 2, DOOR_STILE, color);
+
+  // Solid bottom panel, flush with the stiles, with an applied moulding round a field on each face.
+  const panelTop = gy0 - D_STILE;
+  const panel = new THREE.BoxGeometry(W, panelTop - bottom, DOOR_LEAF_THICKNESS);
+  panel.translate(W / 2, (bottom + panelTop) / 2, 0);
+  j.addGeometry(panel, color);
+  panel.dispose();
+  const fx0 = D_STILE + 0.03;
+  const fx1 = W - D_STILE - 0.03;
+  const fy0 = bottom + 0.16;
+  const fy1 = panelTop - 0.05;
+  if (fx1 - fx0 > 0.1 && fy1 - fy0 > 0.1) {
+    for (const prof of [PANEL_MOULDING_FRONT, PANEL_MOULDING_BACK]) j.sweepRect((fx0 + fx1) / 2, (fy0 + fy1) / 2, (fx1 - fx0) / 2, (fy1 - fy0) / 2, prof, color);
+  }
+
+  // Glazing bars on both faces, running 12 mm into the stile beads.
+  for (const u of barOffsets(glass.w, 0.4, 0.022)) {
+    for (const prof of [DOOR_MUNTIN_FRONT, DOOR_MUNTIN_BACK]) j.sweepBar("y", glass.x + u, gy0 - 0.012, gy1 + 0.012, prof, color);
+  }
+  for (const v of barOffsets(glass.h, 0.5, 0.022)) {
+    for (const prof of [DOOR_MUNTIN_FRONT, DOOR_MUNTIN_BACK]) j.sweepBar("x", glass.y + v, gx0 - 0.012, gx1 + 0.012, prof, color);
+  }
+
+  // Three brass butt-hinge knuckles on the hinge edge, on the face toward the reveal.
+  const wSide = -leaf.side;
+  for (const y of [bottom + 0.25, (bottom + top) / 2, top - 0.25]) {
+    const knuckle = new THREE.CylinderGeometry(0.0075, 0.0075, 0.1, 12);
+    knuckle.translate(-0.002, y, wSide * (DOOR_LEAF_THICKNESS / 2 - 0.004));
+    hw.addGeometry(knuckle, brass);
+    knuckle.dispose();
+  }
+  // Lever on the free stile, both faces.
+  const hy = Math.min(Math.max(bottom + 1.05, panelTop + 0.05), gy1 - 0.1);
+  for (const dir of [1, -1] as const) lever(hw, brass, W - D_STILE / 2, hy, (dir * DOOR_LEAF_THICKNESS) / 2, "down", dir);
+  return glass;
+}
+
+/**
+ * French door: a classic timber frame (its bottom member sunk below the floor, an oak threshold instead),
+ * a transom light when the door is tall, and the leaves standing open 90° into the room — the doorway is
+ * walkable, the leaves are colliders (balcony.ts, balconyDoorLeafBoxes).
+ */
 function buildBalconyDoor(l: Local, out: Out) {
   const { joinery: j, color } = out;
-  j.sweepRect(0, 0, l.hw - P_FRAME, l.hh - P_FRAME, PANORAMA_FRAME, color);
-  out.glazed = false;
-  out.panes.push({ x: 0, y: 0, w: 2 * (l.hw - P_FRAME), h: 2 * (l.hh - P_FRAME) });
+  const d = balconyDoorLayout(2 * l.hw, 2 * l.hh);
+  // Frame: inner edge at the floor at the bottom, so the bottom member is under the floor.
+  j.sweepRect(0, (d.innerTop + d.floorY) / 2, d.innerHw, (d.innerTop - d.floorY) / 2, CLASSIC_FRAME, color);
+  j.sweepBar(
+    "x",
+    d.floorY,
+    -d.innerHw - 0.012,
+    d.innerHw + 0.012,
+    [
+      [0, 0.075],
+      [0.012, 0.075],
+      [0.018, 0.06],
+      [0.018, -0.055],
+      [0.01, -0.07],
+      [0, -0.07],
+    ],
+    THRESHOLD_COLOR,
+    true
+  );
+
+  let clearTop = d.innerTop;
+  if (d.transomY !== null) {
+    const half = C_MULLION / 2;
+    j.sweepBar("x", d.transomY, -d.innerHw - C_FACE_START, d.innerHw + C_FACE_START, CLASSIC_MULLION, color);
+    classicSash(out, -d.innerHw, d.innerHw, d.transomY + half, d.innerTop);
+    clearTop = d.transomY - half;
+  }
+  out.open.push({ x: 0, y: (d.floorY + clearTop) / 2, w: 2 * d.innerHw, h: clearTop - d.floorY });
+
+  for (const leaf of d.leaves) {
+    const lj = new SweepBuilder();
+    const lh = new SweepBuilder();
+    const rect = buildLeaf(lj, lh, leaf, color, out.hardwareColor);
+    const m = leafMatrix(d.innerHw, leaf.side);
+    j.append(lj, m);
+    out.hardware.append(lh, m);
+    out.leafPanes.push({ rect, matrix: m });
+  }
+}
+
+/** Collision rectangles (window-local x, z) of a balcony door's open leaves. */
+export function balconyDoorLeafRects(width: number, height: number): { x0: number; x1: number; z0: number; z1: number }[] {
+  const d = balconyDoorLayout(width, height);
+  return d.leaves.map((leaf) => {
+    const a = leaf.side * (d.innerHw - DOOR_LEAF_GAP);
+    const b = leaf.side * (d.innerHw - DOOR_LEAF_GAP - DOOR_LEAF_THICKNESS);
+    return { x0: Math.min(a, b), x1: Math.max(a, b), z0: DOOR_HINGE_Z, z1: DOOR_HINGE_Z + leaf.width };
+  });
 }
 
 // --- Hardware -------------------------------------------------------------------------------------------
 
-/** A lever handle on a backplate, mounted on the face at depth `z`. "down" = classic espagnolette, "side" = modern lever. */
-function lever(out: Out, x: number, y: number, z: number, kind: "down" | "side") {
-  const hw = out.hardware;
-  const c = out.hardwareColor;
+/**
+ * A lever handle on a backplate, mounted on a face at depth `z` facing `dir` (+1 = +z). "down" = classic
+ * espagnolette, "side" = modern lever.
+ */
+function lever(hw: SweepBuilder, c: THREE.Color, x: number, y: number, z: number, kind: "down" | "side", dir: 1 | -1 = 1) {
   const plate = new THREE.BoxGeometry(kind === "down" ? 0.024 : 0.018, kind === "down" ? 0.085 : 0.055, 0.005);
-  plate.translate(x, y, z + 0.0025);
+  plate.translate(x, y, z + dir * 0.0025);
   hw.addGeometry(plate, c);
   const spindle = new THREE.CylinderGeometry(0.005, 0.005, 0.026, 10);
   spindle.rotateX(Math.PI / 2);
-  spindle.translate(x, y + (kind === "down" ? 0.02 : 0), z + 0.018);
+  spindle.translate(x, y + (kind === "down" ? 0.02 : 0), z + dir * 0.018);
   hw.addGeometry(spindle, c);
   const grip =
     kind === "down" ? new THREE.CapsuleGeometry(0.0055, 0.085, 3, 8) : new THREE.CapsuleGeometry(0.005, 0.075, 3, 8);
-  if (kind === "down") grip.translate(x, y + 0.02 - 0.05, z + 0.032);
+  if (kind === "down") grip.translate(x, y + 0.02 - 0.05, z + dir * 0.032);
   else {
     grip.rotateZ(Math.PI / 2);
-    grip.translate(x - 0.04, y, z + 0.032);
+    grip.translate(x - 0.04, y, z + dir * 0.032);
   }
   hw.addGeometry(grip, c);
   for (const g of [plate, spindle, grip]) g.dispose();
@@ -392,7 +593,8 @@ export function buildWindowParts(opening: WindowOpening): WindowParts {
     hardware: new SweepBuilder(),
     panes: [],
     bars: [],
-    glazed: true,
+    open: [],
+    leafPanes: [],
     color: new THREE.Color(style.joinery.color),
     hardwareColor: new THREE.Color(style.hardware?.color ?? "#000000"),
   };
@@ -406,25 +608,38 @@ export function buildWindowParts(opening: WindowOpening): WindowParts {
   BUILDERS[opening.styleId](local, out);
 
   const rotationY = facing(opening.inward);
-  const matrix = new THREE.Matrix4()
-    .makeTranslation(...opening.center)
-    .multiply(new THREE.Matrix4().makeRotationY(rotationY))
-    .multiply(new THREE.Matrix4().makeTranslation(0, 0, -WINDOW_SETBACK));
+  const matrix = windowMatrix(opening);
   const v = new THREE.Vector3();
+  const n = new THREE.Vector3();
   const origin = new THREE.Vector3(0, 0, 0).applyMatrix4(matrix);
   const xAxis = new THREE.Vector3(1, 0, 0).transformDirection(matrix);
+  const panes: GlassPane[] = out.panes.map((p) => {
+    v.set(p.x, p.y, 0).applyMatrix4(matrix);
+    return { center: [v.x, v.y, v.z], width: p.w, height: p.h, rotationY };
+  });
+  for (const { rect, matrix: leaf } of out.leafPanes) {
+    const m = matrix.clone().multiply(leaf);
+    v.set(rect.x, rect.y, 0).applyMatrix4(m);
+    n.set(0, 0, 1).transformDirection(m);
+    panes.push({ center: [v.x, v.y, v.z], width: rect.w, height: rect.h, rotationY: Math.atan2(n.x, n.z) });
+  }
   return {
     joinery: out.joinery.toGeometry(matrix),
     hardware: out.hardware.empty ? null : out.hardware.toGeometry(matrix),
-    panes: (out.glazed ? out.panes : []).map((p) => {
-      v.set(p.x, p.y, 0).applyMatrix4(matrix);
-      return { center: [v.x, v.y, v.z], width: p.w, height: p.h, rotationY };
-    }),
-    localPanes: out.panes,
+    panes,
+    localPanes: [...out.open, ...out.panes],
     localBars: out.bars,
     origin,
     xAxis,
   };
+}
+
+/** Window-local → world: origin on the glass plane at the opening's centre, +z into the room. */
+export function windowMatrix(opening: WindowOpening): THREE.Matrix4 {
+  return new THREE.Matrix4()
+    .makeTranslation(...opening.center)
+    .multiply(new THREE.Matrix4().makeRotationY(facing(opening.inward)))
+    .multiply(new THREE.Matrix4().makeTranslation(0, 0, -WINDOW_SETBACK));
 }
 
 // --- Transmission mask ------------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { buildCustomRoomLayout, buildRoomLayout, type GridCell } from "./galleryLayout";
+import { PLAYER_RADIUS, buildCustomRoomLayout, buildRoomLayout, type GridCell } from "./galleryLayout";
 import {
   BALCONY_MAX_DEPTH,
   DEFAULT_BALCONY_DEPTH,
@@ -9,10 +9,19 @@ import {
   windowCollides,
   type WindowPlacement,
 } from "./windowOpenings";
-import { FACADE_OFFSET, balconyFacades, balconyGeometries, facadePanels, railingColliders, rectOverlapsCells, solidWallBoxes } from "./balcony";
+import {
+  FACADE_OFFSET,
+  balconyFacades,
+  balconyGeometries,
+  doorLeafColliders,
+  facadePanels,
+  railingColliders,
+  rectOverlapsCells,
+  solidWallBoxes,
+} from "./balcony";
 import { collides, walkableFloorPoint, wallBoxes } from "./clickNavigationGeometry";
 import { planRoute } from "./routePlanner";
-import { buildWindowParts } from "./windowGeometry";
+import { DOOR_LEAF_THICKNESS, balconyDoorLayout, buildWindowParts } from "./windowGeometry";
 import { glassShare, windowLightsFor } from "./windowLight";
 import { facadeSunVisibility, outdoorLightFor, spillLightsFor } from "./outdoorLight";
 import { CONCEPT_EXHIBITIONS } from "./conceptRooms";
@@ -113,12 +122,44 @@ describe("walking out onto the balcony", () => {
 });
 
 describe("door and facade", () => {
-  it("builds an open doorway: a frame, no glass, light through the clear opening", () => {
+  it("hangs a French door: two glazed leaves standing open into the room, light through the clear doorway", () => {
     const o = layout.windows!.find((w) => w.id === "b")!;
     const parts = buildWindowParts(o);
-    expect(parts.panes).toHaveLength(0);
+    // Glass only in the two leaves (2.6 m door: no transom light); the doorway itself is open.
+    expect(parts.panes).toHaveLength(2);
+    for (const p of parts.panes) expect(Math.abs(Math.sin(p.rotationY))).toBeCloseTo(1); // leaves stand across the wall
     expect(parts.localPanes).toHaveLength(1);
     expect(glassShare(o)).toBeGreaterThan(0.85);
+    expect(parts.hardware).not.toBeNull(); // hinges + levers
+  });
+
+  it("makes the open leaves colliders inside the room, leaving the doorway walkable", () => {
+    const leaves = doorLeafColliders(layout.windows);
+    expect(leaves).toHaveLength(2);
+    for (const l of leaves) {
+      expect(l.maxX - l.minX).toBeCloseTo(DOOR_LEAF_THICKNESS);
+      expect(l.maxZ).toBeLessThan(4.1); // starts at the frame…
+      expect(l.minZ).toBeLessThan(3.85 - 0.4); // …and reaches well past the wall's room face (z 3.85)
+      expect(Math.abs(l.minX + l.maxX) / 2).toBeGreaterThan(0.5); // at the jambs, not in the doorway
+    }
+    expect(collides(0, 3.8, leaves)).toBe(false);
+    // Clear width between the leaves fits the visitor.
+    const [a, b] = [...leaves].sort((p, q) => p.minX - q.minX);
+    expect(b.minX - a.maxX).toBeGreaterThan(2 * PLAYER_RADIUS + 0.1);
+  });
+
+  it("gives a tall door a transom light and a narrow one a single leaf, still walkable", () => {
+    const tall = buildRoomLayout([12, 8], 4.2, undefined, undefined, [{ ...door, width: 2.5, height: 3.35 }]).windows![0];
+    const tallParts = buildWindowParts(tall);
+    expect(tallParts.panes.length).toBeGreaterThan(2); // leaves + transom
+    expect(tallParts.localPanes.length).toBeGreaterThan(1);
+    expect(balconyDoorLayout(2.5, 3.35).transomY).not.toBeNull();
+
+    const narrow = buildRoomLayout([12, 8], 3.6, undefined, undefined, [{ ...door, width: 1.1 }]).windows![0];
+    const leaves = doorLeafColliders([narrow]);
+    expect(leaves).toHaveLength(1);
+    const [j0, j1] = [narrow.center[0] - narrow.width / 2 + 0.07, narrow.center[0] + narrow.width / 2 - 0.07];
+    expect(Math.max(j1 - leaves[0].maxX, leaves[0].minX - j0)).toBeGreaterThan(2 * PLAYER_RADIUS);
   });
 
   it("skins the wall's outer face, holed around the door and the window", () => {

@@ -2,9 +2,12 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { applyCeilingLight } from "./ceilingLight";
 import {
+  LABEL_BORDER,
+  LABEL_BORDER_COLOR,
   LABEL_INK,
   LABEL_INK_MUTED,
   LABEL_PAPER,
+  LABEL_PX_PER_M,
   LABEL_TEXTURE_WIDTH,
   LABEL_THICKNESS,
   LABEL_TYPE,
@@ -21,6 +24,13 @@ function drawLabelTexture(layout: LabelLayout): THREE.CanvasTexture {
   if (ctx) {
     ctx.fillStyle = LABEL_PAPER;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Thin black frame on the face; the board edges sample the corner texel, so they read black too.
+    const b = Math.max(2, Math.round(LABEL_BORDER * LABEL_PX_PER_M));
+    ctx.fillStyle = LABEL_BORDER_COLOR;
+    ctx.fillRect(0, 0, canvas.width, b);
+    ctx.fillRect(0, canvas.height - b, canvas.width, b);
+    ctx.fillRect(0, 0, b, canvas.height);
+    ctx.fillRect(canvas.width - b, 0, b, canvas.height);
     ctx.textBaseline = "alphabetic";
     for (const line of layout.lines) {
       for (const run of line.runs) {
@@ -37,7 +47,7 @@ function drawLabelTexture(layout: LabelLayout): THREE.CanvasTexture {
 }
 
 /**
- * The printed face (uv 0..1) plus four edges; the edges sample a corner texel (plain paper), so the whole
+ * The printed face (uv 0..1) plus four edges; the edges sample a corner texel (the black border), so the whole
  * board is one mesh, one material, one draw call. No back face (it's against the wall).
  */
 function buildBoardGeometry(width: number, height: number): THREE.BufferGeometry {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balconyGeometries, railingColliders, solidWallBoxes } from "./balcony";
+import { balconyGeometries, doorLeafColliders, railingColliders, solidWallBoxes } from "./balcony";
 import { EXHIBITIONS } from "./exhibitions";
 import { FRAME_BORDER } from "./artworkShadow";
 import { EYE_HEIGHT, PLAYER_RADIUS, WALL_CLEARANCE, minCeilingFor } from "./galleryLayout";
@@ -127,9 +127,12 @@ for (const spec of CONCEPT_ROOM_SPECS) {
     });
 
     it("keeps furniture off the walls, colliding and clear of every painting's stand-in-front spot", () => {
-      // Walls (cut at balcony doors) and balcony railings come first, then one box per furniture piece (on its
+      // Walls (cut at balcony doors), open door leaves and balcony railings come first, then one box per furniture piece (on its
       // level, with a mezzanine: then the stair/columns follow on the room floor).
-      const fixed = solidWallBoxes(layout.walls, layout.windows).length + railingColliders(balconyGeometries(layout.windows)).length;
+      const fixed =
+        solidWallBoxes(layout.walls, layout.windows).length +
+        doorLeafColliders(layout.windows).length +
+        railingColliders(balconyGeometries(layout.windows)).length;
       const pieces = (level: number) => spec.furniture.filter((f) => (f.level ?? 0) === level).length;
       if (layout.levels) {
         layout.levels.forEach((l, i) => expect(l.colliders.length - l.walls.length, `level ${i}`).toBe(pieces(i)));
@@ -148,7 +151,8 @@ for (const spec of CONCEPT_ROOM_SPECS) {
         const furniture = layout.levels
           ? layout.levels[level].colliders.filter((c) => !layout.levels![level].walls.some((w) => JSON.stringify(w) === JSON.stringify(c)))
           : layout.colliders.slice(fixed);
-        for (const c of furniture) {
+        // An open balcony door leaf mustn't stand on the spot either.
+        for (const c of [...furniture, ...doorLeafColliders(layout.windows)]) {
           const blocked = vx > c.minX - PLAYER_RADIUS && vx < c.maxX + PLAYER_RADIUS && vz > c.minZ - PLAYER_RADIUS && vz < c.maxZ + PLAYER_RADIUS;
           expect(blocked, a.id).toBe(false);
         }

@@ -35,6 +35,7 @@ import { buildableMezzanine, mezzanineGroundRules, mezzanineSpecFor, mezzanineWa
 import { resolveStair } from "./mezzanine";
 import type { FloorRect } from "./balcony";
 import i18n from "../../lib/i18n";
+import { artworkDisplaySize } from "./artworkDisplayScale";
 
 /**
  * Resolves a template's stored furniture placements against a fetched
@@ -155,7 +156,7 @@ function toRenderableArtwork(
     year: artwork.yearCreated ? String(artwork.yearCreated) : "",
     exhibitionId,
     image: artwork.imageUrl,
-    aspect: artwork.widthCm / artwork.heightCm,
+    aspect: artworkDisplaySize(artwork).aspect,
     height: placement.height,
     // No frame mesh either way: framed: true means the uploaded image already shows its own frame, and an
     // unframed work hangs as a bare stretched canvas (user decision 2026-11-20 — no frame the artist didn't add).
@@ -220,8 +221,7 @@ function placeAll(
       run,
       rule.ceiling ?? wallHeight,
       links.map((link) => ({
-        aspect: link.artwork.widthCm / link.artwork.heightCm,
-        height: link.artwork.heightCm / 100,
+        ...artworkDisplaySize(link.artwork),
         heightYOverride: link.positionData?.heightY,
         alongFraction: link.positionData?.alongFraction,
       })),

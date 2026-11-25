@@ -3,9 +3,11 @@ import * as THREE from "three";
 import { useTexture } from "@react-three/drei";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { useExhibition } from "./ExhibitionContext";
-import { railingGeometry } from "./railingGeometry";
+import { RAILING_GLASS_ABSORPTION, balustradeGeometry } from "./glassBalustrade";
+import { createGlassMaterial } from "./glassMaterial";
 import {
   BALCONY_SLAB,
+  FACADE_OFFSET,
   balconyFacades,
   balconyGeometries,
   facadePanels,
@@ -16,12 +18,14 @@ import { applyOutdoorLight, outdoorLightFor, setOutdoorLight, spillLightsFor } f
 import { findOutdoorPanorama } from "./outdoorPanoramas";
 import { FLOOR_TEXTURES, WALL_TEXTURES, findTexture, type SurfaceTexture } from "./surfaceTextures";
 
-// Outside finishes: stone paving on the platform, render (plaster tinted warm grey) on the facade, a powder-
-// coated steel railing. Fixed, not themed: the room's colours are interior choices.
+// Outside finishes: stone paving on the platform, render (plaster tinted warm grey) on the facade, a glass
+// balustrade on anthracite steel posts (glassBalustrade.ts). Fixed, not themed: the room's colours are interior
+// choices.
 const PAVING = findTexture(FLOOR_TEXTURES, "PavingStones142")!;
 const RENDER = findTexture(WALL_TEXTURES, "Plaster001")!;
 const FACADE_COLOR = "#d8d1c4";
-const RAILING = { color: "#2a2b2e", roughness: 0.45, metalness: 0.6 };
+/** Powder coat is paint, not bare metal: dielectric, satin. Colours are in the vertex colours. */
+const RAILING = { vertexColors: true, roughness: 0.42, metalness: 0 };
 
 /** Platform slabs, UVs in world metres ÷ tile, so the paving runs on across balconies. */
 function slabGeometry(balconies: BalconyGeometry[], tileSize: number): THREE.BufferGeometry | null {
@@ -97,8 +101,10 @@ function useOutdoorMaps(texture: SurfaceTexture) {
 }
 
 /**
- * Every balcony of the room (balcony.ts): paved platform, steel railing and the facade skin around the doors,
- * all lit by the panorama (outdoorLight.ts) instead of the room's lights. Three draw calls in total.
+ * Every balcony of the room (balcony.ts): paved platform, glass balustrade and the facade skin around the
+ * doors, all lit by the panorama (outdoorLight.ts) instead of the room's lights. The balustrade's steel and
+ * glass reflect the panorama too (it's their env map — the room's env would put ceiling lamps in them).
+ * Four draw calls in total.
  */
 export default function Balconies() {
   const { layout, exhibition } = useExhibition();
@@ -114,22 +120,37 @@ export default function Balconies() {
 
   const paving = useOutdoorMaps(PAVING);
   const render = useOutdoorMaps(RENDER);
+  // Same URL as OutdoorPanorama.tsx: drei's cache hands back the very same texture (one upload, one PMREM).
+  const sky = useTexture(panorama.url);
 
   const built = useMemo(() => {
     const slab = slabGeometry(balconies, PAVING.tileSize);
-    const railing = railingGeometry(balconies.flatMap((b) => b.railings));
+    const balustrade = balustradeGeometry(
+      balconies.flatMap((b) => b.railings),
+      { wallGapAt: () => FACADE_OFFSET }
+    );
     const facade = facadeGeometry(facades, windows ?? [], RENDER.tileSize);
 
     const slabMaterial = new THREE.MeshStandardMaterial({ ...paving, normalScale: new THREE.Vector2(...PAVING.normalScale), roughness: 1 });
     const facadeMaterial = new THREE.MeshStandardMaterial({ ...render, color: FACADE_COLOR, roughness: 1 });
     const railingMaterial = new THREE.MeshStandardMaterial(RAILING);
     for (const m of [slabMaterial, facadeMaterial, railingMaterial]) applyOutdoorLight(m);
+    const glassMaterial = createGlassMaterial(RAILING_GLASS_ABSORPTION);
+    // OutdoorPanorama sets the same two fields on this shared texture; whichever runs first wins, same values.
+    sky.mapping = THREE.EquirectangularReflectionMapping;
+    sky.colorSpace = THREE.SRGBColorSpace;
+    for (const m of [railingMaterial, glassMaterial]) {
+      m.envMap = sky;
+      m.envMapRotation.set(0, rotationY, 0);
+      m.envMapIntensity = panorama.intensity;
+    }
     return [
-      { key: "slab", geometry: slab, material: slabMaterial },
-      { key: "facade", geometry: facade, material: facadeMaterial },
-      { key: "railing", geometry: railing, material: railingMaterial },
+      { key: "slab", geometry: slab, material: slabMaterial, renderOrder: 0 },
+      { key: "facade", geometry: facade, material: facadeMaterial, renderOrder: 0 },
+      { key: "railing", geometry: balustrade?.solid ?? null, material: railingMaterial, renderOrder: 0 },
+      { key: "glass", geometry: balustrade?.glass ?? null, material: glassMaterial, renderOrder: 1 },
     ];
-  }, [balconies, facades, windows, paving, render]);
+  }, [balconies, facades, windows, paving, render, sky, rotationY, panorama.intensity]);
 
   useEffect(
     () => () => {
@@ -144,7 +165,7 @@ export default function Balconies() {
   if (!balconies.length) return null;
   return (
     <group>
-      {built.map((b) => (b.geometry ? <mesh key={b.key} geometry={b.geometry} material={b.material} /> : null))}
+      {built.map((b) => (b.geometry ? <mesh key={b.key} geometry={b.geometry} material={b.material} renderOrder={b.renderOrder} /> : null))}
     </group>
   );
 }

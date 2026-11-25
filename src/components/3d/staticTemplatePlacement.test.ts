@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ApiArtwork } from "../../lib/api/domains/artworks";
 import type { ApiExhibition, ApiExhibitionArtwork } from "../../lib/api/domains/exhibitions";
+import { ARTWORK_DISPLAY_SCALE } from "./artworkDisplayScale";
 import { adaptApiExhibition } from "./backendAdapter";
 import { EXHIBITIONS } from "./exhibitions";
 import { staticArtworkPosition } from "./staticTemplatePlacement";
@@ -20,8 +21,10 @@ function backendCopy(templateId: string): ApiExhibition {
       id: `art-${a.id}`,
       title: a.title,
       artistDisplayName: a.artist,
-      heightCm: a.heightCm!,
-      widthCm: a.heightCm! * a.aspect,
+      // Scaled back by the display scale so the rendered height equals the static room's real-size hang —
+      // this test checks the placement math, not the ARTWORK_DISPLAY_SCALE knob.
+      heightCm: a.heightCm! / ARTWORK_DISPLAY_SCALE,
+      widthCm: (a.heightCm! / ARTWORK_DISPLAY_SCALE) * a.aspect,
       imageUrl: a.image,
     } as ApiArtwork,
   }));
