@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { applyCeilingLight } from "./ceilingLight";
+import { applyPictureLight } from "./pictureLightMaterial";
+import type { PictureLightPlacement } from "./pictureLight";
 import {
   LABEL_BORDER,
   LABEL_BORDER_COLOR,
@@ -80,23 +81,27 @@ function buildBoardGeometry(width: number, height: number): THREE.BufferGeometry
 /**
  * A printed museum label on a thin board, its back flat on the wall (`position` is its back centre in the
  * painting's local frame). Matte paper, lit like the wall: picture-light spill, room fill and the ceiling
- * fixtures (applyCeilingLight) — so the ink darkens with the room instead of glowing.
+ * fixtures (pictureLightMaterial.ts, `ceiling: true`) — so the ink darkens with the room instead of glowing.
  */
-export default function WallLabel({ layout, position }: { layout: LabelLayout; position: [number, number, number] }) {
+export default function WallLabel({
+  layout,
+  position,
+  lights,
+}: {
+  layout: LabelLayout;
+  position: [number, number, number];
+  /** Picture lamps whose wash reaches the label (Artwork.tsx, lampsReaching). */
+  lights: PictureLightPlacement[];
+}) {
   const texture = useMemo(() => drawLabelTexture(layout), [layout]);
   const geometry = useMemo(() => buildBoardGeometry(LABEL_WIDTH, layout.height), [layout.height]);
   const material = useMemo(() => {
     const m = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.85, metalness: 0 });
-    applyCeilingLight(m);
+    applyPictureLight(m, lights, { ceiling: true });
     return m;
-  }, [texture]);
-  useEffect(
-    () => () => {
-      texture.dispose();
-      material.dispose();
-    },
-    [texture, material]
-  );
+  }, [texture, lights]);
+  useEffect(() => () => texture.dispose(), [texture]);
+  useEffect(() => () => material.dispose(), [material]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   return <mesh position={position} geometry={geometry} material={material} raycast={() => null} />;
 }

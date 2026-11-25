@@ -66,7 +66,7 @@ interface PendingRect {
   face?: number;
 }
 
-const FACE_NORMALS: [number, number, number][] = [
+export const FACE_NORMALS: [number, number, number][] = [
   [1, 0, 0],
   [-1, 0, 0],
   [0, 1, 0],
@@ -76,7 +76,7 @@ const FACE_NORMALS: [number, number, number][] = [
 ];
 
 /** For a box face: the local axes its u/v run along (same as buildWorldUvBoxGeometry's projection). */
-function faceAxes(face: number): [number, number] {
+export function faceAxes(face: number): [number, number] {
   const k = Math.floor(face / 2);
   if (k === 0) return [2, 1]; // ±x faces: u = z, v = y
   if (k === 1) return [0, 2]; // ±y faces: u = x, v = z
@@ -133,38 +133,45 @@ function collect(walls: WallSegment[], bounds: [number, number, number, number],
   return pending;
 }
 
-type Packed = { width: number; height: number; placed: (AtlasRect & { piece?: number; face?: number })[] };
+/** Where packRects put each rect: the inner (un-guttered) area's pixel position. */
+export interface PackedLayout {
+  width: number;
+  height: number;
+  at: { x: number; y: number }[];
+}
 
 /** Shelf packing at a fixed width, tallest first. Null when a rect is wider than `width`. */
-function packAt(pending: PendingRect[], order: number[], width: number): Packed | null {
-  const g = DAYLIGHT_GUTTER;
-  const placed: Packed["placed"] = new Array(pending.length);
+function packAt(sizes: { w: number; h: number }[], order: number[], width: number, gutter: number): PackedLayout | null {
+  const at: PackedLayout["at"] = new Array(sizes.length);
   let x = 0;
   let y = 0;
   let shelf = 0;
   for (const i of order) {
-    const p = pending[i];
-    const pw = p.w + 2 * g;
-    const ph = p.h + 2 * g;
+    const pw = sizes[i].w + 2 * gutter;
+    const ph = sizes[i].h + 2 * gutter;
     if (pw > width) return null;
     if (x + pw > width) {
       x = 0;
       y += shelf;
       shelf = 0;
     }
-    placed[i] = { ...p.rect, x: x + g, y: y + g, w: p.w, h: p.h, piece: p.piece, face: p.face };
+    at[i] = { x: x + gutter, y: y + gutter };
     x += pw;
     shelf = Math.max(shelf, ph);
   }
-  return { width, height: Math.max(1, y + shelf), placed };
+  return { width, height: Math.max(1, y + shelf), at };
 }
 
-/** Tries a range of atlas widths (WebGL2 has no power-of-two rule) and keeps the smallest area. Null if nothing fits `maxSize`². */
-function pack(pending: PendingRect[], maxSize: number): Packed | null {
-  const order = pending.map((_, i) => i).sort((a, b) => pending[b].h - pending[a].h);
-  let best: Packed | null = null;
+/**
+ * Packs rects (each grown by `gutter` texels per side) into the smallest-area atlas no larger than
+ * `maxSize`², trying a range of widths (WebGL2 has no power-of-two rule). Null if nothing fits. Shared by the
+ * daylight and picture-light bakes.
+ */
+export function packRects(sizes: { w: number; h: number }[], maxSize: number, gutter = DAYLIGHT_GUTTER): PackedLayout | null {
+  const order = sizes.map((_, i) => i).sort((a, b) => sizes[b].h - sizes[a].h);
+  let best: PackedLayout | null = null;
   for (let width = 64; width <= maxSize; width += 32) {
-    const packed = packAt(pending, order, width);
+    const packed = packAt(sizes, order, width, gutter);
     if (!packed || packed.height > maxSize) continue;
     if (!best || packed.width * packed.height < best.width * best.height) best = packed;
   }
@@ -187,9 +194,11 @@ export function buildDaylightAtlas(
   let texel = DAYLIGHT_TEXEL;
   let ceilingTexel = DAYLIGHT_CEILING_TEXEL;
   for (;;) {
-    const packed = pack(collect(walls, bounds, wallHeight, texel, ceilingTexel), maxSize);
+    const pending = collect(walls, bounds, wallHeight, texel, ceilingTexel);
+    const packed = packRects(pending, maxSize);
     if (packed) {
-      const [floor, ceiling, ...rest] = packed.placed;
+      const placed = pending.map((p, i) => ({ ...p.rect, ...packed.at[i], w: p.w, h: p.h, piece: p.piece, face: p.face }));
+      const [floor, ceiling, ...rest] = placed;
       const faces = rest.map((r) => ({ ...r, piece: r.piece!, face: r.face! }));
       return { width: packed.width, height: packed.height, floor, ceiling, faces, bounds };
     }
@@ -238,7 +247,11 @@ export function addDaylightUv(geometry: THREE.BufferGeometry, atlas: DaylightAtl
  * world position (extrapolated across the gutter) and the face normal.
  */
 export function buildBakeGeometry(atlas: DaylightAtlas): THREE.BufferGeometry {
-  const rects: AtlasRect[] = [atlas.floor, atlas.ceiling, ...atlas.faces];
+  return buildRectBakeGeometry([atlas.floor, atlas.ceiling, ...atlas.faces], atlas.width, atlas.height);
+}
+
+/** buildBakeGeometry for any list of atlas rects (an atlas `width` × `height` texels). */
+export function buildRectBakeGeometry(rects: AtlasRect[], width: number, height: number): THREE.BufferGeometry {
   const g = DAYLIGHT_GUTTER;
   const position = new Float32Array(rects.length * 4 * 3);
   const world = new Float32Array(rects.length * 4 * 3);
@@ -253,8 +266,8 @@ export function buildBakeGeometry(atlas: DaylightAtlas): THREE.BufferGeometry {
     ];
     corners.forEach(([cx, cy], ci) => {
       const o = (ri * 4 + ci) * 3;
-      position[o] = ((r.x + cx) / atlas.width) * 2 - 1;
-      position[o + 1] = ((r.y + cy) / atlas.height) * 2 - 1;
+      position[o] = ((r.x + cx) / width) * 2 - 1;
+      position[o + 1] = ((r.y + cy) / height) * 2 - 1;
       position[o + 2] = 0;
       const w = r.origin.clone().addScaledVector(r.uAxis, cx / r.w).addScaledVector(r.vAxis, cy / r.h);
       world.set([w.x, w.y, w.z], o);
@@ -272,7 +285,7 @@ export function buildBakeGeometry(atlas: DaylightAtlas): THREE.BufferGeometry {
 }
 
 /** The off-screen target the atlas is baked into (linear HDR irradiance, filtered, no mips). */
-export function createDaylightTarget(atlas: DaylightAtlas): THREE.WebGLRenderTarget {
+export function createDaylightTarget(atlas: { width: number; height: number }): THREE.WebGLRenderTarget {
   return new THREE.WebGLRenderTarget(atlas.width, atlas.height, {
     type: THREE.HalfFloatType,
     format: THREE.RGBAFormat,

@@ -15,7 +15,7 @@ const FIXTURE_BASE_MATERIAL = new THREE.MeshStandardMaterial({ color: "#1a1a1a",
 const FIXTURE_ARM_MATERIAL = new THREE.MeshStandardMaterial({ color: "#1a1a1a", roughness: 0.35, metalness: 0.6 });
 const FIXTURE_BAR_MATERIAL = new THREE.MeshStandardMaterial({ color: "#1c1c1c", roughness: 0.3, metalness: 0.6 });
 
-/** Every painting's swing-arm picture-light fixture (wall base + 2 curved arms + light bar + LED strip), batched into shared InstancedMesh pools instead of one set of meshes per painting. The actual spotLights are a separate, fixed-size pool (see ArtworkLightPool.tsx) reassigned to the nearest paintings each frame — lights can't be instanced, only the cosmetic geometry around them can. */
+/** Every painting's swing-arm picture-light fixture (wall base + 2 curved arms + light bar + LED strip), batched into shared InstancedMesh pools instead of one set of meshes per painting. The light itself isn't a three.js light: it's baked on the walls (pictureLightBake.ts) and evaluated on each painting/label (pictureLightMaterial.ts), always on. */
 export default function ArtworkFixtures({ artworks }: { artworks: ArtworkData[] }) {
   const { exhibition, layout } = useExhibition();
 
@@ -29,9 +29,7 @@ export default function ArtworkFixtures({ artworks }: { artworks: ArtworkData[] 
       new THREE.MeshStandardMaterial({
         color: "#0a0a0a",
         emissive: exhibition.theme.spotColor,
-        // This strip is always lit regardless of the real spotLight's distance-based fade/pool assignment
-        // (ArtworkLightPool.tsx) — it's the only "is this lamp on" cue once a painting's own light has
-        // faded out or isn't currently in the pool. Bumped from 1.4: at typical gallery viewing distance the strip only covers a
+        // The visible "lamp is on" cue (the picture light itself is always on too, see pictureLight.ts). Bumped from 1.4: at typical gallery viewing distance the strip only covers a
         // few screen pixels, and Bloom's mip-based downsampling loses weak sub-pixel bright spots, so a
         // modest intensity read as "off" from across a room even though the material itself never changes.
         // Free to raise — emissive intensity is a per-fragment material constant on an already-drawn,

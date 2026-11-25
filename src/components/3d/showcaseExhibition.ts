@@ -10,7 +10,7 @@
 // - Few, well-placed pieces of furniture: one bench facing the main wall (sittable), one plant in the corner
 //   visible from the entrance view. Both are platform default models shipped in public/furnitures/ — their
 //   footprints below are the models' measured bounding boxes at scale 1.
-// - 7 paintings, so every one gets a picture light from the 8-light ArtworkLightPool at once.
+// - 7 paintings (every picture lamp is always on since 2026-11-25 — no light budget to stay under any more).
 //
 // Static (no backend) on purpose: it always exists, never changes under a screenshot series, and opens at
 // /exhibition/vitrin-1 (static templates aren't listed on the homepage selector).

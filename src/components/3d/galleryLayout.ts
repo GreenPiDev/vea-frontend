@@ -135,8 +135,8 @@ export function buildRoomLayout(
   // Curator-placed fixtures (see ExhibitionTemplateForm.tsx/ExhibitionForm.tsx's
   // CeilingLightEditor) win when present; otherwise fall back to the sparse
   // auto-grid below, deliberately light on light count for FPS headroom on
-  // modest devices — per-painting spotlights (see ArtworkLightPool.tsx) do the
-  // actual highlighting either way, these are cosmetic discs only.
+  // modest devices — per-painting picture lights (pictureLight.ts) do the
+  // highlighting either way; these discs also drive the ceiling-fixture light (ceilingLight.ts).
   const ceilingSpots: [number, number, number][] = [];
   if (ceilingLights?.length) {
     for (const { x, y, z } of ceilingLights) ceilingSpots.push([x, y ?? H - 0.1, z]);

@@ -5,9 +5,10 @@ import {
   BOTTOM_LEVEL,
   PICTURE_LIGHT_GAIN,
   SPILL,
-  decodePictureLight,
-  encodePictureLight,
-  installPictureLightShader,
+  PICTURE_LIGHT_FUNCTIONS,
+  pictureLampUniform,
+  pictureLightInfluence,
+  pictureLightIntensity,
   pictureLightIrradiance,
   pictureLightPlacement,
 } from "./pictureLight";
@@ -144,26 +145,41 @@ describe("picture light: consistent with the visible lamp", () => {
   });
 });
 
-describe("picture light: GPU plumbing", () => {
-  it("round-trips the window through a SpotLight's fields", () => {
-    const p = pictureLightPlacement(painting(1.8, 1.2), 8);
-    const e = encodePictureLight(p);
-    expect(e.penumbra).toBeGreaterThanOrEqual(0);
-    expect(e.penumbra).toBeLessThanOrEqual(1);
-    const d = decodePictureLight(e.angle, e.penumbra, e.distance, e.decay);
-    expect(d.standoff).toBeCloseTo(p.standoff, 6);
-    expect(d.topDepth).toBeCloseTo(p.topDepth, 6);
-    expect(d.bottomDepth).toBe(p.bottomDepth);
-    expect(d.halfWidth).toBe(p.halfWidth);
+describe("picture light: always-on plumbing", () => {
+  it.each(SIZES)("%s m tall: the influence box holds every point the lamp reaches", (h, aspect) => {
+    const art = { ...painting(h, aspect), position: [2, Math.max(1.6, h / 2 + 0.5), 3] as [number, number, number], rotationY: 0.7 };
+    const light = pictureLightPlacement(art, 8);
+    const box = pictureLightInfluence(light);
+    const p = new THREE.Vector3();
+    let lit = 0;
+    // A grid around the painting, well beyond the box.
+    for (let x = -3; x <= 3; x += 0.1) {
+      for (let y = -0.5; y <= 4.5; y += 0.1) {
+        for (let z = -1; z <= 2; z += 0.1) {
+          p.set(2 + x, y, 3 + z);
+          if (pictureLightIntensity(p, light) > 0) {
+            lit++;
+            expect(box.containsPoint(p)).toBe(true);
+          }
+        }
+      }
+    }
+    expect(lit).toBeGreaterThan(50);
   });
 
-  it("replaces three's spot term in the shader chunk (fails loudly on a three upgrade)", () => {
-    expect(installPictureLightShader()).toBe(true);
-    const chunk = THREE.ShaderChunk.lights_pars_begin;
-    expect(chunk).toContain("pictureLightShape");
-    expect(chunk.match(/void getSpotLightInfo\(/g)).toHaveLength(1);
-    // The rest of the chunk (rect area lights etc.) is intact.
-    expect(chunk).toContain("NUM_RECT_AREA_LIGHTS");
-    expect(chunk).toContain("getHemisphereLightIrradiance");
+  it("irradiance = intensity × cosine toward the lamp", () => {
+    const light = pictureLightPlacement(painting(1.2, 1), 8);
+    const p = { x: 0.2, y: 1.5, z: 0 };
+    const toLamp = light.position.clone().sub(new THREE.Vector3(p.x, p.y, p.z)).normalize();
+    expect(pictureLightIrradiance(p, WALL_N, light)).toBeCloseTo(pictureLightIntensity(p, light) * toLamp.z, 10);
+  });
+
+  it("packs the lamp for the shaders and ships the GLSL mirror", () => {
+    const light = pictureLightPlacement(painting(1.8, 1.2), 8);
+    const u = pictureLampUniform(light);
+    expect(u.position.distanceTo(light.position)).toBe(0);
+    expect(u.window.toArray()).toEqual([light.standoff, light.topDepth, light.bottomDepth, light.halfWidth]);
+    expect(PICTURE_LIGHT_FUNCTIONS).toContain("float pictureLightIntensity(");
+    expect(PICTURE_LIGHT_FUNCTIONS).toContain("float pictureLightShape(");
   });
 });

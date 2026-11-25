@@ -7,8 +7,12 @@ import { buildStretchedCanvasGeometry, canvasZ, getFrameGeometry } from "./frame
 import { WEAVE_TILE_METERS, getCanvasWeaveNormalMap } from "./canvasWeave";
 import { cropToUvTransform, measureImageCrop } from "./artworkImageCrop";
 import WallLabel from "./WallLabel";
-import { LABEL_WALL_Z, type LabelLayout, type LabelPlacement } from "./wallLabelLayout";
-import { applyDaylight } from "./ceilingLight";
+import { LABEL_WALL_Z, LABEL_WIDTH, type LabelLayout, type LabelPlacement } from "./wallLabelLayout";
+import { ARTWORK_WALL_GAP, FRAME_BORDER } from "./artworkShadow";
+import { applyPictureLight } from "./pictureLightMaterial";
+import { lampsReaching, localBoxToWorld } from "./pictureLightBake";
+import { usePictureLights } from "./usePictureLights";
+import type { PictureLightPlacement } from "./pictureLight";
 
 // Paint surface: a painting isn't a matte print. A thin varnish layer gives it a soft sheen the picture
 // light can catch (0.65 read like paper), and the shared linen weave normal map breaks that sheen up the
@@ -20,27 +24,12 @@ const CANVAS_ROUGHNESS = 0.5;
 const CANVAS_NORMAL_SCALE = new THREE.Vector2(0.35, 0.35);
 
 // Sides of an unframed (stretched) canvas: bare primed linen, warm off-white, matte, with the weave a bit
-// stronger than on the varnished face. One material for every painting.
+// stronger than on the varnished face.
 const CANVAS_SIDE_COLOR = "#ddd3bf";
-let canvasSideMaterial: THREE.MeshStandardMaterial | null = null;
-function getCanvasSideMaterial(): THREE.MeshStandardMaterial {
-  if (!canvasSideMaterial) {
-    canvasSideMaterial = new THREE.MeshStandardMaterial({
-      color: CANVAS_SIDE_COLOR,
-      roughness: 0.85,
-      metalness: 0,
-      normalMap: getCanvasWeaveNormalMap(),
-      normalScale: new THREE.Vector2(0.6, 0.6),
-    });
-    applyDaylight(canvasSideMaterial);
-  }
-  return canvasSideMaterial;
-}
+const CANVAS_SIDE_NORMAL_SCALE = new THREE.Vector2(0.6, 0.6);
 
-// Keyed by frame style — every painting using, say, "modernBlack" gets the exact same frame look, so
-// there's no reason for each one to own its own MeshStandardMaterial (and its own
-// map/roughnessMap/metalnessMap bindings) when they're all identical.
-const frameMaterialCache = new Map<FrameStyle, THREE.MeshStandardMaterial>();
+// Canvas, canvas sides, frame and label each own their material (sharing textures and the compiled
+// program): it carries the lamps that light that one painting as uniforms (pictureLightMaterial.ts).
 
 /** A single framed, lit, labeled painting mounted flush on a gallery wall. */
 export default function Artwork({
@@ -52,6 +41,28 @@ export default function Artwork({
   label?: { layout: LabelLayout; placement: LabelPlacement };
 }) {
   const texture = useTexture(data.image);
+
+  // The lamps reaching this painting / its label (own first; a neighbour only if its wash spills over).
+  const { lights, index } = usePictureLights();
+  const own = index.get(data.id) ?? -1;
+  const paintingLights = useMemo(() => {
+    const halfW = (data.height * data.aspect) / 2 + FRAME_BORDER;
+    const halfH = data.height / 2 + FRAME_BORDER;
+    const box = localBoxToWorld(data.position, data.rotationY, [-halfW, -halfH, -ARTWORK_WALL_GAP], [halfW, halfH, 0.01]);
+    return lampsReaching(box, lights, own).map((i) => lights[i]);
+  }, [lights, own, data.position, data.rotationY, data.height, data.aspect]);
+  const labelLights = useMemo(() => {
+    if (!label) return [];
+    const { x, y } = label.placement;
+    const halfH = label.layout.height / 2;
+    const box = localBoxToWorld(
+      data.position,
+      data.rotationY,
+      [x - LABEL_WIDTH / 2, y - halfH, LABEL_WALL_Z],
+      [x + LABEL_WIDTH / 2, y + halfH, LABEL_WALL_Z + 0.01]
+    );
+    return lampsReaching(box, lights, own).map((i) => lights[i]);
+  }, [label, lights, own, data.position, data.rotationY]);
 
   useMemo(() => {
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -83,7 +94,7 @@ export default function Artwork({
   }, [width, data.height, framed]);
   useEffect(() => () => canvasGeometry.dispose(), [canvasGeometry]);
 
-  // Receives window daylight and sun patches, not the ceiling fixtures (applyDaylight, ceilingLight.ts).
+  // Receives its picture lamp(s), window daylight and sun patches, not the ceiling fixtures (pictureLightMaterial.ts).
   const canvasMaterial = useMemo(() => {
     const material = new THREE.MeshStandardMaterial({
       map: texture,
@@ -92,21 +103,34 @@ export default function Artwork({
       normalMap: getCanvasWeaveNormalMap(),
       normalScale: CANVAS_NORMAL_SCALE,
     });
-    applyDaylight(material);
+    applyPictureLight(material, paintingLights, { ceiling: false });
     return material;
-  }, [texture]);
+  }, [texture, paintingLights]);
   useEffect(() => () => canvasMaterial.dispose(), [canvasMaterial]);
+  const sideMaterial = useMemo(() => {
+    if (framed) return null;
+    const material = new THREE.MeshStandardMaterial({
+      color: CANVAS_SIDE_COLOR,
+      roughness: 0.85,
+      metalness: 0,
+      normalMap: getCanvasWeaveNormalMap(),
+      normalScale: CANVAS_SIDE_NORMAL_SCALE,
+    });
+    applyPictureLight(material, paintingLights, { ceiling: false });
+    return material;
+  }, [framed, paintingLights]);
+  useEffect(() => () => sideMaterial?.dispose(), [sideMaterial]);
 
   return (
     <group position={data.position} rotation={[0, data.rotationY, 0]}>
       {/* Frame — only works that have one (static demo rooms); backend works hang without (artworks.ts's `frame` doc comment). */}
-      {data.frame ? <FrameMesh style={data.frame} canvasWidth={width} canvasHeight={data.height} /> : null}
+      {data.frame ? <FrameMesh style={data.frame} canvasWidth={width} canvasHeight={data.height} lights={paintingLights} /> : null}
 
       {/* Canvas — in the frame's rebate, 1.4 cm behind its face; unframed: a bare stretched canvas just off the wall (frameProfile.ts) */}
       <mesh
         position={[0, 0, canvasZ(data.frame)]}
         geometry={canvasGeometry}
-        material={framed ? canvasMaterial : [canvasMaterial, getCanvasSideMaterial()]}
+        material={sideMaterial ? [canvasMaterial, sideMaterial] : canvasMaterial}
       />
 
       {/* Wall label — its back flat on the wall face. */}
@@ -114,6 +138,7 @@ export default function Artwork({
         <WallLabel
           layout={label.layout}
           position={[label.placement.x, label.placement.y, LABEL_WALL_Z]}
+          lights={labelLights}
         />
       ) : null}
     </group>
@@ -121,7 +146,17 @@ export default function Artwork({
 }
 
 /** Moulded frame swept from its style's profile (frameProfile.ts), with the real photo-scanned material (gold/walnut scans, or the same gold scan re-tinted for "modernBlack" — see frameTextures.ts) following the moulding at real-world scale. */
-function FrameMesh({ style, canvasWidth, canvasHeight }: { style: FrameStyle; canvasWidth: number; canvasHeight: number }) {
+function FrameMesh({
+  style,
+  canvasWidth,
+  canvasHeight,
+  lights,
+}: {
+  style: FrameStyle;
+  canvasWidth: number;
+  canvasHeight: number;
+  lights: PictureLightPlacement[];
+}) {
   const frameStyle = FRAME_TEXTURES[style];
   const urls = frameStyle.metalnessMap
     ? [frameStyle.map, frameStyle.roughnessMap, frameStyle.metalnessMap]
@@ -142,9 +177,8 @@ function FrameMesh({ style, canvasWidth, canvasHeight }: { style: FrameStyle; ca
     }
   }, [map, roughnessMap, metalnessMap]);
 
+  // Its own material (the scans are shared through useTexture's cache): it carries this painting's lamps.
   const material = useMemo(() => {
-    const cached = frameMaterialCache.get(style);
-    if (cached) return cached;
     const created = new THREE.MeshStandardMaterial({
       map,
       roughnessMap,
@@ -153,10 +187,10 @@ function FrameMesh({ style, canvasWidth, canvasHeight }: { style: FrameStyle; ca
       roughness: frameStyle.roughness,
       color: frameStyle.color ?? "#ffffff",
     });
-    applyDaylight(created);
-    frameMaterialCache.set(style, created);
+    applyPictureLight(created, lights, { ceiling: false });
     return created;
-  }, [style, map, roughnessMap, metalnessMap, frameStyle.metalness, frameStyle.roughness, frameStyle.color]);
+  }, [map, roughnessMap, metalnessMap, frameStyle.metalness, frameStyle.roughness, frameStyle.color, lights]);
+  useEffect(() => () => material.dispose(), [material]);
 
   // Shared per style + size (cached in frameProfile.ts, not disposed per mesh). Front face at z = 0, back at
   // −FRAME_DEPTH — the same volume the old box filled, so the wall shadow and picking still match.

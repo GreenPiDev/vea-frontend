@@ -2,8 +2,8 @@
 //
 // Plugs into three's own `aomap_fragment` slot semantics: occlusion only scales *indirect* light
 // (ambient/hemisphere fill + environment map), never direct light from spots/directional lights —
-// same as a real aoMap would, so a painting's picture light still lights the wall right down to the
-// baseboard while the ambient fill fades into the corner.
+// same as a real aoMap would, so a painting's picture light (baked, ROOM_PICTURE_LIGHT) still lights the wall
+// right down to the baseboard while the ambient fill fades into the corner.
 //
 // Sampled by world position rather than UV so it works on every surface regardless of how its UVs
 // are laid out (the floor plane's UVs are tiled for the color texture, walls carry pre-scaled box UVs).
@@ -17,6 +17,7 @@ import { UNDER_SLAB_REACH, UNDER_SLAB_SHADE } from "./mezzanine";
 import { CEILING_LIGHT_FRAGMENT_DECL, CEILING_ONLY_FRAGMENT_DECL, ceilingLightApply, ceilingLightUniforms } from "./ceilingLight";
 import { windowLightUniforms } from "./windowLight";
 import { sunLightUniforms } from "./sunLight";
+import { pictureLightUniforms } from "./pictureLight";
 import {
   CEILING_MACRO_VARIATION,
   DEFAULT_MACRO_VARIATION,
@@ -97,6 +98,43 @@ vec3 roomBakedDaylight() {
     #endif
     return texture2D(uDaylightMap, r.xy + f * r.zw).rgb;
   #endif
+}
+`;
+
+/** The room's baked picture-light wash (pictureLightBake.ts) — walls only. */
+export interface PictureLightBakeUniforms {
+  uPictureLightMap: { value: THREE.Texture | null };
+}
+
+const PICTURE_LIGHT_VERTEX_DECL = /* glsl */ `
+attribute vec2 pictureLightUv;
+attribute vec4 pictureLightUvClamp;
+varying vec2 vPictureLightUv;
+varying vec4 vPictureLightUvClamp;
+`;
+const PICTURE_LIGHT_VERTEX_BODY = /* glsl */ `
+vPictureLightUv = pictureLightUv;
+vPictureLightUvClamp = pictureLightUvClamp;
+`;
+const PICTURE_LIGHT_FRAGMENT_DECL = /* glsl */ `
+uniform sampler2D uPictureLightMap;
+uniform vec3 uPictureLightColor;
+varying vec2 vPictureLightUv;
+varying vec4 vPictureLightUvClamp;
+`;
+// The texel holds I·(lamp − p) and I (pictureLightBake.ts): one incident light toward the (intensity-weighted)
+// lamp, through three's own BRDF with the normal-mapped normal — what the spotLights used to do, minus the
+// per-pixel window evaluation.
+const PICTURE_LIGHT_APPLY = /* glsl */ `
+{
+  vec4 pictureBaked = texture2D(uPictureLightMap, clamp(vPictureLightUv, vPictureLightUvClamp.xy, vPictureLightUvClamp.zw));
+  if (pictureBaked.a > 1e-4) {
+    IncidentLight pictureIncident;
+    pictureIncident.direction = normalize((viewMatrix * vec4(pictureBaked.rgb / pictureBaked.a, 0.0)).xyz);
+    pictureIncident.color = uPictureLightColor * pictureBaked.a;
+    pictureIncident.visible = true;
+    RE_Direct(pictureIncident, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
+  }
 }
 `;
 
@@ -283,8 +321,15 @@ export const ENVMAP_PHYSICAL_PARS = THREE.ShaderChunk.envmap_physical_pars_fragm
 );
 
 function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramParametersWithUniforms) {
-  const data = this.userData as { roomAoUniforms: RoomAoUniforms; macroVariation: { value: number }; daylight: RoomDaylight };
+  const data = this.userData as {
+    roomAoUniforms: RoomAoUniforms;
+    macroVariation: { value: number };
+    daylight: RoomDaylight;
+    pictureLight?: PictureLightBakeUniforms;
+  };
   const daylight = data.daylight;
+  const picture = data.pictureLight;
+  if (picture) Object.assign(shader.uniforms, picture, pictureLightUniforms);
   Object.assign(shader.uniforms, data.roomAoUniforms, ceilingLightUniforms, { uMacroVariation: data.macroVariation });
   if (daylight.mode === "live") Object.assign(shader.uniforms, windowLightUniforms, sunLightUniforms);
   if (daylight.mode === "baked") Object.assign(shader.uniforms, daylight.uniforms);
@@ -293,10 +338,19 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
   const daylightTerm = daylight.mode === "live" ? undefined : daylight.mode === "baked" ? "roomBakedDaylight()" : "vec3(0.0)";
   const baked = daylight.mode === "baked";
   shader.vertexShader = shader.vertexShader
-    .replace("#include <common>", `#include <common>\n${VERTEX_DECL}${baked ? DAYLIGHT_VERTEX_DECL : ""}`)
-    .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX_BODY}${baked ? DAYLIGHT_VERTEX_BODY : ""}`);
+    .replace(
+      "#include <common>",
+      `#include <common>\n${VERTEX_DECL}${baked ? DAYLIGHT_VERTEX_DECL : ""}${picture ? PICTURE_LIGHT_VERTEX_DECL : ""}`
+    )
+    .replace(
+      "#include <project_vertex>",
+      `#include <project_vertex>\n${VERTEX_BODY}${baked ? DAYLIGHT_VERTEX_BODY : ""}${picture ? PICTURE_LIGHT_VERTEX_BODY : ""}`
+    );
   shader.fragmentShader = shader.fragmentShader
-    .replace("#include <common>", `#include <common>\n${FRAGMENT_DECL}\n${lightDecl}\n${SLAB_AO_DECL}\n${MACRO_VARIATION_DECL}`)
+    .replace(
+      "#include <common>",
+      `#include <common>\n${FRAGMENT_DECL}\n${lightDecl}\n${SLAB_AO_DECL}\n${MACRO_VARIATION_DECL}\n${picture ? PICTURE_LIGHT_FRAGMENT_DECL : ""}`
+    )
     // Low-frequency tone/gloss variation that breaks the scan's tiling lattice (macroVariation.ts).
     .replace("#include <map_fragment>", `#include <map_fragment>\n${MACRO_VARIATION_ALBEDO}`)
     .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>\n${MACRO_VARIATION_ROUGHNESS}`)
@@ -308,7 +362,10 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
     .replace("#include <lights_physical_fragment>", `#include <lights_physical_fragment>\n${SPEC_AA_ROUGHNESS}`)
     // Directional light from the ceiling fixtures (ceilingLight.ts) — direct light, so the AO below
     // doesn't touch it; only furniture contact shadows on the floor scale it.
-    .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>\n${ceilingLightApply("vRoomAoWorldPos", "roomCeilingLightOcclusion()", daylightTerm)}`)
+    .replace(
+      "#include <lights_fragment_end>",
+      `#include <lights_fragment_end>\n${ceilingLightApply("vRoomAoWorldPos", "roomCeilingLightOcclusion()", daylightTerm)}\n${picture ? PICTURE_LIGHT_APPLY : ""}`
+    )
     .replace("#include <aomap_fragment>", `#include <aomap_fragment>\n${FRAGMENT_APPLY}`);
 }
 
@@ -325,7 +382,7 @@ export function applyRoomAo(
   uniforms: RoomAoUniforms,
   macroVariation: number = surface === "ceiling" ? CEILING_MACRO_VARIATION : DEFAULT_MACRO_VARIATION,
   daylight: RoomDaylight = { mode: "live" },
-  options: { baseboard?: boolean } = {}
+  options: { baseboard?: boolean; pictureLight?: PictureLightBakeUniforms | null } = {}
 ): void {
   material.defines = {
     ...(material.defines ?? {}),
@@ -333,7 +390,10 @@ export function applyRoomAo(
     ROOM_DAYLIGHT: DAYLIGHT_DEFINE[daylight.mode],
     // Skirting boards (baseboard.ts): distance fade of the up-facing faces — its own program.
     ...(options.baseboard ? { ROOM_BASEBOARD: 1 } : {}),
+    // Walls with a baked picture-light wash (pictureLightBake.ts) — its own program.
+    ...(options.pictureLight ? { ROOM_PICTURE_LIGHT: 1 } : {}),
   };
+  material.userData.pictureLight = options.pictureLight ?? undefined;
   material.userData.roomAoUniforms = uniforms;
   material.userData.daylight = daylight;
   material.userData.macroVariation = { value: macroVariation };

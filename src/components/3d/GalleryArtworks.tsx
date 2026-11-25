@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import Artwork from "./Artwork";
 import ArtworkFixtures from "./ArtworkFixtures";
-import ArtworkLightPool from "./ArtworkLightPool";
 import ArtworkWallShadows from "./ArtworkWallShadows";
 import { ArtworkErrorBoundary } from "./ArtworkErrorBoundary";
 import { useWallLabels } from "./useWallLabels";
@@ -16,11 +15,8 @@ export default function GalleryArtworks() {
       {/* Every painting's picture-light fixture, batched into a few shared InstancedMesh pools — see
           ArtworkFixtures.tsx. Rendered once up front rather than per-painting below. */}
       <ArtworkFixtures artworks={artworks} />
-      {/* Fixed-size pool of real spotLights, reassigned every frame to the paintings nearest the camera —
-          see ArtworkLightPool.tsx's doc comment for why this replaced one real light per artwork. Lives
-          outside the per-artwork Suspense/error boundaries below: it doesn't depend on any painting's own
-          texture load succeeding. */}
-      <ArtworkLightPool artworks={artworks} />
+      {/* No light component: every picture lamp is always on — its wall wash is baked with the room
+          (GalleryRoom, pictureLightBake.ts), the painting and label light themselves (pictureLightMaterial.ts). */}
       {/* Every painting's soft shadow on its wall, one instanced draw call — see artworkShadow.ts. Placed from
           data alone, like the fixtures above: if a painting's image fails to load (ArtworkErrorBoundary drops
           it), its shadow stays behind together with its fixture. */}

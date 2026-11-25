@@ -24,12 +24,16 @@ import {
   applyRoomAo,
   createRoomAoUniforms,
   type DaylightBakeUniforms,
+  type PictureLightBakeUniforms,
   type RoomAoSurface,
   type RoomAoUniforms,
   type RoomDaylight,
 } from "./roomAoMaterial";
 import { addDaylightUv, buildDaylightAtlas, createDaylightTarget, rectUv, type DaylightAtlas } from "./daylightBake";
 import DaylightBaker from "./DaylightBaker";
+import { addPictureLightUv, buildPictureLightAtlas, type PictureLightAtlas } from "./pictureLightBake";
+import PictureLightBaker from "./PictureLightBaker";
+import { usePictureLights } from "./usePictureLights";
 import { onSlab, type Mezzanine } from "./mezzanine";
 
 // The ceiling scan's own baked depth, unexaggerated. It used to be boosted to 2.5 to make the bump
@@ -103,6 +107,18 @@ export default function GalleryRoom() {
   }, [windows, renderWalls, room, wallHeight]);
   useEffect(() => () => bake?.target.dispose(), [bake]);
   const surfaceDaylight: RoomDaylight = bake?.daylight ?? NO_DAYLIGHT;
+
+  // Every painting's picture-light wash on the walls, baked once (pictureLightBake.ts) — the lamps are always
+  // on, at no per-frame cost. Null when no lamp reaches a wall.
+  const { lights: pictureLights } = usePictureLights();
+  const pictureBake = useMemo(() => {
+    const atlas = buildPictureLightAtlas(renderWalls, pictureLights);
+    if (!atlas) return null;
+    const target = createDaylightTarget(atlas);
+    const uniforms: PictureLightBakeUniforms = { uPictureLightMap: { value: target.texture } };
+    return { atlas, target, uniforms };
+  }, [renderWalls, pictureLights]);
+  useEffect(() => () => pictureBake?.target.dispose(), [pictureBake]);
   // Baseboards aren't in the atlas: live terms where there are windows.
   const baseboardDaylight: RoomDaylight = bake ? LIVE_DAYLIGHT : NO_DAYLIGHT;
 
@@ -147,6 +163,8 @@ export default function GalleryRoom() {
         aoUniforms={aoUniforms}
         daylight={surfaceDaylight}
         atlas={bake?.atlas ?? null}
+        pictureAtlas={pictureBake?.atlas ?? null}
+        pictureLight={pictureBake?.uniforms ?? null}
       />
 
       <Baseboards walls={renderWalls} wallColor={theme.wallColor} aoUniforms={aoUniforms} daylight={baseboardDaylight} />
@@ -167,6 +185,7 @@ export default function GalleryRoom() {
       )}
 
       {bake && <DaylightBaker atlas={bake.atlas} target={bake.target} />}
+      {pictureBake && <PictureLightBaker atlas={pictureBake.atlas} target={pictureBake.target} lights={pictureLights} />}
 
       {windows && windows.length > 0 && <WindowFixtures windows={windows} />}
     </group>
@@ -397,6 +416,8 @@ function TexturedWalls({
   aoUniforms,
   daylight,
   atlas,
+  pictureAtlas,
+  pictureLight,
 }: {
   walls: WallSegment[];
   texture: SurfaceTexture;
@@ -407,6 +428,9 @@ function TexturedWalls({
   daylight: RoomDaylight;
   /** Daylight atlas of a windowed room — each wall geometry gets its `daylightUv` into it. */
   atlas: DaylightAtlas | null;
+  /** Baked picture-light wash (pictureLightBake.ts) — each wall geometry gets its `pictureLightUv` into it. */
+  pictureAtlas: PictureLightAtlas | null;
+  pictureLight: PictureLightBakeUniforms | null;
 }) {
   const { map, roughnessMap, normalMap } = useSurfaceMaps(texture);
 
@@ -429,9 +453,9 @@ function TexturedWalls({
       roughness: roughness ?? 1,
       color: color ?? "#ffffff",
     });
-    applyRoomAo(m, "wall", aoUniforms, texture.macroVariation, daylight);
+    applyRoomAo(m, "wall", aoUniforms, texture.macroVariation, daylight, { pictureLight });
     return m;
-  }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, texture.macroVariation, aoUniforms, daylight]);
+  }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, texture.macroVariation, aoUniforms, daylight, pictureLight]);
 
   const geometries = useMemo(
     () =>
@@ -442,9 +466,10 @@ function TexturedWalls({
           ? buildWorldUvBoxGeometry(w.size, w.position, texture.tileSize)
           : buildTexturedBoxGeometry(w.size, texture.tileSize);
         if (atlas) addDaylightUv(geometry, atlas, i, w.size);
+        if (pictureAtlas) addPictureLightUv(geometry, pictureAtlas, i, w.size);
         return geometry;
       }),
-    [walls, texture.tileSize, atlas]
+    [walls, texture.tileSize, atlas, pictureAtlas]
   );
 
   useEffect(() => {

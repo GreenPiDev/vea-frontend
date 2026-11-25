@@ -43,7 +43,7 @@ export const CEILING_LIGHT_FLOOR_IRRADIANCE = 1.1;
  */
 export const ENV_CEILING_FIXTURE_INTENSITY = 13;
 
-/** Multiplier on each theme's spotIntensity for the picture lights (ArtworkLightPool.tsx). Was 0.6. */
+/** Multiplier on each theme's spotIntensity for the picture lights (pictureLight.ts, set in GalleryLights). Was 0.6. */
 export const SPOT_INTENSITY_SCALE = 0.75;
 
 /**

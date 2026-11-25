@@ -273,7 +273,7 @@ const FURNITURE_VERTEX_BODY = /* glsl */ `
 }
 `;
 
-function patchLitShader(shader: THREE.WebGLProgramParametersWithUniforms, apply: string) {
+export function patchLitShader(shader: THREE.WebGLProgramParametersWithUniforms, apply: string) {
   Object.assign(shader.uniforms, ceilingLightUniforms, windowLightUniforms, sunLightUniforms);
   shader.vertexShader = shader.vertexShader
     .replace("#include <common>", `#include <common>\n${FURNITURE_VERTEX_DECL}`)
@@ -288,7 +288,7 @@ function furnitureOnBeforeCompile(shader: THREE.WebGLProgramParametersWithUnifor
 }
 
 /** Daylight only (windows + sun), no ceiling fixtures — for paintings and frames, see applyDaylight. */
-function daylightApply(worldPos: string): string {
+export function daylightApply(worldPos: string): string {
   return /* glsl */ `
 {
   vec3 ceilingN = normalize(inverseTransformDirection(normal, viewMatrix));

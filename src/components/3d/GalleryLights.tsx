@@ -3,7 +3,8 @@ import * as THREE from "three";
 import { useExhibition } from "./ExhibitionContext";
 import { ceilingLightsForLayout, setCeilingBounce, setCeilingLights, setCeilingSlab } from "./ceilingLight";
 import { ceilingBounceIrradiance } from "./ceilingBounce";
-import { HEMISPHERE_INTENSITY, ROOM_FILL_SCALE } from "./sceneLighting";
+import { HEMISPHERE_INTENSITY, ROOM_FILL_SCALE, SPOT_INTENSITY_SCALE } from "./sceneLighting";
+import { setPictureLightColor } from "./pictureLight";
 import { setWindowLights, windowLightsFor } from "./windowLight";
 import { setSunLight, sunSetupFor } from "./sunLight";
 import { daylightFill, linearAlbedo, sunBounceLights } from "./daylightBounce";
@@ -42,7 +43,8 @@ function getCeilingFixtureMaterial(spotColor: string) {
  *     the analytic downlight term in ceilingLight.ts (floor pools, walls fading in below the ceiling,
  *     a lit and a shaded side on furniture). Not three.js lights: fixed cost, no recompiles.
  *  2. A dim themed ambient/hemisphere fill (sceneLighting.ts) — only there so corners never go black.
- *  3. Per-painting picture lights (ArtworkLightPool.tsx), the brightest thing in view.
+ *  3. Per-painting picture lights (pictureLight.ts), the brightest thing in view — always on: baked on the
+ *     walls (pictureLightBake.ts), evaluated live only on each painting and its label (pictureLightMaterial.ts).
  *
  * No light in this rig casts real shadows — a one-time baked directional
  * "skylight" shadow was tried and dropped (didn't read as correct gallery
@@ -78,6 +80,11 @@ export default function GalleryLights() {
     setCeilingBounce(ceilingBounceIrradiance(layout, lights, linearAlbedo(theme.floorColor), linearAlbedo(theme.wallColor)));
   }, [layout, theme.ambientIntensity, theme.spotColor, theme.floorColor, theme.wallColor]);
 
+  // Every picture lamp's colour × intensity — one shared uniform (the wall bake stores light per unit intensity).
+  useLayoutEffect(() => {
+    setPictureLightColor(theme.spotColor, theme.spotIntensity * SPOT_INTENSITY_SCALE);
+  }, [theme.spotColor, theme.spotIntensity]);
+
   // Daylight through the windows (windowLight.ts), coloured by the view outside. Always written — a room
   // without windows clears the previous room's.
   const panoramaId = exhibition.outdoor?.panoramaId ?? DEFAULT_OUTDOOR_PANORAMA.id;
@@ -111,7 +118,7 @@ export default function GalleryLights() {
 
   return (
     <>
-      {/* Room's own default lighting — the only real light source besides each painting's spot */}
+      {/* Room's own default lighting — the only real three.js lights in the room (the picture lamps aren't any) */}
       <ambientLight color={theme.ambientColor} intensity={theme.ambientIntensity * ROOM_FILL_SCALE} />
       <hemisphereLight
         args={[theme.hemisphereSkyColor, theme.hemisphereGroundColor, HEMISPHERE_INTENSITY * ROOM_FILL_SCALE]}
