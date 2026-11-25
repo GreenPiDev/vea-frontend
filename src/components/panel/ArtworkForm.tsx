@@ -13,7 +13,11 @@ import { ApiError } from '../../lib/api/client';
 import LoadingScreen from '../common/LoadingScreen';
 
 const ALLOWED_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
-const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
+// Mirrors vea-api's ArtworksController limit by hand (separate repos). The
+// server compresses every upload to a 2048 px WEBP before storing it, so this
+// only caps the raw upload, not what visitors end up downloading.
+const MAX_IMAGE_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_IMAGE_SIZE_MB = MAX_IMAGE_SIZE_BYTES / (1024 * 1024);
 
 const ORIENTATIONS: ArtworkOrientation[] = ['PORTRAIT', 'LANDSCAPE', 'SQUARE'];
 const CATEGORIES: ArtworkCategory[] = ['PAINTING', 'SCULPTURE', 'PHOTOGRAPHY', 'OTHER'];
@@ -30,6 +34,13 @@ const CATEGORY_KEYS: Record<ArtworkCategory, string> = {
   PHOTOGRAPHY: 'categoryPhotography',
   OTHER: 'categoryOther',
 };
+
+// FileTooLargeFilter (vea-api) returns the endpoint's real limit as `maxBytes`.
+function maxBytesFromError(err: ApiError): number | undefined {
+  const body = err.body;
+  if (typeof body !== 'object' || !body || !('maxBytes' in body) || typeof body.maxBytes !== 'number') return undefined;
+  return Math.round(body.maxBytes / (1024 * 1024));
+}
 
 interface ArtworkFormProps {
   editing?: ApiArtwork;
@@ -92,7 +103,7 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
       return;
     }
     if (file.size > MAX_IMAGE_SIZE_BYTES) {
-      setError(t('artworkFormImageSizeError'));
+      setError(t('artworkFormImageSizeError', { max: MAX_IMAGE_SIZE_MB }));
       return;
     }
     setImageFile(file);
@@ -110,7 +121,14 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
         const result = await uploadImage.mutateAsync(imageFile);
         finalImageUrl = result.url;
       } catch (err) {
-        onError(err);
+        // 413 is localized here rather than shown raw — the client-side size
+        // check above normally prevents it, but the server limit is the source
+        // of truth (it may be lower than this copy, or a proxy may cut it).
+        if (err instanceof ApiError && err.status === 413) {
+          setError(t('artworkFormImageSizeError', { max: maxBytesFromError(err) ?? MAX_IMAGE_SIZE_MB }));
+        } else {
+          onError(err);
+        }
         return;
       }
     }
@@ -355,6 +373,7 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
           onChange={handleFileChange}
           className="rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none file:mr-3 file:rounded file:border-0 file:bg-brand-100 file:px-3 file:py-1 file:text-brand-800 focus:border-brand-500"
         />
+        <span className="text-xs text-brand-600">{t('artworkFormImageHint', { max: MAX_IMAGE_SIZE_MB })}</span>
         {uploadImage.isPending && <span className="text-xs text-brand-600">{t('artworkFormImageUploading')}</span>}
         {imagePreview && (
           <img src={imagePreview} alt="" className="mt-2 h-32 w-32 rounded-md object-cover" />

@@ -92,9 +92,10 @@ export function useArtworkMutations() {
   });
 }
 
-// POST /artworks/upload-image (multipart) — uploads to the caller's own
-// Cloudinary folder (VEA/<env>/artworks/<slugified-artist-name>) and hands
-// back a secure_url the caller submits as ApiArtwork.imageUrl in a normal
+// POST /artworks/upload-image (multipart) — the server compresses the image
+// (2048 px WEBP), stores it in R2 under the caller's own folder
+// (VEA/<env>/artworks/<slugified-artist-name>) and hands back a proxied
+// file URL the caller submits as ApiArtwork.imageUrl in a normal
 // create/update call. Doesn't touch any Artwork row itself, so no cache to
 // invalidate here.
 export function useUploadArtworkImage() {
