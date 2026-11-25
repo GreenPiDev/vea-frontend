@@ -28,19 +28,36 @@ void main() {
 }
 `;
 
+/** A per-texel shader for the room-surface atlas: gets `vBakeWorld` / `vBakeNormal` (world position, face normal). */
+export interface AtlasBakeShader {
+  fragmentShader: string;
+  uniforms: Record<string, THREE.IUniform>;
+}
+
+const DAYLIGHT_BAKE: AtlasBakeShader = { fragmentShader: FRAGMENT, uniforms: { ...windowLightUniforms, ...sunLightUniforms } };
+
 /**
  * Bakes the room surfaces' daylight into `target` (layout: daylightBake.ts) on the first frame and again
  * whenever the daylight uniforms change (window lights, sun, shadow casters — e.g. when a furniture model
  * finishes loading). One draw into an off-screen target, before the frame renders; nothing per frame otherwise.
  */
-export default function DaylightBaker({ atlas, target }: { atlas: DaylightAtlas; target: THREE.WebGLRenderTarget }) {
+export default function DaylightBaker({
+  atlas,
+  target,
+  bake = DAYLIGHT_BAKE,
+}: {
+  atlas: DaylightAtlas;
+  target: THREE.WebGLRenderTarget;
+  /** What each texel stores — the daylight by default; the ceiling-light bake passes its own (ceilingLightBake.ts). */
+  bake?: AtlasBakeShader;
+}) {
   const gl = useThree((s) => s.gl);
   const { scene, camera, geometry, material } = useMemo(() => {
     const geometry = buildBakeGeometry(atlas);
     const material = new THREE.ShaderMaterial({
       vertexShader: VERTEX,
-      fragmentShader: FRAGMENT,
-      uniforms: { ...windowLightUniforms, ...sunLightUniforms },
+      fragmentShader: bake.fragmentShader,
+      uniforms: bake.uniforms,
       depthTest: false,
       depthWrite: false,
       blending: THREE.NoBlending,
@@ -51,7 +68,7 @@ export default function DaylightBaker({ atlas, target }: { atlas: DaylightAtlas;
     const scene = new THREE.Scene();
     scene.add(mesh);
     return { scene, camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), geometry, material };
-  }, [atlas]);
+  }, [atlas, bake]);
   useEffect(
     () => () => {
       geometry.dispose();

@@ -27,6 +27,7 @@ import { CEILING_LIGHT_FLOOR_IRRADIANCE } from "./sceneLighting";
 import { WINDOW_LIGHT_FRAGMENT_DECL, windowLightUniforms } from "./windowLight";
 import { SUN_LIGHT_FRAGMENT_DECL, sunLightUniforms } from "./sunLight";
 import { SLAB_SHADOW_SOFTNESS, slabVisibility, type Mezzanine } from "./mezzanine";
+import { bumpDaylightRevision } from "./daylightBake";
 
 const WINDOW_TERM = (p: string, n: string) => `windowLightIrradiance(${p}, ${n})`;
 const SUN_TERM = (p: string, n: string) => `sunLightIrradiance(${p}, ${n})`;
@@ -169,10 +170,12 @@ export function setCeilingBounce(rgb: [number, number, number]): void {
 export function setCeilingSlab(m: Pick<Mezzanine, "rect" | "top" | "underside"> | null | undefined): void {
   if (!m) {
     ceilingLightUniforms.uSlabY.value.set(0, 0, 0);
+    bumpDaylightRevision();
     return;
   }
   ceilingLightUniforms.uSlabRect.value.set(m.rect.minX, m.rect.minZ, m.rect.maxX, m.rect.maxZ);
   ceilingLightUniforms.uSlabY.value.set(m.underside, m.top, 1);
+  bumpDaylightRevision(); // re-bake the room surfaces' ceiling light (ceilingLightBake.ts)
 }
 
 /** Writes a room's lights into the shared uniforms (clustered down to MAX_CEILING_LIGHTS if needed). */
@@ -186,6 +189,8 @@ export function setCeilingLights(lights: CeilingLight[], color: THREE.ColorRepre
   }
   ceilingLightUniforms.uCeilingLightCount.value = packed.length;
   ceilingLightUniforms.uCeilingLightColor.value.set(color);
+  // Positions/powers are baked into the room surfaces (ceilingLightBake.ts); the colour stays a live uniform.
+  bumpDaylightRevision();
 }
 
 /** Ceiling fixtures only (room surfaces whose daylight is baked, or rooms without windows). */
@@ -229,6 +234,33 @@ vec3 ceilingLightIrradiance(vec3 p, vec3 n) {
 }
 `;
 
+/**
+ * For the bake (ceilingLightBake.ts): the fixtures' light at `p` on a surface with geometric normal `n` as ONE
+ * vector, S = Σ wᵢ·Lᵢ over the lamps in front of the surface (wᵢ = power · lobe · slab visibility / (d² + ε)).
+ * The surface then takes max(n'·S, 0) with its normal-mapped n' — exactly ceilingLightIrradiance for n' = n
+ * (every included lamp has n·L > 0), and the relief still answers the light's dominant direction.
+ */
+export const CEILING_LIGHT_VECTOR_GLSL = /* glsl */ `
+vec3 ceilingLightVector(vec3 p, vec3 n) {
+  bool slab = uSlabY.z > 0.5;
+  vec3 s = vec3(0.0);
+  for (int i = 0; i < MAX_CEILING_LIGHTS; i++) {
+    if (i >= uCeilingLightCount) break;
+    vec4 l = uCeilingLights[i];
+    vec3 toLight = l.xyz - p;
+    float d2 = dot(toLight, toLight);
+    vec3 L = toLight * inversesqrt(max(d2, 1e-8));
+    if (dot(n, L) <= 0.0) continue;
+    float down = max(L.y, 0.0);
+    float lobe = ${CEILING_LIGHT_UPLIGHT.toFixed(3)} + ${(1 - CEILING_LIGHT_UPLIGHT).toFixed(3)} * pow(down, ${CEILING_LIGHT_LOBE.toFixed(1)});
+    float w = l.w * lobe / (d2 + ${CEILING_LIGHT_EPSILON.toFixed(3)});
+    if (slab) w *= slabVisibility(p, l.xyz);
+    s += w * L;
+  }
+  return s;
+}
+`;
+
 /** Declarations + irradiance functions (ceiling fixtures + live window daylight and sun). Needs a world-space position/normal from the caller. */
 export const CEILING_LIGHT_FRAGMENT_DECL = /* glsl */ `
 ${WINDOW_LIGHT_FRAGMENT_DECL}
@@ -245,12 +277,14 @@ ${CEILING_ONLY_FRAGMENT_DECL}
  * `occlusion` an optional GLSL float expression scaling the term (the floor's furniture contact shadow);
  * `daylight` replaces the live window + sun terms (a baked lookup, or "vec3(0.0)" in a room without windows).
  */
-export function ceilingLightApply(worldPos: string, occlusion = "1.0", daylight?: string): string {
+export function ceilingLightApply(worldPos: string, occlusion = "1.0", daylight?: string, ceiling?: string): string {
   const day = daylight ?? `${WINDOW_TERM(worldPos, "ceilingN")} + ${SUN_TERM(worldPos, "ceilingN")}`;
+  // `ceiling` replaces the live fixture loop (a baked lookup, ceilingLightBake.ts); may use `ceilingN`.
+  const fixtures = ceiling ?? `ceilingLightIrradiance(${worldPos}, ceilingN)`;
   return /* glsl */ `
 {
   vec3 ceilingN = normalize(inverseTransformDirection(normal, viewMatrix));
-  reflectedLight.directDiffuse += (ceilingLightIrradiance(${worldPos}, ceilingN) + ${day})
+  reflectedLight.directDiffuse += (${fixtures} + ${day})
     * BRDF_Lambert(material.diffuseColor) * (${occlusion});
 }
 `;

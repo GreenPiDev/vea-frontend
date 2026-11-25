@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { EXHIBITIONS } from "./components/3d/exhibitions";
 import { ARTWORKS, type Artwork } from "./components/3d/artworks";
-import type { ArtworkIconPosition } from "./components/3d/ArtworkIconProjector";
 import { adaptApiExhibition, previewAccentColor } from "./components/3d/backendAdapter";
 import { toFurnitureDef } from "./components/3d/furniture";
 import type { SeatSpot } from "./components/3d/seating";
@@ -11,6 +10,8 @@ import ExhibitionSelect, { type ExhibitionCard } from "./components/ExhibitionSe
 import ArtworkDetailCard from "./components/ArtworkDetailCard";
 import ArtworkLabelModal from "./components/ArtworkLabelModal";
 import ArtworkThumbnailRail from "./components/ArtworkThumbnailRail";
+import ArtworkIconOverlay from "./components/ArtworkIconOverlay";
+import { createIconPositionStore } from "./lib/iconPositionStore";
 import type { ArtworkGoToRequest } from "./components/3d/ArtworkGoTo";
 import GallerySceneCanvas from "./components/common/GallerySceneCanvas";
 import FullscreenToggleButton from "./components/common/FullscreenToggleButton";
@@ -44,7 +45,10 @@ export default function App() {
     () => routeExhibitionId ?? new URLSearchParams(window.location.search).get("exhibition")
   );
   const [locked, setLocked] = useState(false);
-  const [iconPositions, setIconPositions] = useState<ArtworkIconPosition[]>([]);
+  // Icon positions live in a store read by ArtworkIconOverlay — as App state they re-rendered App and the
+  // whole Canvas ~10×/s while walking. App only hears about the nearest painting (thumbnail rail highlight).
+  const [iconStore] = useState(createIconPositionStore);
+  const [nearestArtworkId, setNearestArtworkId] = useState<string | null>(null);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   // The wall label opened by clicking it in the scene (ArtworkLabelModal).
   const [labelArtwork, setLabelArtwork] = useState<Artwork | null>(null);
@@ -135,19 +139,6 @@ export default function App() {
   // badge below simply doesn't render in that case, no special-casing needed.
   const visitorCount = useExhibitionVisitorCount(exhibition?.id);
 
-  // The closest in-range painting's "i" icon is drawn emphasized. (Paintings
-  // open by clicking/tapping the painting or its "i" — there's deliberately
-  // no keyboard shortcut for it; Enter/Space is the sit/stand key.)
-  const nearestArtwork = useMemo(() => {
-    let nearest: { artwork: Artwork; distanceSq: number } | null = null;
-    for (const pos of iconPositions) {
-      if (!pos.visible) continue;
-      if (nearest && pos.distanceSq >= nearest.distanceSq) continue;
-      const artwork = exhibitionArtworks.find((a) => a.id === pos.id);
-      if (artwork) nearest = { artwork, distanceSq: pos.distanceSq };
-    }
-    return nearest?.artwork ?? null;
-  }, [iconPositions, exhibitionArtworks]);
 
   function openArtworkDetail(artwork: Artwork) {
     pointerWasLockedRef.current = locked;
@@ -292,7 +283,7 @@ export default function App() {
         exhibition={exhibition}
         overlayHidden={locked || overlayOpen}
         onLockChange={setLocked}
-        onIconPositionsChange={setIconPositions}
+        onIconPositionsChange={iconStore.set}
         onCanvasReady={(el) => (canvasElRef.current = el)}
         seatedSpot={seatedSpot}
         onNearestSeatChange={setNearestSeat}
@@ -311,49 +302,18 @@ export default function App() {
       {!overlayOpen && !locked && (
         <ArtworkThumbnailRail
           artworks={exhibitionArtworks}
-          activeId={nearestArtwork?.id ?? null}
+          activeId={nearestArtworkId}
           onSelect={walkToArtwork}
         />
       )}
 
-      {/* Rendered for every artwork (not just the currently-visible ones) so
-          appearing/disappearing is a CSS opacity/scale transition rather than
-          a mount/unmount pop. */}
-      {!overlayOpen &&
-        iconPositions.map((p) => {
-          const artwork = exhibitionArtworks.find((a) => a.id === p.id);
-          if (!artwork) return null;
-          const isNearest = nearestArtwork?.id === artwork.id;
-          return (
-            <button
-              key={p.id}
-              onClick={() => openArtworkDetail(artwork)}
-              aria-label={t("artworkInfoIconLabel", { title: artwork.title })}
-              tabIndex={p.visible ? 0 : -1}
-              style={{ left: p.x, top: p.y }}
-              // hover: variants only apply on devices with a real hover (Tailwind v4), so touch is unaffected.
-              className={`group absolute z-40 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer flex-col items-center gap-2 transition-[opacity,transform] duration-200 ease-out ${
-                !p.visible
-                  ? "pointer-events-none scale-90 opacity-0"
-                  : isNearest
-                    ? "scale-110 opacity-100 hover:scale-125"
-                    : "scale-100 opacity-70 hover:scale-125 hover:opacity-100"
-              }`}
-            >
-              <span
-                className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-md backdrop-blur-sm transition-[color,background-color,border-color,box-shadow] duration-200 group-hover:border-brand-100 group-hover:bg-brand-900/90 group-hover:shadow-lg ${
-                  isNearest
-                    ? "artwork-icon-ring animate-artwork-icon-breathe border-brand-200/80 bg-brand-950/70"
-                    : "border-brand-200/30 bg-brand-950/50"
-                }`}
-              >
-                <span className="font-serif text-[15px] italic leading-none text-brand-50">
-                  i
-                </span>
-              </span>
-            </button>
-          );
-        })}
+      <ArtworkIconOverlay
+        store={iconStore}
+        artworks={exhibitionArtworks}
+        hidden={overlayOpen}
+        onOpen={openArtworkDetail}
+        onNearestChange={setNearestArtworkId}
+      />
 
       {!touchDevice && !overlayOpen && !seatedSpot && nearestSeat && (
         <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-brand-200/20 bg-brand-950/80 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-brand-100 shadow-md">

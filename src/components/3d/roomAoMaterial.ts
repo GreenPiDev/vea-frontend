@@ -19,6 +19,12 @@ import { windowLightUniforms } from "./windowLight";
 import { sunLightUniforms } from "./sunLight";
 import { pictureLightUniforms } from "./pictureLight";
 import {
+  CEILING_BAKE_FRAGMENT_DECL,
+  CEILING_BAKE_VERTEX_BODY,
+  CEILING_BAKE_VERTEX_DECL,
+  type CeilingLightBakeUniforms,
+} from "./ceilingLightBake";
+import {
   CEILING_MACRO_VARIATION,
   DEFAULT_MACRO_VARIATION,
   MACRO_VARIATION_ALBEDO,
@@ -326,10 +332,13 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
     macroVariation: { value: number };
     daylight: RoomDaylight;
     pictureLight?: PictureLightBakeUniforms;
+    ceilingLight?: CeilingLightBakeUniforms;
   };
   const daylight = data.daylight;
   const picture = data.pictureLight;
+  const ceilingBake = data.ceilingLight;
   if (picture) Object.assign(shader.uniforms, picture, pictureLightUniforms);
+  if (ceilingBake) Object.assign(shader.uniforms, ceilingBake);
   Object.assign(shader.uniforms, data.roomAoUniforms, ceilingLightUniforms, { uMacroVariation: data.macroVariation });
   if (daylight.mode === "live") Object.assign(shader.uniforms, windowLightUniforms, sunLightUniforms);
   if (daylight.mode === "baked") Object.assign(shader.uniforms, daylight.uniforms);
@@ -340,16 +349,16 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
   shader.vertexShader = shader.vertexShader
     .replace(
       "#include <common>",
-      `#include <common>\n${VERTEX_DECL}${baked ? DAYLIGHT_VERTEX_DECL : ""}${picture ? PICTURE_LIGHT_VERTEX_DECL : ""}`
+      `#include <common>\n${VERTEX_DECL}${baked ? DAYLIGHT_VERTEX_DECL : ""}${picture ? PICTURE_LIGHT_VERTEX_DECL : ""}${ceilingBake ? CEILING_BAKE_VERTEX_DECL : ""}`
     )
     .replace(
       "#include <project_vertex>",
-      `#include <project_vertex>\n${VERTEX_BODY}${baked ? DAYLIGHT_VERTEX_BODY : ""}${picture ? PICTURE_LIGHT_VERTEX_BODY : ""}`
+      `#include <project_vertex>\n${VERTEX_BODY}${baked ? DAYLIGHT_VERTEX_BODY : ""}${picture ? PICTURE_LIGHT_VERTEX_BODY : ""}${ceilingBake ? CEILING_BAKE_VERTEX_BODY : ""}`
     );
   shader.fragmentShader = shader.fragmentShader
     .replace(
       "#include <common>",
-      `#include <common>\n${FRAGMENT_DECL}\n${lightDecl}\n${SLAB_AO_DECL}\n${MACRO_VARIATION_DECL}\n${picture ? PICTURE_LIGHT_FRAGMENT_DECL : ""}`
+      `#include <common>\n${FRAGMENT_DECL}\n${lightDecl}\n${ceilingBake ? CEILING_BAKE_FRAGMENT_DECL : ""}\n${SLAB_AO_DECL}\n${MACRO_VARIATION_DECL}\n${picture ? PICTURE_LIGHT_FRAGMENT_DECL : ""}`
     )
     // Low-frequency tone/gloss variation that breaks the scan's tiling lattice (macroVariation.ts).
     .replace("#include <map_fragment>", `#include <map_fragment>\n${MACRO_VARIATION_ALBEDO}`)
@@ -364,7 +373,7 @@ function roomAoOnBeforeCompile(this: THREE.Material, shader: THREE.WebGLProgramP
     // doesn't touch it; only furniture contact shadows on the floor scale it.
     .replace(
       "#include <lights_fragment_end>",
-      `#include <lights_fragment_end>\n${ceilingLightApply("vRoomAoWorldPos", "roomCeilingLightOcclusion()", daylightTerm)}\n${picture ? PICTURE_LIGHT_APPLY : ""}`
+      `#include <lights_fragment_end>\n${ceilingLightApply("vRoomAoWorldPos", "roomCeilingLightOcclusion()", daylightTerm, ceilingBake ? "roomBakedCeilingLight(ceilingN)" : undefined)}\n${picture ? PICTURE_LIGHT_APPLY : ""}`
     )
     .replace("#include <aomap_fragment>", `#include <aomap_fragment>\n${FRAGMENT_APPLY}`);
 }
@@ -382,7 +391,12 @@ export function applyRoomAo(
   uniforms: RoomAoUniforms,
   macroVariation: number = surface === "ceiling" ? CEILING_MACRO_VARIATION : DEFAULT_MACRO_VARIATION,
   daylight: RoomDaylight = { mode: "live" },
-  options: { baseboard?: boolean; pictureLight?: PictureLightBakeUniforms | null } = {}
+  options: {
+    baseboard?: boolean;
+    pictureLight?: PictureLightBakeUniforms | null;
+    /** Ceiling fixtures read from the room's bake (ceilingLightBake.ts) instead of the per-pixel loop. */
+    ceilingLight?: CeilingLightBakeUniforms | null;
+  } = {}
 ): void {
   material.defines = {
     ...(material.defines ?? {}),
@@ -392,8 +406,11 @@ export function applyRoomAo(
     ...(options.baseboard ? { ROOM_BASEBOARD: 1 } : {}),
     // Walls with a baked picture-light wash (pictureLightBake.ts) — its own program.
     ...(options.pictureLight ? { ROOM_PICTURE_LIGHT: 1 } : {}),
+    // Floor/ceiling/walls with the baked ceiling-fixture light — its own program.
+    ...(options.ceilingLight ? { ROOM_CEILING_BAKED: 1 } : {}),
   };
   material.userData.pictureLight = options.pictureLight ?? undefined;
+  material.userData.ceilingLight = options.ceilingLight ?? undefined;
   material.userData.roomAoUniforms = uniforms;
   material.userData.daylight = daylight;
   material.userData.macroVariation = { value: macroVariation };

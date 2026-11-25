@@ -23,7 +23,8 @@ interface GallerySceneCanvasProps {
   exhibition: Exhibition;
   overlayHidden: boolean;
   onLockChange: (locked: boolean) => void;
-  onIconPositionsChange: (positions: ArtworkIconPosition[]) => void;
+  /** Omitted → no icon projection at all (a screen that shows no "i" icons). */
+  onIconPositionsChange?: (positions: ArtworkIconPosition[]) => void;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
   seatedSpot?: SeatSpot | null;
   onNearestSeatChange?: (seat: SeatSpot | null) => void;

@@ -210,10 +210,27 @@ export function applyWallTargetOutline(
   }
 }
 
+/**
+ * What the highlight needs from the on-demand render loop (FrameScheduler.tsx): "fading" = a frame every
+ * frame, "breathing" = only the slow breath (a low frame rate is enough), "idle" = nothing. Written by
+ * tickOutline each frame it runs, read and reset by the scheduler at the end of that frame — so an unmounted
+ * picker can't leave a stale request behind.
+ */
+export type OutlineActivity = "idle" | "fading" | "breathing";
+let outlineActivity: OutlineActivity = "idle";
+export function takeOutlineActivity(): OutlineActivity {
+  const activity = outlineActivity;
+  outlineActivity = "idle";
+  return activity;
+}
+
 /** Advances the fade/settle/breath animation — call every frame from the picker's useFrame. */
 export function tickOutline(mesh: THREE.Mesh, dt: number, time: number): void {
   const st = state(mesh);
   st.opacity = stepOutlineOpacity(st.opacity, st.key !== null, dt);
+  const target = st.key !== null ? 1 : 0;
+  if (st.opacity !== target) outlineActivity = "fading";
+  else if (st.key !== null && outlineActivity === "idle") outlineActivity = "breathing";
   mesh.visible = st.opacity > 0;
   if (!mesh.visible) return;
   const u = outlineMaterial.uniforms;

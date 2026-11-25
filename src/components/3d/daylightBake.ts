@@ -183,7 +183,9 @@ export function buildDaylightAtlas(
   walls: WallSegment[],
   room: { center: [number, number]; size: [number, number] },
   wallHeight: number,
-  maxSize = MAX_ATLAS_SIZE
+  maxSize = MAX_ATLAS_SIZE,
+  /** Texel sizes (m) — the ceiling-light bake (ceilingLightBake.ts) uses the same layout, coarser. */
+  texels: { surface: number; ceiling: number } = { surface: DAYLIGHT_TEXEL, ceiling: DAYLIGHT_CEILING_TEXEL }
 ): DaylightAtlas {
   const bounds: [number, number, number, number] = [
     room.center[0] - room.size[0] / 2,
@@ -191,8 +193,8 @@ export function buildDaylightAtlas(
     room.size[0],
     room.size[1],
   ];
-  let texel = DAYLIGHT_TEXEL;
-  let ceilingTexel = DAYLIGHT_CEILING_TEXEL;
+  let texel = texels.surface;
+  let ceilingTexel = texels.ceiling;
   for (;;) {
     const pending = collect(walls, bounds, wallHeight, texel, ceilingTexel);
     const packed = packRects(pending, maxSize);
@@ -217,7 +219,13 @@ export function rectUv(atlas: DaylightAtlas, r: AtlasRect): [number, number, num
  * each vertex maps into its face's rect. Faces with no rect (hidden tops/bottoms) map to the floor rect's
  * corner — never sampled visibly.
  */
-export function addDaylightUv(geometry: THREE.BufferGeometry, atlas: DaylightAtlas, piece: number, size: [number, number, number]): void {
+export function addDaylightUv(
+  geometry: THREE.BufferGeometry,
+  atlas: DaylightAtlas,
+  piece: number,
+  size: [number, number, number],
+  attribute = "daylightUv"
+): void {
   const pos = geometry.attributes.position;
   const nrm = geometry.attributes.normal;
   const uv = new Float32Array(pos.count * 2);
@@ -239,7 +247,7 @@ export function addDaylightUv(geometry: THREE.BufferGeometry, atlas: DaylightAtl
     uv[i * 2] = (r.x + fu * r.w) / atlas.width;
     uv[i * 2 + 1] = (r.y + fv * r.h) / atlas.height;
   }
-  geometry.setAttribute("daylightUv", new THREE.BufferAttribute(uv, 2));
+  geometry.setAttribute(attribute, new THREE.BufferAttribute(uv, 2));
 }
 
 /**

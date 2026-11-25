@@ -31,6 +31,7 @@ import {
 } from "./roomAoMaterial";
 import { addDaylightUv, buildDaylightAtlas, createDaylightTarget, rectUv, type DaylightAtlas } from "./daylightBake";
 import DaylightBaker from "./DaylightBaker";
+import { CEILING_LIGHT_BAKE, CEILING_LIGHT_UV, createCeilingLightBake, type CeilingLightBakeUniforms } from "./ceilingLightBake";
 import { addPictureLightUv, buildPictureLightAtlas, type PictureLightAtlas } from "./pictureLightBake";
 import PictureLightBaker from "./PictureLightBaker";
 import { usePictureLights } from "./usePictureLights";
@@ -119,6 +120,11 @@ export default function GalleryRoom() {
     return { atlas, target, uniforms };
   }, [renderWalls, pictureLights]);
   useEffect(() => () => pictureBake?.target.dispose(), [pictureBake]);
+  // The ceiling fixtures' light on floor, ceiling and walls, baked once per room (ceilingLightBake.ts) instead
+  // of a per-pixel loop over every fixture. Re-baked by DaylightBaker when the fixtures change.
+  const ceilingBake = useMemo(() => createCeilingLightBake(renderWalls, room, wallHeight), [renderWalls, room, wallHeight]);
+  useEffect(() => () => ceilingBake.target.dispose(), [ceilingBake]);
+
   // Baseboards aren't in the atlas: live terms where there are windows.
   const baseboardDaylight: RoomDaylight = bake ? LIVE_DAYLIGHT : NO_DAYLIGHT;
 
@@ -136,6 +142,7 @@ export default function GalleryRoom() {
         aoSurface="floor"
         aoUniforms={aoUniforms}
         daylight={surfaceDaylight}
+        ceilingLight={ceilingBake.uniforms}
       />
 
       <TexturedPlane
@@ -153,6 +160,7 @@ export default function GalleryRoom() {
         aoSurface="ceiling"
         aoUniforms={aoUniforms}
         daylight={surfaceDaylight}
+        ceilingLight={ceilingBake.uniforms}
       />
 
       <TexturedWalls
@@ -165,6 +173,8 @@ export default function GalleryRoom() {
         atlas={bake?.atlas ?? null}
         pictureAtlas={pictureBake?.atlas ?? null}
         pictureLight={pictureBake?.uniforms ?? null}
+        ceilingAtlas={ceilingBake.atlas}
+        ceilingLight={ceilingBake.uniforms}
       />
 
       <Baseboards walls={renderWalls} wallColor={theme.wallColor} aoUniforms={aoUniforms} daylight={baseboardDaylight} />
@@ -185,6 +195,7 @@ export default function GalleryRoom() {
       )}
 
       {bake && <DaylightBaker atlas={bake.atlas} target={bake.target} />}
+      <DaylightBaker atlas={ceilingBake.atlas} target={ceilingBake.target} bake={CEILING_LIGHT_BAKE} />
       {pictureBake && <PictureLightBaker atlas={pictureBake.atlas} target={pictureBake.target} lights={pictureLights} />}
 
       {windows && windows.length > 0 && <WindowFixtures windows={windows} />}
@@ -357,6 +368,7 @@ function TexturedPlane({
   aoSurface,
   aoUniforms,
   daylight,
+  ceilingLight,
 }: {
   position: [number, number, number];
   rotation: [number, number, number];
@@ -373,6 +385,8 @@ function TexturedPlane({
   aoSurface: RoomAoSurface;
   aoUniforms: RoomAoUniforms;
   daylight: RoomDaylight;
+  /** Baked ceiling-fixture light (ceilingLightBake.ts). */
+  ceilingLight: CeilingLightBakeUniforms;
 }) {
   const { map, roughnessMap, normalMap } = useSurfaceMaps(texture);
 
@@ -397,9 +411,9 @@ function TexturedPlane({
       color: color ?? "#ffffff",
     });
     // The ceiling keeps applyRoomAo's calmer default; floors use the scan's own amplitude.
-    applyRoomAo(m, aoSurface, aoUniforms, aoSurface === "ceiling" ? undefined : texture.macroVariation, daylight);
+    applyRoomAo(m, aoSurface, aoUniforms, aoSurface === "ceiling" ? undefined : texture.macroVariation, daylight, { ceilingLight });
     return m;
-  }, [map, roughnessMap, normalMap, color, roughness, metalness, normalScale, aoSurface, aoUniforms, texture.macroVariation, daylight]);
+  }, [map, roughnessMap, normalMap, color, roughness, metalness, normalScale, aoSurface, aoUniforms, texture.macroVariation, daylight, ceilingLight]);
 
   return (
     <mesh position={position} rotation={rotation} material={material}>
@@ -418,6 +432,8 @@ function TexturedWalls({
   atlas,
   pictureAtlas,
   pictureLight,
+  ceilingAtlas,
+  ceilingLight,
 }: {
   walls: WallSegment[];
   texture: SurfaceTexture;
@@ -431,6 +447,9 @@ function TexturedWalls({
   /** Baked picture-light wash (pictureLightBake.ts) — each wall geometry gets its `pictureLightUv` into it. */
   pictureAtlas: PictureLightAtlas | null;
   pictureLight: PictureLightBakeUniforms | null;
+  /** Baked ceiling-fixture light (ceilingLightBake.ts) — each wall geometry gets its `ceilingLightUv` into it. */
+  ceilingAtlas: DaylightAtlas;
+  ceilingLight: CeilingLightBakeUniforms;
 }) {
   const { map, roughnessMap, normalMap } = useSurfaceMaps(texture);
 
@@ -453,9 +472,9 @@ function TexturedWalls({
       roughness: roughness ?? 1,
       color: color ?? "#ffffff",
     });
-    applyRoomAo(m, "wall", aoUniforms, texture.macroVariation, daylight, { pictureLight });
+    applyRoomAo(m, "wall", aoUniforms, texture.macroVariation, daylight, { pictureLight, ceilingLight });
     return m;
-  }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, texture.macroVariation, aoUniforms, daylight, pictureLight]);
+  }, [map, roughnessMap, normalMap, color, roughness, texture.normalScale, texture.macroVariation, aoUniforms, daylight, pictureLight, ceilingLight]);
 
   const geometries = useMemo(
     () =>
@@ -467,9 +486,10 @@ function TexturedWalls({
           : buildTexturedBoxGeometry(w.size, texture.tileSize);
         if (atlas) addDaylightUv(geometry, atlas, i, w.size);
         if (pictureAtlas) addPictureLightUv(geometry, pictureAtlas, i, w.size);
+        addDaylightUv(geometry, ceilingAtlas, i, w.size, CEILING_LIGHT_UV);
         return geometry;
       }),
-    [walls, texture.tileSize, atlas, pictureAtlas]
+    [walls, texture.tileSize, atlas, pictureAtlas, ceilingAtlas]
   );
 
   useEffect(() => {

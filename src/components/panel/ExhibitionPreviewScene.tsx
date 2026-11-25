@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ArtworkIconPosition } from '../3d/ArtworkIconProjector';
 import type { Exhibition } from '../3d/exhibitions';
 import GallerySceneCanvas from '../common/GallerySceneCanvas';
 import FullscreenToggleButton from '../common/FullscreenToggleButton';
@@ -31,7 +30,6 @@ export default function ExhibitionPreviewScene({
   const { t } = useTranslation();
   const [locked, setLocked] = useState(false);
   const forcedLandscape = useForcedLandscape();
-  const [, setIconPositions] = useState<ArtworkIconPosition[]>([]);
 
   if (showLoadingScreen) {
     return <LoadingScreen />;
@@ -56,7 +54,6 @@ export default function ExhibitionPreviewScene({
         exhibition={exhibition}
         overlayHidden={locked}
         onLockChange={setLocked}
-        onIconPositionsChange={setIconPositions}
       />
 
       <div className="fixed right-3 top-3 z-40 rounded-md bg-black/55 px-3 py-1.5 text-sm font-medium text-white backdrop-blur">

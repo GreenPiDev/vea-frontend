@@ -1,6 +1,6 @@
 import { Suspense, useContext, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { PerformanceMonitor, Stats } from "@react-three/drei";
+import { Stats } from "@react-three/drei";
 import {
   EffectComposer,
   EffectComposerContext,
@@ -11,9 +11,10 @@ import {
   ToneMapping,
 } from "@react-three/postprocessing";
 import SeparateFXAA from "./SeparateFXAA";
+import FrameScheduler, { QualityMonitor } from "./FrameScheduler";
 import { antialiasMode, renderPixelRatio } from "./renderScale";
 import { isTouchPrimaryDevice } from "../../lib/navigationMode";
-import { BlendFunction, ToneMappingMode } from "postprocessing";
+import { BlendFunction, ToneMappingMode, type BloomEffect } from "postprocessing";
 import * as THREE from "three";
 import Gallery from "./Gallery";
 import Player from "./Player";
@@ -47,7 +48,7 @@ const QUALITY_STEP = 0.25;
  * otherwise the post-processing chain keeps rendering at whatever ratio it started with.
  */
 function AdaptiveRenderScale({ quality }: { quality: number }) {
-  const { gl, size } = useThree();
+  const { gl, size, invalidate } = useThree();
   const { composer } = useContext(EffectComposerContext);
 
   useEffect(() => {
@@ -60,7 +61,9 @@ function AdaptiveRenderScale({ quality }: { quality: number }) {
     if (gl.getPixelRatio() === ratio) return;
     gl.setPixelRatio(ratio);
     composer.setSize(size.width, size.height);
-  }, [gl, composer, size, quality]);
+    // Resizing clears the drawing buffer — redraw now (on-demand loop, FrameScheduler.tsx).
+    invalidate();
+  }, [gl, composer, size, quality, invalidate]);
 
   return null;
 }
@@ -80,6 +83,17 @@ function CameraFov({ cameraZoom }: { cameraZoom: CameraZoom }) {
     camera.updateProjectionMatrix();
   });
   return null;
+}
+
+/**
+ * The FPS counter: dev server, or `?fps` in the URL on a live build — visitors never see it. Under on-demand
+ * rendering (FrameScheduler.tsx) it reads low/frozen while nothing moves; that's frames not drawn, not slowness.
+ */
+const SHOW_FPS_STATS = import.meta.env.DEV || new URLSearchParams(window.location.search).has("fps");
+
+/** Bloom's luminance (threshold) pass at half resolution — see the <Bloom> comment in Scene. */
+function halfResBloomThreshold(bloom: BloomEffect | null) {
+  if (bloom) bloom.luminancePass.resolution.scale = 0.5;
 }
 
 interface SceneProps {
@@ -130,7 +144,14 @@ export default function Scene({
       // No renderer-level toneMapping here: <EffectComposer> forces gl.toneMapping to NoToneMapping while
       // mounted (@react-three/postprocessing does this unconditionally), so a value set here was silently
       // ignored and the HDR frame was hard-clipped. Tone mapping lives in the composer instead, see below.
-      gl={{ antialias: false }}
+      // The canvas's own framebuffer only ever receives the composer's final full-screen pass — the scene is
+      // drawn into the composer's buffers, which carry their own depth. So no depth/stencil here (memory +
+      // bandwidth on shared-memory GPUs like a MacBook Air's), and no alpha: the page never shows through,
+      // and an opaque canvas spares the browser compositor a blend every frame. Keep the composer mounted —
+      // without it the scene would render straight here, with no depth buffer.
+      gl={{ antialias: false, alpha: false, depth: false, stencil: false }}
+      // Frames only when something on screen can change — see FrameScheduler.tsx (device heat on long visits).
+      frameloop="demand"
       // Layout size (offsetWidth/Height) instead of getBoundingClientRect: on a phone held upright the
       // scene root is rotated 90° with CSS (useForcedLandscape.ts), and the bounding rect would report the
       // rotated, portrait box — the wrong aspect ratio.
@@ -142,16 +163,10 @@ export default function Scene({
         onCanvasReady?.(gl.domElement);
       }}
     >
-      <PerformanceMonitor
-        factor={INITIAL_QUALITY}
-        step={QUALITY_STEP}
-        iterations={PERF_ITERATIONS}
-        onChange={({ factor }) => setQuality(factor)}
-        // A borderline device can incline/decline back and forth every few seconds, which reads to the
-        // user as the image randomly sharpening/softening. Once drei detects that oscillation (default:
-        // 3 flip-flops), settle one step below the current quality and stop adjusting.
-        onFallback={({ factor }) => setQuality(Math.max(0, factor - QUALITY_STEP))}
-      />
+      <FrameScheduler />
+      {/* drei's PerformanceMonitor times frames by wall clock — idle pauses would read as low FPS under
+          on-demand rendering. QualityMonitor counts continuous render time only (FrameScheduler.tsx). */}
+      <QualityMonitor factor={INITIAL_QUALITY} step={QUALITY_STEP} iterations={PERF_ITERATIONS} onChange={setQuality} />
       <color attach="background" args={[exhibition.theme.backgroundColor]} />
       <ExhibitionProvider exhibition={exhibition} layout={layout}>
         <Suspense fallback={null}>
@@ -186,7 +201,7 @@ export default function Scene({
           />
         )}
       </ExhibitionProvider>
-      <Stats className="fps-stats" />
+      {SHOW_FPS_STATS && <Stats className="fps-stats" />}
       {/* multisampling stays 0 (real MSAA, same as the renderer's own antialias:false above, is the
           expensive option) — SMAA is a cheap edge-detection post-process pass instead, added last so
           it smooths the final composited frame (including Bloom's contribution) in one go. */}
@@ -198,7 +213,10 @@ export default function Scene({
         {/* Threshold 1.5 (was 1.0): since the exposure rebalance (sceneLighting.ts) the light areas of a
             picture-lit canvas reach ~1.4 linear, and a painting must never glow like a lamp. The ceiling
             fixture discs (emissive 3) and the picture-light LED strips (3.5) still clear it and keep their halo. */}
-        <Bloom intensity={0.4} luminanceThreshold={1.5} luminanceSmoothing={0.25} mipmapBlur />
+        {/* Threshold pass at half resolution (postprocessing runs it at full size by default): its output only
+            feeds the mip blur, whose first level is half size anyway — one full-size HalfFloat write + read
+            less per frame for the same glow. */}
+        <Bloom ref={halfResBloomThreshold} intensity={0.4} luminanceThreshold={1.5} luminanceSmoothing={0.25} mipmapBlur />
         {/* Khronos PBR Neutral rather than ACES Filmic: ACES shifts hues and saturation (warm yellows/oranges
             especially), which misrepresents the artworks' real colors — the one thing a gallery must not do.
             Neutral leaves everything below ~0.8 essentially linear (so the room's existing brightness tuning

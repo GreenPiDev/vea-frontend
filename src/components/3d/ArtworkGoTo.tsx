@@ -20,6 +20,7 @@ export interface ArtworkGoToRequest {
  */
 export default function ArtworkGoTo({ request, navigation }: { request: ArtworkGoToRequest | null; navigation: NavigationRequest }) {
   const camera = useThree((s) => s.camera);
+  const invalidate = useThree((s) => s.invalidate);
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height));
   const { layout } = useExhibition();
   const { artworks } = useWallLabels();
@@ -42,7 +43,9 @@ export default function ArtworkGoTo({ request, navigation }: { request: ArtworkG
     clearNavigation(navigation);
     camera.position.set(viewpoint.x, y + EYE_HEIGHT, viewpoint.z);
     camera.rotation.set(viewpoint.pitch, viewpoint.yaw, 0);
-  }, [request]);
+    // Moved outside a frame: request one (on-demand loop, FrameScheduler.tsx).
+    invalidate();
+  }, [request, invalidate]);
 
   return null;
 }

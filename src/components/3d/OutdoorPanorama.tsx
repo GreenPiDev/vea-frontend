@@ -13,6 +13,8 @@ import type { OutdoorPanorama as Panorama } from "./outdoorPanoramas";
 export default function OutdoorPanorama({ panorama, rotationY = 0 }: { panorama: Panorama; rotationY?: number }) {
   const texture = useTexture(panorama.url);
   const scene = useThree((s) => s.scene);
+  // Renders nothing itself, so R3F doesn't redraw on its own when the photo arrives (on-demand loop).
+  const invalidate = useThree((s) => s.invalidate);
 
   useEffect(() => {
     texture.mapping = THREE.EquirectangularReflectionMapping;
@@ -26,12 +28,14 @@ export default function OutdoorPanorama({ panorama, rotationY = 0 }: { panorama:
     scene.background = texture;
     scene.backgroundIntensity = panorama.intensity;
     scene.backgroundRotation.set(0, rotationY, 0);
+    invalidate();
     return () => {
       scene.background = previous.background;
       scene.backgroundIntensity = previous.intensity;
       scene.backgroundRotation.copy(previous.rotation);
+      invalidate();
     };
-  }, [texture, scene, panorama.intensity, rotationY]);
+  }, [texture, scene, panorama.intensity, rotationY, invalidate]);
 
   return null;
 }

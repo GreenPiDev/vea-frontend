@@ -51,7 +51,10 @@ interface PlayerProps {
 
 /** First-person controller: WASD move + wall collision, plus either pointer-lock look or click-to-go. */
 export default function Player({ onLockChange, seatedSpot, navigationMode, navigation }: PlayerProps) {
-  const { camera, gl } = useThree();
+  const { camera, invalidate, gl } = useThree();
+  // Sitting down / standing up comes from outside the Canvas (HUD button, Enter) — wake the on-demand loop
+  // so the frame below picks it up (FrameScheduler.tsx keeps it going while the camera eases).
+  useEffect(() => invalidate(), [seatedSpot, invalidate]);
   const { layout } = useExhibition();
   // Collider sets per walking level (one level unless the room has a mezzanine, levels.ts). A routed walk may
   // pass through furniture, never through a wall (that's how a visitor ended up outside the room).
