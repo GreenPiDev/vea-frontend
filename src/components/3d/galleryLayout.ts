@@ -98,6 +98,14 @@ function furnitureCollider(piece: PlacedFurnitureInput): ColliderBox {
   };
 }
 
+/** Minimum distance (m) a rectangle room's curator-set spawn point keeps from each wall. */
+export const SPAWN_WALL_MARGIN = 0.6;
+
+function clampInside(v: number, half: number): number {
+  const limit = Math.max(half - SPAWN_WALL_MARGIN, 0);
+  return Math.min(Math.max(v, -limit), limit);
+}
+
 /** Builds a fully enclosed single-room layout for a given [width, depth] and ceiling height. */
 export function buildRoomLayout(
   size: [number, number],
@@ -105,7 +113,8 @@ export function buildRoomLayout(
   ceilingLights?: CeilingLightPoint[],
   furniture?: PlacedFurnitureInput[],
   windows?: WindowPlacement[],
-  mezzanine?: MezzanineSpec
+  mezzanine?: MezzanineSpec,
+  spawn?: SpawnOverride
 ): RoomLayout {
   const [W, D] = size;
   const H = wallHeight;
@@ -153,8 +162,13 @@ export function buildRoomLayout(
     walls,
     colliders: levels ? levels[0].colliders : colliders,
     ceilingSpots,
-    playerStart: [0, EYE_HEIGHT, D / 2 - 2],
-    playerStartYaw: 0,
+    // Default: 2 m in front of the south wall, facing north. A curator-set spawn (template roomShape.spawn)
+    // is kept SPAWN_WALL_MARGIN inside the walls, so a stale point from a since-shrunk room can't drop the
+    // visitor into/behind a wall.
+    playerStart: spawn
+      ? [clampInside(spawn.x, W / 2), EYE_HEIGHT, clampInside(spawn.z, D / 2)]
+      : [0, EYE_HEIGHT, D / 2 - 2],
+    playerStartYaw: spawn?.yaw ?? 0,
     furniture,
     windows: openings,
     ...(mezz && levels ? { mezzanine: mezz, levels } : {}),

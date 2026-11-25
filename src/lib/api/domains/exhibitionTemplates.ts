@@ -88,6 +88,8 @@ export interface RectangleRoomShape {
   outdoor?: OutdoorView;
   /** A mezzanine with its stair (MezzanineEditor.tsx). Omitted = a single-level room. */
   mezzanine?: MezzanineData;
+  /** Where/facing which way the visitor enters (yaw: 0 = north, PI/2 = west…). Omitted = galleryLayout.ts's default (south wall, facing north). */
+  spawn?: { x: number; z: number; yaw: number };
 }
 
 export interface CustomRoomShape {

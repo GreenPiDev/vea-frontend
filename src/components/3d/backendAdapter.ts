@@ -26,6 +26,7 @@ import {
   placeArtworksAlongWall,
   type GridCell,
   type PlacedFurnitureInput,
+  type SpawnOverride,
   type WallRunGeometry,
   type WallSpan,
 } from "./galleryLayout";
@@ -407,10 +408,19 @@ export function rectangleBlueprint(
   roomSize: [number, number],
   furniture: BlueprintFurniturePiece[] = [],
   windowPlacements?: WindowPlacementData[],
-  mezzanine?: MezzanineData
+  mezzanine?: MezzanineData,
+  spawn?: SpawnOverride
 ): BlueprintLayout {
   const [W, D] = roomSize;
-  const { playerStart, playerStartYaw, windows } = buildRoomLayout(roomSize, BLUEPRINT_WALL_HEIGHT, undefined, undefined, windowPlacements);
+  const { playerStart, playerStartYaw, windows } = buildRoomLayout(
+    roomSize,
+    BLUEPRINT_WALL_HEIGHT,
+    undefined,
+    undefined,
+    windowPlacements,
+    undefined,
+    spawn
+  );
   return {
     cells: null,
     bounds: { minX: -W / 2, maxX: W / 2, minZ: -D / 2, maxZ: D / 2 },
@@ -462,7 +472,7 @@ export function blueprintForSceneConfig(
     const furniture = resolveBlueprintFurniture(resolvedTemplate.roomShape.furniture, furnitureCatalog);
     const { roomShape } = resolvedTemplate;
     return roomShape.kind === "rectangle"
-      ? rectangleBlueprint([roomShape.width, roomShape.depth], furniture, roomShape.windows, templateMezzanine(resolvedTemplate))
+      ? rectangleBlueprint([roomShape.width, roomShape.depth], furniture, roomShape.windows, templateMezzanine(resolvedTemplate), roomShape.spawn)
       : customBlueprint(roomShape.cells, resolvedTemplate.wallHeight, roomShape.spawn, furniture, roomShape.windows);
   }
   return customBlueprint(config.cells, config.wallHeight, config.spawn, [], config.windows);
@@ -554,7 +564,7 @@ function exhibitionFromBackendTemplate(
   };
   const windows = backendTemplate.roomShape.windows;
   if (backendTemplate.roomShape.kind === "rectangle") {
-    const { width, depth, ceilingLights } = backendTemplate.roomShape;
+    const { width, depth, ceilingLights, spawn } = backendTemplate.roomShape;
     // Rectangle templates normally render via roomSize alone (Scene.tsx computes
     // the layout at render time via buildRoomLayout) — but that call site has no
     // way to pass curator-placed ceiling lights/furniture through, so when either
@@ -562,14 +572,15 @@ function exhibitionFromBackendTemplate(
     // `customLayout` field a custom-shaped room already uses (Scene.tsx's
     // `customLayout ?? buildRoomLayout(...)` fallback picks it up with no further
     // changes needed).
-    if (ceilingLights?.length || colliderInputs.length || windows?.length || mezz) {
+    if (ceilingLights?.length || colliderInputs.length || windows?.length || mezz || spawn) {
       const layout = buildRoomLayout(
         [width, depth],
         backendTemplate.wallHeight,
         ceilingLights,
         colliderInputs,
         windows,
-        mezzSpec
+        mezzSpec,
+        spawn
       );
       return { ...base, customLayout: layout };
     }

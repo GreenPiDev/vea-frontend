@@ -163,6 +163,8 @@ export default function ExhibitionTemplateForm({ editing, onDone }: ExhibitionTe
             ...windows.payload,
             // Shape-locked: the mezzanine is echoed as stored (its walls carry artworks).
             ...(lockedShape?.kind === 'rectangle' ? (lockedShape.mezzanine ? { mezzanine: lockedShape.mezzanine } : {}) : mezzanine.payload),
+            // No editor for it yet — echo the stored spawn so saving the form doesn't reset the entry point.
+            ...(editing?.roomShape.kind === 'rectangle' && editing.roomShape.spawn ? { spawn: editing.roomShape.spawn } : {}),
           }
         : {
             kind: 'custom' as const,

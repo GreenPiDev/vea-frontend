@@ -3,6 +3,7 @@ import {
   buildRoomLayout,
   buildCustomRoomLayout,
   EYE_HEIGHT,
+  SPAWN_WALL_MARGIN,
   WALL_THICKNESS,
   placeArtworksAlongWall,
   slideRange,
@@ -90,6 +91,27 @@ describe('buildRoomLayout', () => {
     const withNone = buildRoomLayout([10, 8], 4);
 
     expect(withEmpty.ceilingSpots).toEqual(withNone.ceilingSpots);
+  });
+
+  it('defaults the spawn to 2 m in front of the south wall, facing north', () => {
+    const layout = buildRoomLayout([10, 8], 4);
+
+    expect(layout.playerStart).toEqual([0, EYE_HEIGHT, 2]);
+    expect(layout.playerStartYaw).toBe(0);
+  });
+
+  it('uses a curator-set spawn point and facing when provided', () => {
+    const layout = buildRoomLayout([10, 8], 4, undefined, undefined, undefined, undefined, { x: 3, z: -1, yaw: Math.PI / 2 });
+
+    expect(layout.playerStart).toEqual([3, EYE_HEIGHT, -1]);
+    expect(layout.playerStartYaw).toBe(Math.PI / 2);
+  });
+
+  it('keeps a curator-set spawn SPAWN_WALL_MARGIN inside the walls', () => {
+    const layout = buildRoomLayout([10, 8], 4, undefined, undefined, undefined, undefined, { x: 50, z: -50, yaw: 0 });
+
+    expect(layout.playerStart[0]).toBeCloseTo(5 - SPAWN_WALL_MARGIN);
+    expect(layout.playerStart[2]).toBeCloseTo(-(4 - SPAWN_WALL_MARGIN));
   });
 });
 
