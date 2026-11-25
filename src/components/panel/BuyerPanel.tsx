@@ -1,3 +1,4 @@
+import { currentIntlLocale } from '../../lib/i18n';
 import { useTranslation } from 'react-i18next';
 import { useMyOffersAsBuyer, type ApiOffer, type OfferStatus } from '../../lib/api/domains/offers';
 import PanelLayout from '../layout/PanelLayout';
@@ -15,7 +16,7 @@ const STATUS_KEYS: Record<OfferStatus, string> = {
 };
 
 function formatAmount(amount: number, currency: string): string {
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(amount / 100);
+  return new Intl.NumberFormat(currentIntlLocale(), { style: 'currency', currency }).format(amount / 100);
 }
 
 interface BuyerPanelProps {

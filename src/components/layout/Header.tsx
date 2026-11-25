@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import AuthBar from "../auth/AuthBar";
+import LanguageSwitcher from "../common/LanguageSwitcher";
 
 interface HeaderProps {
   /** Scrollable element to watch for show/hide + color transitions. Falls
@@ -61,7 +62,13 @@ export default function Header({ scrollTargetRef }: HeaderProps) {
       >
         {t("headerBrandTitle")}
       </Link>
-      <AuthBar atTop={atTop} />
+      <div className="flex items-center gap-4">
+        <LanguageSwitcher atTop={atTop} />
+        <span className={atTop ? "text-white/30" : "text-brand-900/30"} aria-hidden="true">
+          |
+        </span>
+        <AuthBar atTop={atTop} />
+      </div>
     </header>
   );
 }

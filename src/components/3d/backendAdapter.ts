@@ -33,6 +33,7 @@ import type { MezzanineData } from "../../lib/api/domains/exhibitionTemplates";
 import { buildableMezzanine, mezzanineGroundRules, mezzanineSpecFor, mezzanineWallRuns, MEZZ_RUN_SUFFIX } from "./mezzanineTemplate";
 import { resolveStair } from "./mezzanine";
 import type { FloorRect } from "./balcony";
+import i18n from "../../lib/i18n";
 
 /**
  * Resolves a template's stored furniture placements against a fetched
@@ -149,7 +150,7 @@ function toRenderableArtwork(
     ...(floorY ? { floorY } : {}),
     id: link.id,
     title: artwork.title,
-    artist: artwork.artistDisplayName || artwork.artistProfile?.displayName || "Bilinmeyen Sanatçı",
+    artist: artwork.artistDisplayName || artwork.artistProfile?.displayName || i18n.t("artworkUnknownArtist"),
     year: artwork.yearCreated ? String(artwork.yearCreated) : "",
     exhibitionId,
     image: artwork.imageUrl,

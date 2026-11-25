@@ -1,3 +1,4 @@
+import { currentIntlLocale } from '../../lib/i18n';
 import type { OfferStatus } from '../../lib/api/domains/offers';
 
 // Shared offer presentation for panel tables (OrgOfferTable, the SUPERADMIN
@@ -17,5 +18,5 @@ export const OFFER_STATUS_KEYS: Record<OfferStatus, string> = {
 
 /** Amounts are minor units (kuruş/cent) from the API. */
 export function formatAmount(amount: number, currency: string): string {
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(amount / 100);
+  return new Intl.NumberFormat(currentIntlLocale(), { style: 'currency', currency }).format(amount / 100);
 }

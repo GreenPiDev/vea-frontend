@@ -5,6 +5,7 @@ import type { ApiExhibition, ApiExhibitionArtwork } from "../../lib/api/domains/
 import type { ApiArtwork } from "../../lib/api/domains/artworks";
 import type { ApiExhibitionTemplate } from "../../lib/api/domains/exhibitionTemplates";
 import type { FurnitureDef } from "./furniture";
+import i18n from "../../lib/i18n";
 
 function makeArtwork(overrides: Partial<ApiArtwork> = {}): ApiArtwork {
   return {
@@ -137,7 +138,7 @@ describe("adaptApiExhibition", () => {
       })
     );
 
-    expect(result!.artworks![0].artist).toBe("Bilinmeyen Sanatçı");
+    expect(result!.artworks![0].artist).toBe(i18n.t("artworkUnknownArtist"));
   });
 
   it("builds a custom exhibition from cells/spawn and derives a full theme from the 3 picked colors", () => {

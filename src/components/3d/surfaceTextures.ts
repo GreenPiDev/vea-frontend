@@ -10,7 +10,8 @@ import { DEFAULT_MACRO_VARIATION } from "./macroVariation";
 
 export interface SurfaceTexture {
   id: string;
-  label: string;
+  /** i18n key of the name shown in the panel's texture picker. */
+  labelKey: string;
   /** Small preview shown in the builder's texture picker. */
   thumbnail: string;
   map: string;
@@ -37,14 +38,14 @@ export interface SurfaceTexture {
 
 function tex(
   id: string,
-  label: string,
+  labelKey: string,
   tileSize: number,
   normalScale: [number, number] = [1, 1],
   macroVariation: number = DEFAULT_MACRO_VARIATION
 ): SurfaceTexture {
   return {
     id,
-    label,
+    labelKey,
     thumbnail: `/textures/${id}/thumb.jpg`,
     map: `/textures/${id}/color.jpg`,
     roughnessMap: `/textures/${id}/roughness.jpg`,
@@ -56,35 +57,35 @@ function tex(
 }
 
 export const FLOOR_TEXTURES: SurfaceTexture[] = [
-  tex("WoodFloor051", "Açık Parke", 3, [1.3, 1.3], 0.08),
-  tex("WoodFloor034", "Balıksırtı Parke", 2, [1.4, 1.4], 0.08),
-  tex("Wood051", "Koyu Ahşap Parke", 3, [1.3, 1.3], 0.08),
-  tex("Marble012", "Gri Mermer", 2.5, [0.8, 0.8]),
-  tex("Marble004", "Krem Mermer", 3, [0.8, 0.8]),
-  tex("Terrazzo003", "Terrazzo", 2, [1.2, 1.2], 0.08),
-  tex("PavingStones142", "Taş Döşeme", 1.5, [2.4, 2.4], 0.12),
-  tex("MetalPlates006", "Endüstriyel Metal Zemin", 2, [1.8, 1.8], 0.06),
-  tex("Carpet013", "Kırmızı Halı", 2, [1.4, 1.4], 0.06),
-  tex("Concrete048", "Cilalı Beton", 3, [1, 1], 0.08),
+  tex("WoodFloor051", "textureLightParquet", 3, [1.3, 1.3], 0.08),
+  tex("WoodFloor034", "textureHerringboneParquet", 2, [1.4, 1.4], 0.08),
+  tex("Wood051", "textureDarkWoodParquet", 3, [1.3, 1.3], 0.08),
+  tex("Marble012", "textureGreyMarble", 2.5, [0.8, 0.8]),
+  tex("Marble004", "textureCreamMarble", 3, [0.8, 0.8]),
+  tex("Terrazzo003", "textureTerrazzo", 2, [1.2, 1.2], 0.08),
+  tex("PavingStones142", "textureStonePaving", 1.5, [2.4, 2.4], 0.12),
+  tex("MetalPlates006", "textureIndustrialMetalFloor", 2, [1.8, 1.8], 0.06),
+  tex("Carpet013", "textureRedCarpet", 2, [1.4, 1.4], 0.06),
+  tex("Concrete048", "texturePolishedConcrete", 3, [1, 1], 0.08),
 ];
 
 export const WALL_TEXTURES: SurfaceTexture[] = [
-  tex("Plaster001", "Düz Sıva", 3, [1, 1], 0.06),
-  tex("Bricks097", "Tuğla", 2, [2.5, 2.5], 0.12),
-  tex("WoodSiding009", "Ahşap Panel", 2.5, [1.5, 1.5]),
-  tex("Wood062", "Koyu Ahşap Kaplama", 2.5, [1.3, 1.3]),
-  tex("Fabric026", "Kumaş Kaplama", 2, [1.3, 1.3]),
-  tex("Marble012", "Mermer Kaplama", 3, [0.8, 0.8]),
-  tex("Travertine009", "Traverten", 2.5, [1.6, 1.6], 0.1),
-  tex("Concrete033", "Ham Beton Duvar", 3, [1.2, 1.2], 0.1),
+  tex("Plaster001", "texturePlainPlaster", 3, [1, 1], 0.06),
+  tex("Bricks097", "textureBrick", 2, [2.5, 2.5], 0.12),
+  tex("WoodSiding009", "textureWoodPanel", 2.5, [1.5, 1.5]),
+  tex("Wood062", "textureDarkWoodCladding", 2.5, [1.3, 1.3]),
+  tex("Fabric026", "textureFabricCladding", 2, [1.3, 1.3]),
+  tex("Marble012", "textureMarbleCladding", 3, [0.8, 0.8]),
+  tex("Travertine009", "textureTravertine", 2.5, [1.6, 1.6], 0.1),
+  tex("Concrete033", "textureRawConcreteWall", 3, [1.2, 1.2], 0.1),
 ];
 
 export const CEILING_TEXTURES: SurfaceTexture[] = [
-  tex("Plaster003", "Mat Beyaz Sıva", 4),
-  tex("Plaster007", "Sıcak Krem Sıva", 4),
-  tex("Metal048A", "Metalik Tavan", 3),
-  tex("Concrete014", "Ham Beton Tavan", 4),
-  tex("WoodSiding007", "Ahşap Lambri Tavan", 3),
+  tex("Plaster003", "textureMatteWhitePlaster", 4),
+  tex("Plaster007", "textureWarmCreamPlaster", 4),
+  tex("Metal048A", "textureMetalCeiling", 3),
+  tex("Concrete014", "textureRawConcreteCeiling", 4),
+  tex("WoodSiding007", "textureWoodPanelCeiling", 3),
 ];
 
 export function findTexture(list: SurfaceTexture[], id: string | undefined): SurfaceTexture | null {

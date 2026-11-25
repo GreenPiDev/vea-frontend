@@ -34,13 +34,13 @@ export default function TexturePicker({
           </button>
         </div>
         {options.map((texture) => (
-          <div className="exform-texture-swatch-wrap" data-tooltip={texture.label} key={texture.id}>
+          <div className="exform-texture-swatch-wrap" data-tooltip={t(texture.labelKey)} key={texture.id}>
             <button
               type="button"
               className={`exform-texture-swatch ${value === texture.id ? 'active' : ''}`}
               onClick={() => onChange(texture.id)}
             >
-              <img src={texture.thumbnail} alt={texture.label} loading="lazy" />
+              <img src={texture.thumbnail} alt={t(texture.labelKey)} loading="lazy" />
             </button>
           </div>
         ))}

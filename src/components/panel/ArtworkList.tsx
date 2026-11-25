@@ -1,3 +1,4 @@
+import { currentIntlLocale } from '../../lib/i18n';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,7 +15,7 @@ import Tooltip from '../layout/Tooltip';
 import { EditIcon, EyeIcon, EyeOffIcon, TrashIcon, UndoIcon } from '../layout/icons';
 
 function formatAmount(amount: number, currency: string): string {
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(amount / 100);
+  return new Intl.NumberFormat(currentIntlLocale(), { style: 'currency', currency }).format(amount / 100);
 }
 
 const STATUS_KEYS: Record<ApiArtwork['status'], string> = {

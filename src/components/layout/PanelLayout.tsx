@@ -5,6 +5,7 @@ import Sidebar, { type PanelNavItem } from './Sidebar';
 import { ArrowLeftIcon, MenuIcon } from './icons';
 import NotificationBell from '../notifications/NotificationBell';
 import Tooltip from './Tooltip';
+import LanguageSwitcher from '../common/LanguageSwitcher';
 
 interface PanelLayoutProps {
   title: string;
@@ -60,6 +61,7 @@ export default function PanelLayout({
           <h1 className="truncate text-base font-semibold text-brand-900">{title}</h1>
         </div>
         <div className="flex flex-shrink-0 items-center gap-3">
+          <LanguageSwitcher />
           <NotificationBell />
           <span className="hidden text-sm text-brand-700 sm:inline">{user?.email}</span>
           <button

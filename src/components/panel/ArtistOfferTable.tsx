@@ -1,3 +1,4 @@
+import { currentIntlLocale } from '../../lib/i18n';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMyOffersAsSeller, useSetArtistDecision, type ApiOffer, type ArtistDecision } from '../../lib/api/domains/offers';
@@ -14,7 +15,7 @@ const OFFER_STATUS_KEYS: Record<ApiOffer['status'], string> = {
 };
 
 function formatAmount(amount: number, currency: string): string {
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(amount / 100);
+  return new Intl.NumberFormat(currentIntlLocale(), { style: 'currency', currency }).format(amount / 100);
 }
 
 // The artist's own view of offers on their artworks — no buyer identity

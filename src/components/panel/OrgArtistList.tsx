@@ -1,3 +1,4 @@
+import { currentIntlLocale } from '../../lib/i18n';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAddMyOrgArtist, useMyOrgArtists, useRemoveMyOrgArtist, type ApiOrgArtist } from '../../lib/api/domains/organizations';
@@ -48,7 +49,7 @@ export default function OrgArtistList() {
       key: 'joined',
       header: t('artistColJoined'),
       render: (artist) => (
-        <span className="text-brand-700">{new Date(artist.createdAt).toLocaleDateString('tr-TR')}</span>
+        <span className="text-brand-700">{new Date(artist.createdAt).toLocaleDateString(currentIntlLocale())}</span>
       ),
     },
     {

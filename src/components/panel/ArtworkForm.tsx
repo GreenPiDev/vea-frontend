@@ -1,3 +1,4 @@
+import { currentIntlLocale } from '../../lib/i18n';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_CURRENCIES, type SupportedCurrency } from '../../lib/currencies';
@@ -170,7 +171,7 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
   const discountPct = Number(maxDiscountPercent);
   const minOfferLabel =
     maxDiscountPercent && priceAmount && !Number.isNaN(priceMajor) && !Number.isNaN(discountPct)
-      ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency }).format(
+      ? new Intl.NumberFormat(currentIntlLocale(), { style: 'currency', currency }).format(
           Math.ceil(priceMajor * 100 * (1 - discountPct / 100)) / 100
         )
       : null;

@@ -1,3 +1,4 @@
+import { currentIntlLocale } from '../../lib/i18n';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -18,7 +19,7 @@ function renderMessage(n: ApiNotification, t: (key: string, opts?: Record<string
   const payload = n.payload;
   switch (n.type) {
     case 'OFFER_CREATED': {
-      const amount = new Intl.NumberFormat('tr-TR', {
+      const amount = new Intl.NumberFormat(currentIntlLocale(), {
         style: 'currency',
         currency: String(payload.currency ?? 'TRY'),
       }).format(Number(payload.amount ?? 0) / 100);

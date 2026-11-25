@@ -1,3 +1,4 @@
+import { currentIntlLocale } from '../lib/i18n';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Artwork } from './3d/artworks';
@@ -74,7 +75,7 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose, full
 
   const priceLabel =
     artwork.priceAmount != null && artwork.currency
-      ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: artwork.currency }).format(
+      ? new Intl.NumberFormat(currentIntlLocale(), { style: 'currency', currency: artwork.currency }).format(
           artwork.priceAmount / 100,
         )
       : null;
@@ -91,7 +92,7 @@ export default function ArtworkDetailCard({ artwork, exhibitionId, onClose, full
   const belowMinimum = minAmountMajor != null && amount !== '' && enteredAmount < minAmountMajor;
   const minAmountLabel =
     minAmountMajor != null && artwork.currency
-      ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: artwork.currency }).format(minAmountMajor)
+      ? new Intl.NumberFormat(currentIntlLocale(), { style: 'currency', currency: artwork.currency }).format(minAmountMajor)
       : null;
 
   function handleSubmitOffer(e: FormEvent) {

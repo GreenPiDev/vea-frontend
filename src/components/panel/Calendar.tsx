@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { intlLocale } from '../../lib/language';
 
 interface CalendarProps {
   value: string;
@@ -35,7 +36,7 @@ function isSameDay(a: Date, b: Date): boolean {
 // palette instead of the OS/browser chrome.
 export default function Calendar({ value, onSelect, onClose }: CalendarProps) {
   const { i18n, t } = useTranslation();
-  const locale = i18n.language === 'en' ? 'en-US' : 'tr-TR';
+  const locale = intlLocale(i18n.language);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selected = parseIso(value);
