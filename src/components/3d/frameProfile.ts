@@ -243,19 +243,51 @@ export function getFrameGeometry(style: FrameStyle, canvasW: number, canvasH: nu
  * bare primed canvas (Artwork.tsx's side material — the photo has nothing to show there; stretching its edge
  * pixels read as streaks). `uv1` is in metres / `weaveTile` for the linen weave normal map.
  * Face at z = 0, back at −depth.
+ *
+ * `border` (m per side, x/y): a framed work's photo already shows its frame — the face is then split into
+ * the inner canvas (group 0, woven) and a border ring (group 2, its own material without the weave), so
+ * the canvas texture doesn't show on the photographed frame. uv stays continuous across the split.
  */
-export function buildStretchedCanvasGeometry(width: number, height: number, weaveTile: number, depth = STRETCHER_DEPTH): THREE.BufferGeometry {
+export function buildStretchedCanvasGeometry(
+  width: number,
+  height: number,
+  weaveTile: number,
+  depth = STRETCHER_DEPTH,
+  border: { x: number; y: number } = { x: 0, y: 0 }
+): THREE.BufferGeometry {
   const w = width / 2;
   const h = height / 2;
   const d = -depth;
+  const bx = Math.min(Math.max(border.x, 0), w * 0.45);
+  const by = Math.min(Math.max(border.y, 0), h * 0.45);
+  const hasBorder = bx > 0 || by > 0;
+  type Quad = { p: [number, number, number][]; n: [number, number, number]; uv: [number, number][] };
+  // A flat face rectangle (x0..x1, y0..y1) with uvs mapped from its position on the whole face.
+  const faceQuad = (x0: number, y0: number, x1: number, y1: number): Quad => {
+    const u = (x: number) => (x + w) / width;
+    const v = (y: number) => (y + h) / height;
+    return {
+      p: [[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]],
+      n: [0, 0, 1],
+      uv: [[u(x0), v(y0)], [u(x1), v(y0)], [u(x1), v(y1)], [u(x0), v(y1)]],
+    };
+  };
   // Each quad: 4 corners (counter-clockwise seen from outside), its normal, 4 uvs.
-  const quads: { p: [number, number, number][]; n: [number, number, number]; uv: [number, number][] }[] = [
-    { p: [[-w, -h, 0], [w, -h, 0], [w, h, 0], [-w, h, 0]], n: [0, 0, 1], uv: [[0, 0], [1, 0], [1, 1], [0, 1]] },
+  const quads: Quad[] = [
+    faceQuad(-w + bx, -h + by, w - bx, h - by),
     { p: [[-w, h, 0], [w, h, 0], [w, h, d], [-w, h, d]], n: [0, 1, 0], uv: [[0, 1], [1, 1], [1, 1], [0, 1]] },
     { p: [[-w, -h, d], [w, -h, d], [w, -h, 0], [-w, -h, 0]], n: [0, -1, 0], uv: [[0, 0], [1, 0], [1, 0], [0, 0]] },
     { p: [[-w, -h, d], [-w, -h, 0], [-w, h, 0], [-w, h, d]], n: [-1, 0, 0], uv: [[0, 0], [0, 0], [0, 1], [0, 1]] },
     { p: [[w, -h, 0], [w, -h, d], [w, h, d], [w, h, 0]], n: [1, 0, 0], uv: [[1, 0], [1, 0], [1, 1], [1, 1]] },
   ];
+  if (hasBorder) {
+    quads.push(
+      faceQuad(-w, h - by, w, h), // top strip
+      faceQuad(-w, -h, w, -h + by), // bottom strip
+      faceQuad(-w, -h + by, -w + bx, h - by), // left
+      faceQuad(w - bx, -h + by, w, h - by) // right
+    );
+  }
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
@@ -281,6 +313,7 @@ export function buildStretchedCanvasGeometry(width: number, height: number, weav
   g.setAttribute("uv1", new THREE.Float32BufferAttribute(uv1, 2));
   g.setIndex(index);
   g.addGroup(0, 6, 0);
-  g.addGroup(6, index.length - 6, 1);
+  g.addGroup(6, 24, 1);
+  if (hasBorder) g.addGroup(30, 24, 2);
   return g;
 }

@@ -8,6 +8,7 @@ import type { SeatSpot } from "./seating";
 import { angleDelta, clearNavigation, type NavigationRequest } from "./clickNavigationGeometry";
 import { collidesOnLevel, floorYAt, levelAt, levelNav, moveOnLevels, stepTowardOnLevels } from "./levels";
 import type { NavigationMode } from "../../lib/navigationMode";
+import { addMouseMovement, applyPitch, consumeLook } from "./mouseLookSmoothing";
 
 /**
  * WASD pace (m/s). A calm museum stroll (~2 m/s with the narrower camera, see cameraFov.ts) — the old
@@ -50,7 +51,7 @@ interface PlayerProps {
 
 /** First-person controller: WASD move + wall collision, plus either pointer-lock look or click-to-go. */
 export default function Player({ onLockChange, seatedSpot, navigationMode, navigation }: PlayerProps) {
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   const { layout } = useExhibition();
   // Collider sets per walking level (one level unless the room has a mezzanine, levels.ts). A routed walk may
   // pass through furniture, never through a wall (that's how a visitor ended up outside the room).
@@ -81,6 +82,21 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
   useEffect(() => {
     if (navigationMode !== "walk" && document.pointerLockElement) document.exitPointerLock();
   }, [navigationMode]);
+
+  // Smoothed mouse-look (mouseLookSmoothing.ts): PointerLockControls below only handles the lock itself
+  // (pointerSpeed 0); mouse motion is collected here and eased into the camera in useFrame.
+  const pendingLook = useRef({ yaw: 0, pitch: 0 });
+  useEffect(() => {
+    pendingLook.current.yaw = 0;
+    pendingLook.current.pitch = 0;
+    if (navigationMode !== "walk") return;
+    const onMove = (e: MouseEvent) => {
+      if (document.pointerLockElement !== gl.domElement) return;
+      addMouseMovement(pendingLook.current, e.movementX, e.movementY);
+    };
+    document.addEventListener("mousemove", onMove);
+    return () => document.removeEventListener("mousemove", onMove);
+  }, [navigationMode, gl]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => setKey(e.code, true);
@@ -117,6 +133,12 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
   const rightDir = useRef(new THREE.Vector3());
 
   useFrame((_, delta) => {
+    const look = pendingLook.current;
+    if (look.yaw !== 0 || look.pitch !== 0) {
+      const step = consumeLook(look, delta);
+      camera.rotation.set(applyPitch(camera.rotation.x, step.pitch, look), camera.rotation.y + step.yaw, 0);
+    }
+
     if (seatedSpot) {
       // Sitting overrides any walk in progress.
       clearNavigation(navigation);
@@ -276,6 +298,8 @@ export default function Player({ onLockChange, seatedSpot, navigationMode, navig
       // behind it, hijacking the mouse into camera look while that UI is
       // still open.
       selector="#gallery-canvas-wrapper"
+      // Lock only — the look itself is smoothed in useFrame above (mouseLookSmoothing.ts).
+      pointerSpeed={0}
       onLock={() => onLockChange?.(true)}
       onUnlock={() => onLockChange?.(false)}
     />

@@ -43,3 +43,14 @@ export function artworkDisplaySize(artwork: ArtworkSizeInput): { height: number;
 export function artworkDisplayHeight(artwork: ArtworkSizeInput): number {
   return artworkDisplaySize(artwork).height;
 }
+
+/**
+ * Framed works: the share of the displayed image's width (x) and height (y) on each side that is the
+ * photographed frame, from the same estimate artworkDisplaySize adds — {0, 0} for an unframed work.
+ * Artwork.tsx keeps the canvas weave off that border so it doesn't show on the frame.
+ */
+export function frameBorderFraction(artwork: ArtworkSizeInput): { x: number; y: number } {
+  const frame = estimatedFrameCm(artwork);
+  if (!frame) return { x: 0, y: 0 };
+  return { x: frame / (artwork.widthCm + 2 * frame), y: frame / (artwork.heightCm + 2 * frame) };
+}

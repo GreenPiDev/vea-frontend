@@ -5,6 +5,7 @@ import type { Artwork as ArtworkData, FrameStyle } from "./artworks";
 import { FRAME_TEXTURES } from "./frameTextures";
 import { buildStretchedCanvasGeometry, canvasZ, getFrameGeometry } from "./frameProfile";
 import { WEAVE_TILE_METERS, getCanvasWeaveNormalMap } from "./canvasWeave";
+import { frameBorderFraction } from "./artworkDisplayScale";
 import { cropToUvTransform, measureImageCrop } from "./artworkImageCrop";
 import WallLabel from "./WallLabel";
 import { LABEL_WALL_Z, LABEL_WIDTH, type LabelLayout, type LabelPlacement } from "./wallLabelLayout";
@@ -27,6 +28,10 @@ const CANVAS_NORMAL_SCALE = new THREE.Vector2(0.35, 0.35);
 // stronger than on the varnished face.
 const CANVAS_SIDE_COLOR = "#ddd3bf";
 const CANVAS_SIDE_NORMAL_SCALE = new THREE.Vector2(0.6, 0.6);
+
+// The photographed frame around a `framed: true` work's image: same photo, no canvas weave (it would show as
+// linen on the moulding). A touch glossier than the canvas — most frames are lacquered/gilded.
+const PHOTO_FRAME_ROUGHNESS = 0.4;
 
 // Canvas, canvas sides, frame and label each own their material (sharing textures and the compiled
 // program): it carries the lamps that light that one painting as uniforms (pictureLightMaterial.ts).
@@ -82,8 +87,18 @@ export default function Artwork({
   // Second UV set in meters/tile for the weave (see canvasWeave.ts) — the color map keeps the 0..1 `uv`.
   // An unframed work is a stretched canvas with depth (frameProfile.ts), a framed one a plane in the rebate.
   const framed = Boolean(data.frame);
+  // A backend `framed: true` work: the outer strip of its photo is the frame (same estimate that enlarged it).
+  const border = useMemo(
+    () => (data.heightCm && data.widthCm ? frameBorderFraction({ heightCm: data.heightCm, widthCm: data.widthCm, framed: data.framed }) : { x: 0, y: 0 }),
+    [data.heightCm, data.widthCm, data.framed]
+  );
+  const hasPhotoFrame = !framed && (border.x > 0 || border.y > 0);
   const canvasGeometry = useMemo(() => {
-    if (!framed) return buildStretchedCanvasGeometry(width, data.height, WEAVE_TILE_METERS);
+    if (!framed)
+      return buildStretchedCanvasGeometry(width, data.height, WEAVE_TILE_METERS, undefined, {
+        x: border.x * width,
+        y: border.y * data.height,
+      });
     const geometry = new THREE.PlaneGeometry(width, data.height);
     const uv1 = geometry.attributes.uv.clone();
     for (let i = 0; i < uv1.count; i++) {
@@ -91,7 +106,7 @@ export default function Artwork({
     }
     geometry.setAttribute("uv1", uv1);
     return geometry;
-  }, [width, data.height, framed]);
+  }, [width, data.height, framed, border]);
   useEffect(() => () => canvasGeometry.dispose(), [canvasGeometry]);
 
   // Receives its picture lamp(s), window daylight and sun patches, not the ceiling fixtures (pictureLightMaterial.ts).
@@ -120,6 +135,17 @@ export default function Artwork({
     return material;
   }, [framed, paintingLights]);
   useEffect(() => () => sideMaterial?.dispose(), [sideMaterial]);
+  const photoFrameMaterial = useMemo(() => {
+    if (!hasPhotoFrame) return null;
+    const material = new THREE.MeshStandardMaterial({ map: texture, roughness: PHOTO_FRAME_ROUGHNESS, metalness: 0 });
+    applyPictureLight(material, paintingLights, { ceiling: false });
+    return material;
+  }, [hasPhotoFrame, texture, paintingLights]);
+  useEffect(() => () => photoFrameMaterial?.dispose(), [photoFrameMaterial]);
+  const canvasMaterials = useMemo(() => {
+    if (!sideMaterial) return canvasMaterial;
+    return photoFrameMaterial ? [canvasMaterial, sideMaterial, photoFrameMaterial] : [canvasMaterial, sideMaterial];
+  }, [canvasMaterial, sideMaterial, photoFrameMaterial]);
 
   return (
     <group position={data.position} rotation={[0, data.rotationY, 0]}>
@@ -130,7 +156,7 @@ export default function Artwork({
       <mesh
         position={[0, 0, canvasZ(data.frame)]}
         geometry={canvasGeometry}
-        material={sideMaterial ? [canvasMaterial, sideMaterial] : canvasMaterial}
+        material={canvasMaterials}
       />
 
       {/* Wall label — its back flat on the wall face. */}

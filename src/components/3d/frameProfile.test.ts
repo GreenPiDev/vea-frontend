@@ -166,3 +166,40 @@ describe("frame profiles", () => {
     expect(getFrameGeometry("gold", 1, 1, 0.6)).not.toBe(getFrameGeometry("walnut", 1, 1, 0.6));
   });
 });
+
+describe("stretched canvas with a photographed frame border", () => {
+  it("splits the face into a woven canvas and a weave-free border ring with continuous uvs", () => {
+    const W = 1.0, H = 0.8, BX = 0.1, BY = 0.08;
+    const g = buildStretchedCanvasGeometry(W, H, 0.1, undefined, { x: BX, y: BY });
+    expect(g.groups).toEqual([
+      { start: 0, count: 6, materialIndex: 0 },
+      { start: 6, count: 24, materialIndex: 1 },
+      { start: 30, count: 24, materialIndex: 2 },
+    ]);
+    const pos = g.getAttribute("position");
+    const uv = g.getAttribute("uv");
+    const idx = g.getIndex()!;
+    let faceArea = 0;
+    let innerArea = 0;
+    for (const group of [g.groups[0], g.groups[2]]) {
+      for (let t = group.start; t < group.start + group.count; t += 3) {
+        const p = [0, 1, 2].map((k) => idx.getX(t + k)).map((v) => new THREE.Vector3(pos.getX(v), pos.getY(v), pos.getZ(v)));
+        const a = p[1].clone().sub(p[0]).cross(p[2].clone().sub(p[0]));
+        expect(a.z).toBeGreaterThan(0); // faces the room
+        faceArea += a.length() / 2;
+        if (group.materialIndex === 0) innerArea += a.length() / 2;
+      }
+      for (let t = group.start; t < group.start + group.count; t++) {
+        const v = idx.getX(t);
+        expect(uv.getX(v)).toBeCloseTo((pos.getX(v) + W / 2) / W, 6);
+        expect(uv.getY(v)).toBeCloseTo((pos.getY(v) + H / 2) / H, 6);
+      }
+    }
+    expect(faceArea).toBeCloseTo(W * H, 6); // ring + inner tile the face, no overlap/gap
+    expect(innerArea).toBeCloseTo((W - 2 * BX) * (H - 2 * BY), 6);
+  });
+
+  it("keeps the plain two-group layout without a border", () => {
+    expect(buildStretchedCanvasGeometry(1, 1, 0.1).groups).toHaveLength(2);
+  });
+});
