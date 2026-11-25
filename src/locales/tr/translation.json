@@ -71,6 +71,8 @@
   "artworkFormPrice": "Fiyat",
   "artworkFormMaxDiscount": "Maksimum İskonto (%)",
   "artworkFormMaxDiscountPlaceholder": "Sınırsız (opsiyonel)",
+  "artworkFormMaxDiscountHint": "En fazla %{{max}} iskonto girilebilir",
+  "artworkFormMaxDiscountError": "İskonto oranı en fazla %{{max}} olabilir",
   "artworkFormMinOfferHint": "Bu esere verilebilecek minimum teklif: {{amount}}",
   "artworkFormCurrency": "Para Birimi",
   "artworkFormImage": "Görsel",

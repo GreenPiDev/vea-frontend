@@ -71,6 +71,8 @@
   "artworkFormPrice": "Price",
   "artworkFormMaxDiscount": "Maximum Discount (%)",
   "artworkFormMaxDiscountPlaceholder": "Unlimited (optional)",
+  "artworkFormMaxDiscountHint": "Up to {{max}}% discount allowed",
+  "artworkFormMaxDiscountError": "Discount can be at most {{max}}%",
   "artworkFormMinOfferHint": "Minimum offer allowed on this artwork: {{amount}}",
   "artworkFormCurrency": "Currency",
   "artworkFormImage": "Image",

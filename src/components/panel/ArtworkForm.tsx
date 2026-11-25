@@ -11,6 +11,7 @@ import {
 } from '../../lib/api/domains/artworks';
 import { useMyArtistProfile } from '../../lib/api/domains/artistProfiles';
 import { ApiError } from '../../lib/api/client';
+import { isValidDiscountInput, MAX_DISCOUNT_PERCENT } from '../../lib/artworkDiscount';
 import LoadingScreen from '../common/LoadingScreen';
 
 const ALLOWED_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -116,6 +117,11 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
 
     const onError = (err: unknown) => setError(err instanceof ApiError ? err.message : t('artworkFormError'));
 
+    if (!isValidDiscountInput(maxDiscountPercent)) {
+      setError(t('artworkFormMaxDiscountError', { max: MAX_DISCOUNT_PERCENT }));
+      return;
+    }
+
     let finalImageUrl = imageUrl;
     if (imageFile) {
       try {
@@ -169,8 +175,9 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
   // ArtworkDetailCard.tsx's buyer-facing minimum-amount warning.
   const priceMajor = Number(priceAmount);
   const discountPct = Number(maxDiscountPercent);
+  const discountValid = isValidDiscountInput(maxDiscountPercent);
   const minOfferLabel =
-    maxDiscountPercent && priceAmount && !Number.isNaN(priceMajor) && !Number.isNaN(discountPct)
+    discountValid && maxDiscountPercent && priceAmount && !Number.isNaN(priceMajor) && !Number.isNaN(discountPct)
       ? new Intl.NumberFormat(currentIntlLocale(), { style: 'currency', currency }).format(
           Math.ceil(priceMajor * 100 * (1 - discountPct / 100)) / 100
         )
@@ -344,13 +351,20 @@ export default function ArtworkForm({ editing, onDone }: ArtworkFormProps) {
         <input
           type="number"
           min={0}
-          max={100}
           step={1}
           value={maxDiscountPercent}
           onChange={(e) => setMaxDiscountPercent(e.target.value)}
           placeholder={t('artworkFormMaxDiscountPlaceholder')}
-          className="w-40 rounded-md border border-brand-300 bg-white px-3 py-2 text-sm text-brand-900 outline-none focus:border-brand-500"
+          aria-invalid={!discountValid}
+          className={`w-40 rounded-md border bg-white px-3 py-2 text-sm text-brand-900 outline-none ${
+            discountValid ? 'border-brand-300 focus:border-brand-500' : 'border-red-500 focus:border-red-600'
+          }`}
         />
+        {discountValid ? (
+          <span className="text-xs text-brand-600">{t('artworkFormMaxDiscountHint', { max: MAX_DISCOUNT_PERCENT })}</span>
+        ) : (
+          <span className="text-xs text-red-600">{t('artworkFormMaxDiscountError', { max: MAX_DISCOUNT_PERCENT })}</span>
+        )}
         {minOfferLabel && <span className="text-xs text-brand-600">{t('artworkFormMinOfferHint', { amount: minOfferLabel })}</span>}
       </label>
 
