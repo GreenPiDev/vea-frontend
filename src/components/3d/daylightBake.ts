@@ -315,3 +315,13 @@ export function bumpDaylightRevision(): void {
 export function daylightRevision(): number {
   return revision;
 }
+
+/**
+ * True while `target` holds GPU memory. The owner (GalleryRoom) disposes its targets in an effect cleanup, and
+ * React's StrictMode (dev) runs that cleanup once right after mount while the memoised target lives on: the
+ * first bake was freed and the "already baked" check never re-baked — the lamps lit for one frame, then went
+ * dark until a reload (2026-11-25). A disposed target is re-allocated on its next bind, so re-baking is enough.
+ */
+export function isTargetAllocated(gl: THREE.WebGLRenderer, target: THREE.WebGLRenderTarget): boolean {
+  return (gl.properties.get(target) as { __webglFramebuffer?: unknown }).__webglFramebuffer !== undefined;
+}

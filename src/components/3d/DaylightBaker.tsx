@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { buildBakeGeometry, daylightRevision, type DaylightAtlas } from "./daylightBake";
+import { buildBakeGeometry, daylightRevision, isTargetAllocated, type DaylightAtlas } from "./daylightBake";
 import { WINDOW_LIGHT_FRAGMENT_DECL, windowLightUniforms } from "./windowLight";
 import { SUN_LIGHT_FRAGMENT_DECL, sunLightUniforms } from "./sunLight";
 
@@ -78,10 +78,14 @@ export default function DaylightBaker({
   );
 
   const baked = useRef<{ revision: number; target: THREE.WebGLRenderTarget; scene: THREE.Scene } | null>(null);
+  // StrictMode's mount → cleanup → mount disposes the target after it was handed over (isTargetAllocated):
+  // the remount asks for a frame so the re-bake happens right away, not on the next camera move.
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => invalidate(), [target, invalidate]);
   useFrame(() => {
     const revision = daylightRevision();
     const last = baked.current;
-    if (last && last.revision === revision && last.target === target && last.scene === scene) return;
+    if (last && last.revision === revision && last.target === target && last.scene === scene && isTargetAllocated(gl, target)) return;
     const previousTarget = gl.getRenderTarget();
     const previousClear = gl.getClearColor(new THREE.Color());
     const previousAlpha = gl.getClearAlpha();

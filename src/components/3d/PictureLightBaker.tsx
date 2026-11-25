@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { buildRectBakeGeometry } from "./daylightBake";
+import { buildRectBakeGeometry, isTargetAllocated } from "./daylightBake";
 import { PICTURE_LIGHT_FUNCTIONS, pictureLampUniform, type PictureLightPlacement } from "./pictureLight";
 import type { PictureLightAtlas } from "./pictureLightBake";
 
@@ -87,9 +87,12 @@ export default function PictureLightBaker({
   );
 
   const baked = useRef<{ target: THREE.WebGLRenderTarget; scene: THREE.Scene } | null>(null);
+  // Re-bake when the target was freed under us (StrictMode, see isTargetAllocated) — and ask for that frame.
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => invalidate(), [target, invalidate]);
   useFrame(() => {
     const last = baked.current;
-    if (last && last.target === target && last.scene === bake.scene) return;
+    if (last && last.target === target && last.scene === bake.scene && isTargetAllocated(gl, target)) return;
     const previousTarget = gl.getRenderTarget();
     const previousClear = gl.getClearColor(new THREE.Color());
     const previousAlpha = gl.getClearAlpha();

@@ -13,8 +13,7 @@ import {
   daylightRevision,
   rectUv,
   type AtlasRect,
-  type DaylightAtlas,
-} from "./daylightBake";
+  type DaylightAtlas, isTargetAllocated } from "./daylightBake";
 import { setWindowLights } from "./windowLight";
 import { setSunLight } from "./sunLight";
 import { writeSunOccluderUniforms } from "./sunOccluders";
@@ -137,5 +136,29 @@ describe("re-bake trigger", () => {
     setSunLight({ direction: null, color: [0, 0, 0], windows: [] });
     writeSunOccluderUniforms([]);
     expect(daylightRevision()).toBeGreaterThanOrEqual(r0 + 3);
+  });
+});
+
+describe("isTargetAllocated", () => {
+  // Stands in for three's WebGLProperties: a bound target gets __webglFramebuffer, dispose() removes the entry.
+  const fakeGl = (props: WeakMap<object, Record<string, unknown>>) =>
+    ({
+      properties: {
+        get: (o: object) => {
+          if (!props.has(o)) props.set(o, {});
+          return props.get(o)!;
+        },
+      },
+    }) as unknown as THREE.WebGLRenderer;
+
+  it("re-bakes a target that was freed after its bake (StrictMode's mount → cleanup → mount)", () => {
+    const props = new WeakMap<object, Record<string, unknown>>();
+    const gl = fakeGl(props);
+    const target = new THREE.WebGLRenderTarget(4, 4);
+    expect(isTargetAllocated(gl, target)).toBe(false);
+    props.get(target)!.__webglFramebuffer = {};
+    expect(isTargetAllocated(gl, target)).toBe(true);
+    props.delete(target); // what WebGLTextures does on the target's "dispose" event
+    expect(isTargetAllocated(gl, target)).toBe(false);
   });
 });

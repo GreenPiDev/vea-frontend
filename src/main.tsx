@@ -1,4 +1,4 @@
-import { StrictMode, Suspense, lazy } from 'react'
+import { Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
@@ -113,8 +113,12 @@ const queryClient = new QueryClient({
   }),
 })
 
+// No StrictMode: @react-three/fiber bridges it into every Canvas (the exhibition scene in App and the panel's
+// preview in Dashboard), and its dev-only mount → cleanup → mount freed the room's baked light maps
+// (picture-lamp wash, ceiling-fixture light) after their one-shot bake — locally the room rendered darker than
+// production (2026-11-25). Production never ran StrictMode's double effects anyway.
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+  <>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
@@ -136,5 +140,5 @@ createRoot(document.getElementById('root')!).render(
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
-  </StrictMode>,
+  </>,
 )
